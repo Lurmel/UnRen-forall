@@ -1,3 +1,9 @@
+### 🔖 Versions
+
+![UnRen-forall](https://img.shields.io/badge/UnRen--forall-0.28-blue)
+![UnRen-legacy](https://img.shields.io/badge/UnRen--legacy-9.6.43-green)
+![UnRen-current](https://img.shields.io/badge/UnRen--current-9.6.57-purple)
+
 # 🎮 UnRen Toolkit — Multilingual Batch Launcher for Ren'Py Games
 
 I've made these scripts with ❤️ to simplify the management of your favorite Ren'Py games.
