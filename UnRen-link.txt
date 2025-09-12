@@ -6,7 +6,7 @@
 :: NO ELIMINE ESTAS LÍNEAS, SON NECESARIAS PARA LA ACTUALIZACIÓN AUTOMÁTICA.
 :: DIESE ZEILEN NICHT LÖSCHEN, SIE SIND FÜR DIE AUTOMATISCHE AKTUALISIERUNG ERFORDERLICH.
 :: ВЫ НЕ ДОЛЖНЫ УДАЛЯТЬ ЭТИ СТРОКИ, ОНИ НЕОБХОДИМЫ ДЛЯ АВТОМАТИЧЕСКОГО ОБНОВЛЕНИЯ.
-set "https://drive.google.com/uc?export=download&id=1S0csnTe8SGW1gmIcVrRvrAbrRNc9XMrP"
+set "forall_url=https://drive.google.com/uc?export=download&id=1S0csnTe8SGW1gmIcVrRvrAbrRNc9XMrP"
 
 
 >"%scriptdir%/UnRen-Changelog.txt" (
