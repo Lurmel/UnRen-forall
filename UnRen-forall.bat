@@ -7,7 +7,7 @@ setlocal EnableDelayedExpansion
 :: DO NOT MODIFY BELOW THIS LINE unless you know what you're doing
 :: Define various global names
 set "name=forall"
-set "version=%name% (v0.28) (09/012/25)"
+set "version=%name% (v0.28) (09/12/25)"
 title UnRen-%name%.bat - %version%
 set "URL_REF=https://f95zone.to/threads/unrengui-unren-forall-v9-4-unren-powershell-forall-v9-4-unren-old.92717/post-17110063/"
 set "SCRIPTDIR=%~dp0"
@@ -1912,8 +1912,6 @@ if %debuglevel% equ 1 echo powershell.exe -nologo -noprofile -noninteractive -co
 powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%upd_url%', '%TEMP%\%upd_link%.tmp')" %debugredir%
 if not exist "%TEMP%\%upd_link%.tmp" (
     echo %RED% !FAIL.%LNG%! %YEL%!cupd6.%LNG%!%RES%
-    echo.
-    pause
     exit /b
 ) else (
     :: First time

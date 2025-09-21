@@ -3,8 +3,19 @@
 ![UnRen-forall](https://img.shields.io/badge/UnRen--forall-0.28-blue)
 ![UnRen-legacy](https://img.shields.io/badge/UnRen--legacy-9.6.43-green)
 ![UnRen-current](https://img.shields.io/badge/UnRen--current-9.6.57-purple)
+![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
 
-# 🎮 UnRen Toolkit — Multilingual Batch Launcher for Ren'Py Games
+## 📑 Table of Contents
+
+- [🔧 Features](#-features)
+- [🛠️ Installation](#-installation)
+- [⚙️ Options](#-options)
+- [🤝 Contributing](#-contributing)
+- [❓ FAQ](#-faq)
+- [📜 Changelog](#-changelog)
+- [📄 License](#license)
+
+# 🎮 UnRen Toolkit — Multilingual Batch for Ren'Py Games
 
 I've made these scripts with ❤️ to simplify the management of your favorite Ren'Py games.
 
@@ -27,7 +38,7 @@ What started as a simple launcher evolved into a multilingual toolkit with custo
 - Automatic detection of Ren'Py version
 - Launches the appropriate batch script (`legacy` or `current`)
 - Multilingual interface: 🇩🇪 🇬🇧 🇪🇸 🇫🇷 🇮🇹 🇷🇺
-- Independent options not tied to Ren'Py (e.g. cleanup, extraction)
+- Independent options not tied to Ren'Py (e.g. unpacking, extraction)
 - Configurable behavior via `UnRen-cfg.bat`
 - Update system with changelog display
 
@@ -35,7 +46,7 @@ What started as a simple launcher evolved into a multilingual toolkit with custo
 
 ## 🛠️ How to Use
 
-1. Place the batch files in your Ren'Py game directory
+1. Place the batch files in your Ren'Py game directory or a directory of your choice (preferably)
 2. Run `UnRen-forall.bat`
 3. Follow the prompts in your preferred language
 4. (Optional) Use `UnRen-cfg.bat` to customize default options and language
@@ -51,4 +62,31 @@ The launcher checks `UnRen-link.txt` for updates and displays a changelog if a n
 ## 🧠 Notes
 
 This project is designed to be lightweight, user-friendly, and respectful of your time. No installation required, no dependencies — just run and go.
+
+---
+
+## ❓ FAQ
+
+See [FAQ.md](FAQ.md) for answers to common questions.
+
+---
+
+## 📜 Changelog
+
+See [Changelog.md](Changelog.md) for version history and updates.
+
+---
+
+## 📄 Disclaimer
+
+This tool is intended for use with files on which the authors allowed modification of and/or extraction from ONLY and the unauthorized use on files where such consent was not given is highly discouraged, and most likely a license violation as well. Support requests for help with dealing with such files will not be answered.
+
+---
+
+## 📄 License
+
+This project is licensed under the GNU General Public License v3.0.
+You are free to use, modify, and distribute it under the same terms.
+Commercial use is not permitted unless the source remains open and licensed under GPL.
+See the [LICENSE](LICENSE) file for full details.
 
