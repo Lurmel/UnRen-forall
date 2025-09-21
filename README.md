@@ -12,8 +12,8 @@
 - [🛠️ How to Use](#how-to-use)
 - [❓ FAQ](#-faq)
 - [📜 Changelog](#-changelog)
-- [📄 Disclaimer](#-disclaimer)
-- [📄 License](#-license)
+- [⚠️ Disclaimer](#disclaimer)
+- [⚖️ License](#license)
 
 # 🎮 UnRen Toolkit — Multilingual Batch for Ren'Py Games
 
@@ -78,18 +78,21 @@ See [Changelog.md](Changelog.md) for version history and updates.
 
 ---
 
-## 📄 Disclaimer
+<a name="disclaimer"></a>
+## ⚠️ Disclaimer
 
 This tool is intended for use with files on which the authors allowed modification of and/or extraction from ONLY and the unauthorized use on files where such consent was not given is highly discouraged, and most likely a license violation as well. Support requests for help with dealing with such files will not be answered.
 
 ---
 
-## 📄 License
+<a name="license"></a>
+## ⚖️ License
 
 This project is licensed under the GNU General Public License v3.0.
 You are free to use, modify, and distribute it under the same terms.
 Commercial use is not permitted unless the source remains open and licensed under GPL.
 See the [LICENSE](LICENSE) file for full details.
+
 
 
 
