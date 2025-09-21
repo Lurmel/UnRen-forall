@@ -8,12 +8,12 @@
 ## 📑 Table of Contents
 
 - [🔧 Features](#-features)
-- [🛠️ Installation](#-installation)
 - [⚙️ Options](#-options)
-- [🤝 Contributing](#-contributing)
+- [🛠️ How to Use](#-how)
 - [❓ FAQ](#-faq)
 - [📜 Changelog](#-changelog)
-- [📄 License](#license)
+- [📄 Disclaimer](#-disclaimer)
+- [📄 License](#-license)
 
 # 🎮 UnRen Toolkit — Multilingual Batch for Ren'Py Games
 
@@ -89,4 +89,5 @@ This project is licensed under the GNU General Public License v3.0.
 You are free to use, modify, and distribute it under the same terms.
 Commercial use is not permitted unless the source remains open and licensed under GPL.
 See the [LICENSE](LICENSE) file for full details.
+
 
