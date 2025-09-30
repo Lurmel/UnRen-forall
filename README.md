@@ -4,7 +4,7 @@
 ![UnRen-legacy](https://img.shields.io/badge/UnRen--legacy-9.6.43-green)
 ![UnRen-current](https://img.shields.io/badge/UnRen--current-9.7.14-purple)
 ![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
-![Downloads](https://img.shields.io/github/downloads/Lurmel/UnRen-forall.bat/total)
+![Downloads](https://img.shields.io/github/downloads/Lurmel/UnRen-forall/total)
 
 
 ## 📑 Table of Contents
@@ -94,6 +94,7 @@ This project is licensed under the GNU General Public License v3.0.
 You are free to use, modify, and distribute it under the same terms.
 Commercial use is not permitted unless the source remains open and licensed under GPL.
 See the [LICENSE](LICENSE) file for full details.
+
 
 
 
