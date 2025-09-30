@@ -58,8 +58,8 @@ Specific for UnRen-current.bat:
   - Universal Unlock Gallery (ZLZK)
   - Change MC name if named `mcname`
   - Renamed:
-  - `UnRen-forall.bat v9.6.43` → `UnRen-legacy.bat`
-  - `UnRen-forall.bat v9.6.57` → `UnRen-current.bat`
+    - `UnRen-forall.bat v9.6.43` → `UnRen-legacy.bat`
+    - `UnRen-forall.bat v9.6.57` → `UnRen-current.bat`
   - Minor bug fixes and initial cleanup (not finalized)
 
 ---
@@ -143,4 +143,5 @@ Specific for UnRen-current.bat:
 ---
 
 If you encounter any issues, please refer to the `UnRen-forall.log` file and let me know. I’ll make corrections as needed.
+
 
