@@ -1,6 +1,54 @@
 @echo off
 setlocal EnableDelayedExpansion
 
+:: UnRen-current.bat - UnRen Script for Ren'Py >= 8
+:: heavily modified by (SM) aka JoeLurmel @ f95zone.to
+:: This script is licensed under GNU GPL v3 — see LICENSE for details
+
+:: DO NOT MODIFY BELOW THIS LINE unless you know what you're doing
+:: Define various global names
+set "NAME=current"
+set "VERSION=(v9.7.14) (09/30/25)"
+title UnRen-%NAME%.bat - %VERSION%
+set "URL_REF=https://f95zone.to/threads/unrengui-unren-forall-v9-4-unren-powershell-forall-v9-4-unren-old.92717/post-17110063/"
+set "SCRIPTDIR=%~dp0"
+set "UPD_TDIR=%TEMP%\UnRenUpdate"
+set "SCRIPTNAME=%~nx0"
+set "BASENAME=%SCRIPTNAME:.bat=%"
+set "UNRENLOG=%TEMP%\UnRen-forall.log"
+if exist "%UNRENLOG%" del /f /q "%UNRENLOG%" >nul 2>&1
+for /f "skip=1 tokens=1" %%a in ('wmic os get LocalDateTime') do (
+    set datetime=%%a
+    goto :break
+)
+:break
+:: Parse the datetime string
+set year=!datetime:~0,4!
+set month=!datetime:~4,2!
+set day=!datetime:~6,2!
+set hour=!datetime:~8,2!
+set minute=!datetime:~10,2!
+set second=!datetime:~12,2!
+set formatted_date=!month!/!day!/!year:~2,2!
+set formatted_time=!hour!:!minute!:!second!
+
+:: Start the Log
+echo. >> "%UNRENLOG%"
+echo UnRen-%name%.bat !formatted_date! started at !formatted_time! >> "%UNRENLOG%"
+echo. >> "%UNRENLOG%"
+
+:: External configuration file for LNG, MDEFS and MDEFS2.
+set "UNREN_CFG=%SCRIPTDIR%UnRen-cfg.bat"
+:: Load external configuration
+if exist "%UNREN_CFG%" (
+    call "%UNREN_CFG%"
+    if defined LNG goto lngtest
+) else (
+    :: Set default values in case of missing configuration
+    set "MDEFS=acefg"
+    set "MDEFS2=12acefg"
+)
+
 :: Set the cmd screen size with backup of old settings
 set "count=0"
 :: Read the lines of mode con
@@ -10,36 +58,190 @@ for /f "tokens=*" %%A in ('mode con') do (
         set "val=%%B"
         :: Check if it's a number
         echo !val! | findstr /r "[0-9][0-9]" >nul
-        if !errorlevel! == 0 (
+        if !errorlevel! EQU 0 (
             set /a count+=1
-            if !count! == 1 (
-                set "orig_lines=!val!"
+            if !count! EQU 1 (
+                set "ORIG_LINES=!val!"
             )
-            if !count! == 2 (
-                set "orig_cols=!val!"
+            if !count! EQU 2 (
+                set "ORIG_COLS=!val!"
             )
         )
     )
 )
-mode con: cols=110 lines=45
+set "NEW_COLS=110"
+mode con: cols=%NEW_COLS% lines=65
 
+if defined LNG goto lngtest
 :: Get the current code page
 for /f "tokens=2 delims=:" %%a in ('chcp') do set "OLD_CP=%%a"
 :: Switch to code page 65001 for UTF-8
 chcp 65001 >nul
 
+:: Clean retrieval of language code via WMIC
+for /f "skip=1 tokens=1" %%l in ('wmic os get oslanguage') do (
+    set LNGID=%%l
+    goto found_lcid
+)
 
-REM --------------------------------------------------------------------------------
-REM The following variables are Base64 encoded strings for unrpyc and rpatool
-REM Due to batch limitations on variable lengths, they need to be split into
-REM multiple variables, and joined later using powershell.
-REM --------------------------------------------------------------------------------
-REM unrpyc by CensoredUsername
-REM	https://github.com/CensoredUsername/unrpyc
-REM __title__ = "Unrpyc Legacy for Ren'Py v7 and lower"
-REM __version__ = 'v1.3.2'
-REM --------------------------------------------------------------------------------
-REM set unrpyc-legacy01=
+:found_lcid
+:: LCID correspondences
+if "!LNGID!" == "1036" set LNG=fr
+if "!LNGID!" == "1033" set LNG=en
+if "!LNGID!" == "3082" set LNG=es
+if "!LNGID!" == "1040" set LNG=it
+if "!LNGID!" == "1031" set LNG=de
+if "!LNGID!" == "1049" set LNG=ru
+
+if not defined LNG set LNG=en
+
+:lngtest
+:: Language support test
+set "SUPPORTED= de es en fr it ru "
+set "FIND= !LNG! "
+echo !SUPPORTED! | find /i "%FIND%" >nul
+if %errorlevel% NEQ 0 set LNG=en
+
+:: To be able to take screenshots for F95zone
+if not "%~2" == "" (
+    set "LNG=%~2"
+)
+
+
+:: Definition of reusable texts
+set "ANYKEY.en=Press any key to exit..."
+set "ANYKEY.fr=Appuyez sur une touche pour quitter..."
+set "ANYKEY.es=Presione cualquier tecla para salir..."
+set "ANYKEY.it=Premere un tasto per uscire..."
+set "ANYKEY.de=Drücken Sie eine beliebige Taste, um zu beenden..."
+set "ANYKEY.ru=Нажмите любую клавишу для выхода..."
+
+set "ARIGHT.en=Please run this script as an administrator to add the entry."
+set "ARIGHT.fr=Veuillez exécuter ce script en tant qu'administrateur pour ajouter l'entrée."
+set "ARIGHT.es=Por favor, ejecute este script como administrador para agregar la entrada."
+set "ARIGHT.it=Per favore, esegui questo script come amministratore per aggiungere la voce."
+set "ARIGHT.de=Bitte führen Sie dieses Skript als Administrator aus, um den Eintrag hinzuzufügen."
+set "ARIGHT.ru=Пожалуйста, запустите этот скрипт от имени администратора, чтобы добавить элемент."
+
+set "PASS.en=Pass"
+set "PASS.fr=Réussi"
+set "PASS.es=Paso"
+set "PASS.it=Passato"
+set "PASS.de=Bestanden"
+set "PASS.ru=Успех"
+
+set "FAIL.en=Fail"
+set "FAIL.fr=Échoué"
+set "FAIL.es=Fallo"
+set "FAIL.it=Fallito"
+set "FAIL.de=Fehlgeschlagen"
+set "FAIL.ru=Ошибка"
+
+set "APRESENT.en=Option already presented."
+set "APRESENT.fr=Option déjà présentée."
+set "APRESENT.it=Opzione già presentata."
+set "APRESENT.es=Opción ya presentada."
+set "APRESENT.de=Option bereits präsentiert."
+set "APRESENT.ru=Опция уже представлена."
+
+set "TWADD.en=This will add:"
+set "TWADD.fr=Cela ajoutera:"
+set "TWADD.it=Questo aggiungerà:"
+set "TWADD.es=Esto añadirá:"
+set "TWADD.de=Dies wird hinzufügen:"
+set "TWADD.ru=Это добавит:"
+
+set "INCASEOF.en=In case of problem, please refer to:"
+set "INCASEOF.fr=En cas de problème, veuillez vous référer à :"
+set "INCASEOF.it=In caso di problemi, si prega di fare riferimento a:"
+set "INCASEOF.es=En caso de problemas, consulte:"
+set "INCASEOF.de=Im Falle von Problemen wenden Sie sich bitte an:"
+set "INCASEOF.ru=В случае проблемы обратитесь к:"
+
+set "INCASEDEL.en=In case of problem, delete the following files/dirs:"
+set "INCASEDEL.fr=En cas de problème, supprimez le.s fichier.s/répertoire.s suivants :"
+set "INCASEDEL.it=In caso di problemi, eliminare i seguenti file/directory:"
+set "INCASEDEL.es=En caso de problemas, elimine los siguientes archivos/directorios:"
+set "INCASEDEL.de=Im Falle von Problemen löschen Sie die folgenden Dateien/Verzeichnisse:"
+set "INCASEDEL.ru=В случае проблемы удалите следующие файлы/каталоги:"
+
+set "UNDWNLD.en=Unable to download:"
+set "UNDWNLD.fr=Impossible de télécharger :"
+set "UNDWNLD.es=No se puede descargar:"
+set "UNDWNLD.it=Impossibile scaricare:"
+set "UNDWNLD.de=Download nicht möglich:"
+set "UNDWNLD.ru=Не удалось загрузить:"
+
+set "UNINSTALL.en=Unable to install:"
+set "UNINSTALL.fr=Impossible d'installer :"
+set "UNINSTALL.es=No se puede instalar:"
+set "UNINSTALL.it=Impossibile installare:"
+set "UNINSTALL.de=Installation nicht möglich:"
+set "UNINSTALL.ru=Не удалось установить:"
+
+set "UNEXTRACT.en=Unable to extract:"
+set "UNEXTRACT.fr=Impossible d'extraire :"
+set "UNEXTRACT.es=No se puede extraer:"
+set "UNEXTRACT.it=Impossibile estrarre:"
+set "UNEXTRACT.de=Fehler beim Herunterladen von:"
+set "UNEXTRACT.ru=Не удалось извлечь:"
+
+set "MISSING.en=File not found:"
+set "MISSING.fr=Fichier introuvable :"
+set "MISSING.es=Archivo no encontrado:"
+set "MISSING.it=File non trovato:"
+set "MISSING.de=Datei nicht gefunden:"
+set "MISSING.ru=Файл не найден:"
+
+set "ENTERYN.en=Enter [y/n] (default n):"
+set "ENTERYN.fr=Entrez [o/n] (par défaut n) :"
+set "ENTERYN.es=Ingrese [s/n] (predeterminado n):"
+set "ENTERYN.it=Inserisci [s/n] (predefinito n):"
+set "ENTERYN.de=Geben Sie [j/n] ein (Standard n):"
+set "ENTERYN.ru=Введите [д/н] (по умолчанию н):"
+
+set "CLEANUP.en=Cleaning up temporary files..."
+set "CLEANUP.fr=Nettoyage des fichiers temporaires..."
+set "CLEANUP.es=Limpiando archivos temporales..."
+set "CLEANUP.it=Pulizia dei file temporanei..."
+set "CLEANUP.de=Bereinigen temporärer Dateien..."
+set "CLEANUP.ru=Очистка временных файлов..."
+
+set "UNACONT.en=Unable to continue."
+set "UNACONT.fr=Impossible de continuer."
+set "UNACONT.es=No se puede continuar."
+set "UNACONT.it=Impossibile continuare."
+set "UNACONT.de=Kann nicht fortgesetzt werden."
+set "UNACONT.ru=Не удалось продолжить."
+
+set "GRY=[90m"
+set "RED=[91m"
+set "GRE=[92m"
+set "YEL=[93m"
+set "MAG=[95m"
+set "CYA=[96m"
+set "RES=[0m"
+for /f "tokens=4-5 delims=. " %%i in ('ver') do set OSVERS=%%i.%%j
+if "%OSVERS%" == "6.1" (
+    set "GRY="
+    set "RED="
+    set "GRE="
+    set "YEL="
+    set "MAG="
+    set "CYA="
+    set "RES="
+)
+:: End of reusable texts
+
+
+:: The following variables are Base64 encoded strings for unrpyc and rpatool
+:: Due to batch limitations on variable lengths, they need to be split into
+:: multiple variables, and joined later using powershell.
+
+:: unrpyc by CensoredUsername
+::	https://github.com/CensoredUsername/unrpyc
+:: __title__ = "Unrpyc Legacy for Ren'Py v7 and lower"
+:: __version__ = 'v1.3.2'
 set unrpyc-legacy01=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
 set unrpyc-legacy02=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
 set unrpyc-legacy03=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
@@ -79,13 +281,10 @@ set unrpyc-legacy36=Zew51CuKIn5PfkQRCm8twAE3l0ZcGJVNsy6M9WPTwH8Fz1NZh2EYr0/j0zcn
 set unrpyc-legacy37=2vHUiV2Zm+TVmMnO574fWNhqiD5Nj9LgL2s+KKJhXgiL67qigLtcntL3g2WRrRp5tYTGe0xqRQ2kTLguZ+9gTxUmLDkSoExTtP2wAaaGkwgavtu4bEc6eNaWdDrRl5ZyI97StdN7Sgeg8R+xZNleTZ1jwCfeUdBrlvAKNHeN/wI=
 
 
-REM --------------------------------------------------------------------------------
-REM unrpyc by CensoredUsername
-REM	https://github.com/CensoredUsername/unrpyc
-REM __title__ = "Unrpyc Master for Ren'Py v8"
-REM __version__ = 'v2.0.2'
-REM --------------------------------------------------------------------------------
-REM set unrpyc-master01=
+:: unrpyc by CensoredUsername
+::	https://github.com/CensoredUsername/unrpyc
+:: __title__ = "Unrpyc Master for Ren'Py v8"
+:: __version__ = 'v2.0.2'
 set unrpyc-master01=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
 set unrpyc-master02=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
 set unrpyc-master03=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
@@ -115,159 +314,364 @@ set unrpyc-master26=YNd4vKy2J4v5WauHpXpYqY+F3KwjZ6Ilmu1r2Io09jPUDydvOCMGFggRmhGV
 set unrpyc-master27=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
 set unrpyc-master28=4CzuKgo2+dVxsCqc0KhuKJlrG05eUQto/xLyvckzWzWJXKuksyDkqmG29jfQlpUfCHBKvNdw3dLEWaAartfuCqEP465IeTJIWIsdsmxGHM+iBwwg31Da7qJxSg+5zKZJ6M+XpQ3KZ9Zl5SAHX03KrZIEb6hKbw1RJ4u00jeN3YTpl1Tt7gUZS4TisdysMUMKeeJTjINYDA1kGdUSzOpDf4SAdCQ3PcSTLcTuN6aSmfOSCtolde6UOTjn2kJ0nc7spYiN4PyKfqMLCpqkV6wQy0PSdy9yWDCo9xartFphlBKd7vhQxwsN3VQp3MGI/m+qtFjBepyujYqytZ26h6mamRehmDPNEn7WIlBi7IWuUFuVf72KgD3F0UIWunIyHfCHLEmM6HpbRWoFAG5yiVv9Q2QQFi0GS1js4CckVWv70yAwYc7UUGJXQWnBThj8weZRLZkNx05REH8n5+puBcM1M/utBtRzBAJRGIHBaQL/fAo9i4l4wo1BL367+o6h2xn884XTeanu+jA5/qaYAKsd+sKShUY/EMr6ejZ03GF7gTq2Ldu9ew9tDk4T4XR79Dk4+ixEPG7j5bre3MjtYaSfQQV3w4VQfX9zUa66aWiBMt+NFceYiOzm8FlH0yNRdXAY/ENo2TLpEl9l3VYFnNvL4PfJ6fdYTl2JIB3jtSZ1BaCuzUl34QeFAcIM0diN3irVHQUfUpoAgqGBh7vNUsC5WOUJG71+EkT7sVyDW8wa8rBH5P8fe9PmoHV9jvDAEoAGWsgz5/bWJ2t2N8mHBgVToqlvtp1AwUcDj/qmhcm2UzRivx8XDjJlm+YiiFfjYKDStiu8b+j6/yuhibCcmlAYdhhMxx6NqgoCxCJRQJZYaUHoSXZagckwUiFI+GZMEafH+L9bx9G6KaiX7xy9OEikczv9AkFcRey+mCftQa2XtG7mtt6P4/QwxMfJGaAm8P2oUYKyOX1EGnxUMcQEC9q7oEm8FQrawoQ77AjgSrrojId9hSEkzxZNEjX3TOk+jq3uNMLacqC6AyHwqlg0EAxD6wwz1giN/ipvioUqCwqxwZij6Q9addAsbdIYw675N5nXSmtSWEtUi1wZ4dFOYw00nKzKGqObhGLpCFScwCsQHgjPXdxt/M6/MUwYK+vLbFzGEq6gH6OV0756U8Z5GUb6GlvAoZPfZy0AbnvSRl2FsSAVgLS6r4lZ+NW8ahtMp2CvAYPSIHY+X9PztefxgF8faM/FUUBMKhzlz1+Mgzigyzz4U1u3l+I1iG6FsgdTQNCXkfhDep+oWhqUkkNLZs85h+Dmzaz5e6epqlwjbHtVapcld1rIKTzqRvNwrSt17NTrXbVnUecdtoDOEtVs7esENqqySqv7ubM712Nvx/K++A+62djAxwVOOausYWVR2lhIF4HBhLfi6EC5Xza1fS/d5WAiaNrE7WgBUcyUDcGJ6aJRKjlNnRP/dSlbt540YqsXZ0Cx32pp+eGATD6IGSvJ7LWbuGntgKGR2vHUiV2RmeTVmMnObn8YWNhqiD5LTpPgjxs6ToK1nWXFbVVicGAmz/KHwU2ermt5XwQWeUj3hQ2kSLgtFtdiM2W7lByJoEydN90ABqKGkwgavru4bE86eNaW9B3Rl5ZybN7RtdOdSweg8R+yZNFczZ1jgCfeUeBrluwKNNeL/wA=
 
-
-REM --------------------------------------------------------------------------------
-REM rpatool by Shizmob 9a58396 2019-02-22T17:31:07.000Z
-REM	https://github.com/Shizmob/rpatool
-REM --------------------------------------------------------------------------------
-REM set rpatool01=
+:: rpatool by Tom Schmitt
+:: License: Public Domain
+::		http://www.drdobbs.com/python/pathlib-in-python-3-4/240001265
 set rpatool01=IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IHByaW50X2Z1bmN0aW9uDQppbXBvcnQgc3lzDQppbXBvcnQgb3MNCnN5cy5wYXRoLmFwcGVuZCgnLi4nKQ0KdHJ5Og0KICAgIGltcG9ydCBtYWluDQpleGNlcHQ6DQogICAgcGFzcw0KaW1wb3J0IHJlbnB5Lm9iamVjdA0KaW1wb3J0IHJlbnB5LmNvbmZpZw0KaW1wb3J0IHJlbnB5LmxvYWRlcg0KdHJ5Og0KICAgIGltcG9ydCByZW5weS51dGlsDQpleGNlcHQ6DQogICAgcGFzcw0KY2xhc3MgUmVuUHlBcmNoaXZlOg0KICAgIGZpbGUgPSBOb25lDQogICAgaGFuZGxlID0gTm9uZQ0KDQogICAgZmlsZXMgPSB7fQ0KICAgIGluZGV4ZXMgPSB7fQ0KDQogICAgZGVmIF9faW5pdF9fKHNlbGYsIGZpbGUsIGluZGV4KToNCiAgICAgICAgc2VsZi5sb2FkKGZpbGUsIGluZGV4KQ0KDQogICAgIyBDb252ZXJ0cyBhIGZpbGVuYW1lIHRvIGFyY2hpdmUgZm9ybWF0Lg0KICAgIGRlZiBjb252ZXJ0X2ZpbGVuYW1lKHNlbGYsIGZpbGVuYW1lKToNCiAgICAgICAgKGRyaXZlLCBmaWxlbmFtZSkgPSBvcy5wYXRoLnNwbGl0ZHJpdmUob3MucGF0aC5ub3JtcGF0aChmaWxlbmFtZSkucmVwbGFjZShvcy5zZXAsICcvJykpDQogICAgICAgIHJldHVybiBmaWxlbmFtZQ0KDQoNCiAgICAjIExpc3QgZmlsZXMgaW4gYXJjaGl2ZSBhbmQgY3VycmVudCBpbnRlcm5hbCBzdG9yYWdlLg0KICAgIGRlZiBsaXN0KHNlbGYpOg0KICAgICAgICByZXR1cm4gbGlzdChzZWxmLmluZGV4ZXMpDQoNCiAgICAjIFJlYWQgZmlsZSBmcm9tIGFyY2hpdmUgb3IgaW50ZXJuYWwgc3RvcmFnZS4NCiAgICBkZWYgcmVhZChzZWxmLCBmaWxlbmFtZSk6DQogICAgICAgIGZpbGVuYW1lID0gc2VsZi5jb252ZXJ0X2ZpbGVuYW1lKGZpbGVuYW1lKQ0KICAgICAgICBpZihmaWxlbmFtZSAhPSAnLicgYW5kIGlzaW5zdGFuY2Uoc2VsZi5pbmRleGVzW2ZpbGVuYW1lXSwgbGlzdCkpOg0KICAgICAgICAgICAgaWYgaGFzYXR0cihyZW5weS5sb2FkZXIsICJsb2FkX2Zyb21fYXJjaGl2ZSIpOg0KICAgICAgICAgICAgICAgIHN1YmZpbGUgPSAgcmVucHkubG9hZGVyLmxvYWRfZnJvbV9hcmNoaXZlKGZpbGVuYW1lKQ0KICAgICAgICAgICAgZWxzZToNCiAgICAgICAgICAgICAgICBzdWJmaWxlID0gIHJlbnB5LmxvYWRlci5sb2FkX2NvcmUoZmlsZW5hbWUpDQogICAgICAgICAgICByZXR1cm4gc3ViZmlsZS5yZWFkKCkNCiAgICAgICAgZWxzZTogcmV0dXJuIE5vbmUNCg0KICAgICMgTG9hZCBhcmNoaXZlLg0KICAgIGRlZiBsb2FkKHNlbGYsIGZpbGVuYW1lLCBpbmRleCk6DQogICAgICAgIHNlbGYuZmlsZSA9IGZpbGVuYW1lDQogICAgICAgIHNlbGYuZmlsZXMgPSB7fQ0KICAgICAgICBzZWxmLmluZGV4ZXMgPSB7fQ0KICAgICAgICBzZWxmLmhhbmRsZSA9IG9wZW4oc2VsZi5maWxlLCAncmInKQ0KICAgICAgICBiYXNlLCBleHQgPSBmaWxlbmFtZS5yc3BsaXQoIi4iLCAxKQ0KICAgICAgICByZW5weS5jb25maWcuYXJjaGl2ZXMuYXBwZW5kKGJhc2UpDQogICAgICAgIHJlbnB5LmNvbmZpZy5zZWFyY2hwYXRoID0gW29zLnBhdGguZGlybmFtZShvcy5wYXRoLnJlYWxwYXRoKHNlbGYuZmlsZSkpXQ0KICAgICAgICByZW5weS5jb25maWcuYmFzZWRpciA9IG9zLnBhdGguZGlybmFtZShyZW5weS5jb25maWcuc2VhcmNocGF0aFswXSkNCiAgICAgICAgcmVucHkubG9hZGVyLmluZGV4X2FyY2hpdmVzKCkNCiAgICAgICAgaXRlbXMgPSByZW5weS5sb2FkZXIuYXJjaGl2ZXNbaW5kZXhdWzFdLml0ZW1zKCkNCiAgICAgICAgZm9yIGZpbGUsIGluZGV4IGluIGl0ZW1zOg0KICAgICAgICAgICAgc2VsZi5pbmRleGVzW2ZpbGVdID0gaW5kZXgNCg0KaWYgX19uYW1lX18gPT0gIl9fbWFpbl9fIjoNCiAgICBpbXBvcnQgYXJncGFyc2UNCg0KICAgIHBhcnNlciA9IGFyZ3BhcnNlLkFyZ3VtZW50UGFyc2VyKA0KICAgICAgICBkZXNjcmlwdGlvbj0nQSB0b29sIGZvciB3b3JraW5nIHdpdGggUmVuXCdQeSBhcmNoaXZlIGZpbGVzLicsDQogICAgICAgIGVwaWxvZz0nVGhlIEZJTEUgYXJndW1lbnQgY2FuIG9wdGlvbmFsbHkgYmUgaW4gQVJDSElWRT1SRUFMIGZvcm1hdCwgbWFwcGluZyBhIGZpbGUgaW4gdGhlIGFyY2hpdmUgZmlsZSBzeXN0ZW0gdG8gYSBmaWxlIG9uIHlvdXIgcmVhbCBmaWxlIHN5c3RlbS4gQW4gZXhhbXBsZSBvZiB0aGlzOiBycGF0b29sIC14IHRlc3QucnBhIHNjcmlwdC5ycHljPS9ob21lL2Zvby90ZXN0LnJweWMnLA0KICAgICAgICBhZGRfaGVscD1GYWxzZSkNCg0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1yJyxhY3Rpb249InN0b3JlX3RydWUiLCBkZXN0PSdyZW1vdmUnLCBoZWxwPSdEZWxldGUgYXJjaGl2ZXMgYWZ0ZXIgdW5wYWNraW5nLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnZGlyJyx0eXBlPXN0ciwgaGVscD0nVGhlIFJlblwncHkgZGlyIHRvIG9wZXJhdGUgb24uJykNCiAgICBhcmd1bWVudHMgPSBwYXJzZXIucGFyc2VfYXJncygpDQogICAgZGlyZWN0b3J5ID0gYXJndW1lbnRzLmRpcg0KICAgIHJlbW92ZSA9IGFyZ3VtZW50cy5yZW1vdmUNCiAgICBvdXRwdXQgPSAnLicNCiAgICBhcmNoaXZlX2V4dGVudGlvbnMgPSBbXQ0KICAgIGlmIGhhc2F0dHIocmVucHkubG9hZGVyLCAiYXJjaGl2ZV9oYW5kbGVycyIpOg0KICAgICAgICBmb3IgaGFuZGxlciBpbiByZW5weS5sb2FkZXIuYXJjaGl2ZV9oYW5kbGVyczoNCiAgICAgICAgICAgIGlmIGhhc2F0dHIoaGFuZGxlciwgImdldF9zdXBwb3J0ZWRfZXh0ZW5zaW9ucyIpOg0KICAgICAgICAgICAgICAgIGZvciBleHQgaW4gaGFuZGxlci5nZXRfc3VwcG9ydGVkX2V4dGVuc2lvbnMoKToNCiAgICAgICAgICAgICAgICAgICAgaWYgZXh0IG5vdCBpbiBhcmNoaXZlX2V4dGVudGlvbnM6DQogICAgICAgICAgICAgICAgICAgICAgICBhcmNoaXZlX2V4dGVudGlvbnMuYXBwZW5kKGV4dCkNCiAgICAgICAgICAgIGlmIGhhc2F0dHIoaGFuZGxlciwgImdldF9zdXBwb3J0ZWRfZXh0Iik6DQogICAgICAgICAgICAgICAgZm9yIGV4dCBpbiBoYW5kbGVyLmdldF9zdXBwb3J0ZWRfZXh0KCk6DQogICAgICAgICAgICAgICAgICAgIGlmIGV4dCBub3QgaW4gYXJjaGl2ZV9leHRlbnRpb25zOg0KICAgICAgICAgICAgICAgICAgICAgICAgYXJjaGl2ZV9leHRlbnRpb25zLmFwcGVuZChleHQpDQogICAgZWxzZTogYXJjaGl2ZV9leHRlbnRpb25zLmFwcGVuZCgnLnJwYScpDQogICAgIyBNYW51YWxseSBhZGQgdGhlIC5ycGMgZXh0ZW5zaW9uIGlmIGl0IGlzIG5vdCBhbHJlYWR5IHJlY29nbml6ZWQNCiAgICBpZiAnLnJwYycgbm90IGluIGFyY2hpdmVfZXh0ZW50aW9uczoNCiAgICAgICAgYXJjaGl2ZV9leHRlbnRpb25zLmFwcGVuZCgnLnJwYycpDQogICAgYXJjaGl2ZXMgPSBbXQ0KICAgIGZvciByb290LCBkaXJzLCBmaWxlcyBpbiBvcy53YWxrKGRpcmVjdG9yeSk6DQogICAgICAgIGZvciBmaWxlIGluIGZpbGVzOg0KICAgICAgICAgICAgdHJ5Og0KICAgICAgICAgICAgICAgIGJhc2UsIGV4dCA9IGZpbGUucnNwbGl0KCcuJywgMSkNCiAgICAgICAgICAgICAgICBpZiAnLicrZXh0IGluIGFyY2hpdmVfZXh0ZW50aW9ucyBhbmQgJyUnIG5vdCBpbiBmaWxlOg0KICAgICAgICAgICAgICAgICAgICBhcmNoaXZlcy5hcHBlbmQoZmlsZSkNCiAgICAgICAgICAgIGV4Y2VwdDoNCiAgICAgICAgICAgICAgICBwYXNzDQogICAgaWYgYXJjaGl2ZXMgIT0gW106DQogICAgICAgIGZvciBhcmNoIGluIGFyY2hpdmVzOg0KICAgICAgICAgICAgcHJpbnQoIiAgVW5wYWNraW5nIFwiezB9XCIgYXJjaGl2ZS4iLmZvcm1hdChhcmNoKSkNCiAgICAgICAgICAgICMgdHJ5Og0KICAgICAgICAgICAgYXJjaGl2ZSA9IFJlblB5QXJjaGl2ZShhcmNoLCBhcmNoaXZlcy5pbmRleChhcmNoKSkNCg0KICAgICAgICAgICAgZmlsZXMgPSBhcmNoaXZlLmxpc3QoKQ0KDQogICAgICAgICAgICAjIENyZWF0ZSBvdXRwdXQgZGlyZWN0b3J5IGlmIG5vdCBwcmVzZW50Lg0KICAgICAgICAgICAgaWYgbm90IG9zLnBhdGguZXhpc3RzKG91dHB1dCk6DQogICAgICAgICAgICAgICAgb3MubWFrZWRpcnMob3V0cHV0KQ0KDQogICAgICAgICAgICAjIEl0ZXJhdGUgb3ZlciBmaWxlcyB0byBleHRyYWN0Lg0KICAgICAgICAgICAgZm9yIGZpbGVuYW1lIGluIGZpbGVzOg0KICAgICAgICAgICAgICAgIG91dGZpbGUgPSBmaWxlbmFtZQ0KICAgICAgICAgICAgICAgIGNvbnRlbnRzID0gYXJjaGl2ZS5yZWFkKGZpbGVuYW1lKQ0KICAgICAgICAgICAgICAgIGlmKE5vbmUgIT0gY29udGVudHMpOg0KICAgICAgICAgICAgICAgICAgICAjIENyZWF0ZSBvdXRwdXQgZGlyZWN0b3J5IGZvciBmaWxlIGlmIG5vdCBwcmVzZW50Lg0KICAgICAgICAgICAgICAgICAgICBpZiBub3Qgb3MucGF0aC5leGlzdHMob3MucGF0aC5kaXJuYW1lKG9zLnBhdGguam9pbihvdXRwdXQsIG91dGZpbGUpKSk6DQogICAgICAgICAgICAgICAgICAgICAgICBvcy5tYWtlZGlycyhvcy5wYXRoLmRpcm5hbWUob3MucGF0aC5qb2luKG91dHB1dCwgb3V0ZmlsZSkpKQ0KDQogICAgICAgICAgICAgICAgICAgIHdpdGggb3Blbihvcy5wYXRoLmpvaW4ob3V0cHV0LCBvdXRmaWxlKSwgJ3diJykgYXMgZmlsZToNCiAgICAgICAgICAgICAgICAgICAgICAgIGZpbGUud3JpdGUoY29udGVudHMpDQogICAgICAgICAgICAjIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXJyOg0KICAgICAgICAgICAgIyAgICAgcHJpbnQoZXJyKQ0KICAgICAgICAgICAgIyAgICAgc3lzLmV4aXQoMSkNCiAgICAgICAgcHJpbnQoIiAgQWxsIGFyY2hpdmVzIHVucGFja2VkLiIpDQogICAgICAgIGlmIHJlbW92ZToNCiAgICAgICAgICAgIGZvciBhcmNoaXZlIGluIGFyY2hpdmVzOg0KICAgICAgICAgICAgICAgIHByaW50KCIgIEFyY2hpdmUgezB9IGhhcyBiZWVuIGRlbGV0ZWQuIi5mb3JtYXQoYXJjaGl2ZSkpDQogICAgICAgICAgICAgICAgb3MucmVtb3ZlKCJ7MH1cezF9Ii5mb3JtYXQoZGlyZWN0b3J5LCBhcmNoaXZlKSkNCiAgICBlbHNlOg0KICAgICAgICBwcmludCgiICBUaGVyZSBhcmUgbm8gYXJjaGl2ZXMgaW4gdGhlIGdhbWUgZm9sZGVyLiIpDQo=
 
-REM Version 0.8, require Python ^>= 3.8
-set rpatool-new01=IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwoKZnJvbSBfX2Z1dHVyZV9fIGltcG9ydCBwcmludF9mdW5jdGlvbgoKaW1wb3J0IHN5cwppbXBvcnQgb3MKaW1wb3J0IGNvZGVjcwppbXBvcnQgcGlja2xlCmltcG9ydCBlcnJubwppbXBvcnQgcmFuZG9tCnRyeToKICAgIGltcG9ydCBwaWNrbGU1IGFzIHBpY2tsZQpleGNlcHQ6CiAgICBpbXBvcnQgcGlja2xlCiAgICBpZiBzeXMudmVyc2lvbl9pbmZvIDwgKDMsIDgpOgogICAgICAgIHByaW50KCd3YXJuaW5nOiBwaWNrbGU1IG1vZHVsZSBjb3VsZCBub3QgYmUgbG9hZGVkIGFuZCBQeXRob24gdmVyc2lvbiBpcyA8IDMuOCwnLCBmaWxlPXN5cy5zdGRlcnIpCiAgICAgICAgcHJpbnQoJyAgICAgICAgIG5ld2VyIFJlblwnUHkgZ2FtZXMgbWF5IGZhaWwgdG8gdW5wYWNrIScsIGZpbGU9c3lzLnN0ZGVycikKICAgICAgICBpZiBzeXMudmVyc2lvbl9pbmZvID49ICgzLCA1KToKICAgICAgICAgICAgcHJpbnQoJyAgICAgICAgIGlmIHRoaXMgb2NjdXJzLCBmaXggaXQgYnkgaW5zdGFsbGluZyBwaWNrbGU1OicsIGZpbGU9c3lzLnN0ZGVycikKICAgICAgICAgICAgcHJpbnQoJyAgICAgICAgICAgICB7fSAtbSBwaXAgaW5zdGFsbCBwaWNrbGU1Jy5mb3JtYXQoc3lzLmV4ZWN1dGFibGUpLCBmaWxlPXN5cy5zdGRlcnIpCiAgICAgICAgZWxzZToKICAgICAgICAgICAgcHJpbnQoJyAgICAgICAgIGlmIHRoaXMgb2NjdXJzLCBwbGVhc2UgdXBncmFkZSB0byBhIG5ld2VyIFB5dGhvbiAoPj0gMy41KS4nLCBmaWxlPXN5cy5zdGRlcnIpCiAgICAgICAgcHJpbnQoZmlsZT1zeXMuc3RkZXJyKQoKCmlmIHN5cy52ZXJzaW9uX2luZm9bMF0gPj0gMzoKICAgIGRlZiBfdW5pY29kZSh0ZXh0KToKICAgICAgICByZXR1cm4gdGV4dAoKICAgIGRlZiBfcHJpbnRhYmxlKHRleHQpOgogICAgICAgIHJldHVybiB0ZXh0CgogICAgZGVmIF91bm1hbmdsZShkYXRhKToKICAgICAgICBpZiB0eXBlKGRhdGEpID09IGJ5dGVzOgogICAgICAgICAgICByZXR1cm4gZGF0YQogICAgICAgIGVsc2U6CiAgICAgICAgICAgIHJldHVybiBkYXRhLmVuY29kZSgnbGF0aW4xJykKCiAgICBkZWYgX3VucGlja2xlKGRhdGEpOgogICAgICAgICMgU3BlY2lmeSBsYXRpbjEgZW5jb2RpbmcgdG8gcHJldmVudCByYXcgYnl0ZSB2YWx1ZXMgZnJvbSBjYXVzaW5nIGFuIEFTQ0lJIGRlY29kZSBlcnJvci4KICAgICAgICByZXR1cm4gcGlja2xlLmxvYWRzKGRhdGEsIGVuY29kaW5nPSdsYXRpbjEnKQplbGlmIHN5cy52ZXJzaW9uX2luZm9bMF0gPT0gMjoKICAgIGRlZiBfdW5pY29kZSh0ZXh0KToKICAgICAgICBpZiBpc2luc3RhbmNlKHRleHQsIHVuaWNvZGUpOgogICAgICAgICAgICByZXR1cm4gdGV4dAogICAgICAgIHJldHVybiB0ZXh0LmRlY29kZSgndXRmLTgnKQoKICAgIGRlZiBfcHJpbnRhYmxlKHRleHQpOgogICAgICAgIHJldHVybiB0ZXh0LmVuY29kZSgndXRmLTgnKQoKICAgIGRlZiBfdW5tYW5nbGUoZGF0YSk6CiAgICAgICAgcmV0dXJuIGRhdGEKCiAgICBkZWYgX3VucGlja2xlKGRhdGEpOgogICAgICAg
-set rpatool-new02=IHJldHVybiBwaWNrbGUubG9hZHMoZGF0YSkKCmNsYXNzIFJlblB5QXJjaGl2ZToKICAgIGZpbGUgPSBOb25lCiAgICBoYW5kbGUgPSBOb25lCgogICAgZmlsZXMgPSB7fQogICAgaW5kZXhlcyA9IHt9CgogICAgdmVyc2lvbiA9IE5vbmUKICAgIHBhZGxlbmd0aCA9IDAKICAgIGtleSA9IE5vbmUKICAgIHZlcmJvc2UgPSBGYWxzZQoKICAgIFJQQTJfTUFHSUMgPSAnUlBBLTIuMCAnCiAgICBSUEEzX01BR0lDID0gJ1JQQS0zLjAgJwogICAgUlBBM18yX01BR0lDID0gJ1JQQS0zLjIgJwoKICAgICMgRm9yIGJhY2t3YXJkIGNvbXBhdGliaWxpdHksIG90aGVyd2lzZSBQeXRob24zLXBhY2tlZCBhcmNoaXZlcyB3b24ndCBiZSByZWFkIGJ5IFB5dGhvbjIKICAgIFBJQ0tMRV9QUk9UT0NPTCA9IDIKCiAgICBkZWYgX19pbml0X18oc2VsZiwgZmlsZSA9IE5vbmUsIHZlcnNpb24gPSAzLCBwYWRsZW5ndGggPSAwLCBrZXkgPSAweERFQURCRUVGLCB2ZXJib3NlID0gRmFsc2UpOgogICAgICAgIHNlbGYucGFkbGVuZ3RoID0gcGFkbGVuZ3RoCiAgICAgICAgc2VsZi5rZXkgPSBrZXkKICAgICAgICBzZWxmLnZlcmJvc2UgPSB2ZXJib3NlCgogICAgICAgIGlmIGZpbGUgaXMgbm90IE5vbmU6CiAgICAgICAgICAgIHNlbGYubG9hZChmaWxlKQogICAgICAgIGVsc2U6CiAgICAgICAgICAgIHNlbGYudmVyc2lvbiA9IHZlcnNpb24KCiAgICBkZWYgX19kZWxfXyhzZWxmKToKICAgICAgICBpZiBzZWxmLmhhbmRsZSBpcyBub3QgTm9uZToKICAgICAgICAgICAgc2VsZi5oYW5kbGUuY2xvc2UoKQoKICAgICMgRGV0ZXJtaW5lIGFyY2hpdmUgdmVyc2lvbi4KICAgIGRlZiBnZXRfdmVyc2lvbihzZWxmKToKICAgICAgICBzZWxmLmhhbmRsZS5zZWVrKDApCiAgICAgICAgbWFnaWMgPSBzZWxmLmhhbmRsZS5yZWFkbGluZSgpLmRlY29kZSgndXRmLTgnKQoKICAgICAgICBpZiBtYWdpYy5zdGFydHN3aXRoKHNlbGYuUlBBM18yX01BR0lDKToKICAgICAgICAgICAgcmV0dXJuIDMuMgogICAgICAgIGVsaWYgbWFnaWMuc3RhcnRzd2l0aChzZWxmLlJQQTNfTUFHSUMpOgogICAgICAgICAgICByZXR1cm4gMwogICAgICAgIGVsaWYgbWFnaWMuc3RhcnRzd2l0aChzZWxmLlJQQTJfTUFHSUMpOgogICAgICAgICAgICByZXR1cm4gMgogICAgICAgIGVsaWYgc2VsZi5maWxlLmVuZHN3aXRoKCcucnBpJyk6CiAgICAgICAgICAgIHJldHVybiAxCgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoJ3RoZSBnaXZlbiBmaWxlIGlzIG5vdCBhIHZhbGlkIFJlblwnUHkgYXJjaGl2ZSwgb3IgYW4gdW5zdXBwb3J0ZWQgdmVyc2lvbicpCgogICAgIyBFeHRyYWN0IGZpbGUgaW5kZXhlcyBmcm9tIG9wZW5lZCBhcmNoaXZlLgogICAgZGVmIGV4dHJhY3RfaW5kZXhlcyhzZWxmKToKICAgICAgICBzZWxmLmhhbmRsZS5zZWVrKDApCiAgICAgICAgaW5kZXhlcyA9IE5vbmUKCiAgICAgICAgaWYgc2VsZi52ZXJzaW9uIGluIFsyLCAzLCAzLjJdOgogICAgICAgICAgICAjIEZldGNoIG1ldGFkYXRhLgogICAgICAgICAgICBtZXRhZGF0YSA9IHNlbGYuaGFuZGxl
-set rpatool-new03=LnJlYWRsaW5lKCkKICAgICAgICAgICAgdmFscyA9IG1ldGFkYXRhLnNwbGl0KCkKICAgICAgICAgICAgb2Zmc2V0ID0gaW50KHZhbHNbMV0sIDE2KQogICAgICAgICAgICBpZiBzZWxmLnZlcnNpb24gPT0gMzoKICAgICAgICAgICAgICAgIHNlbGYua2V5ID0gMAogICAgICAgICAgICAgICAgZm9yIHN1YmtleSBpbiB2YWxzWzI6XToKICAgICAgICAgICAgICAgICAgICBzZWxmLmtleSBePSBpbnQoc3Via2V5LCAxNikKICAgICAgICAgICAgZWxpZiBzZWxmLnZlcnNpb24gPT0gMy4yOgogICAgICAgICAgICAgICAgc2VsZi5rZXkgPSAwCiAgICAgICAgICAgICAgICBmb3Igc3Via2V5IGluIHZhbHNbMzpdOgogICAgICAgICAgICAgICAgICAgIHNlbGYua2V5IF49IGludChzdWJrZXksIDE2KQoKICAgICAgICAgICAgIyBMb2FkIGluIGluZGV4ZXMuCiAgICAgICAgICAgIHNlbGYuaGFuZGxlLnNlZWsob2Zmc2V0KQogICAgICAgICAgICBjb250ZW50cyA9IGNvZGVjcy5kZWNvZGUoc2VsZi5oYW5kbGUucmVhZCgpLCAnemxpYicpCiAgICAgICAgICAgIGluZGV4ZXMgPSBfdW5waWNrbGUoY29udGVudHMpCgogICAgICAgICAgICAjIERlb2JmdXNjYXRlIGluZGV4ZXMuCiAgICAgICAgICAgIGlmIHNlbGYudmVyc2lvbiBpbiBbMywgMy4yXToKICAgICAgICAgICAgICAgIG9iZnVzY2F0ZWRfaW5kZXhlcyA9IGluZGV4ZXMKICAgICAgICAgICAgICAgIGluZGV4ZXMgPSB7fQogICAgICAgICAgICAgICAgZm9yIGkgaW4gb2JmdXNjYXRlZF9pbmRleGVzLmtleXMoKToKICAgICAgICAgICAgICAgICAgICBpZiBsZW4ob2JmdXNjYXRlZF9pbmRleGVzW2ldWzBdKSA9PSAyOgogICAgICAgICAgICAgICAgICAgICAgICBpbmRleGVzW2ldID0gWyAob2Zmc2V0IF4gc2VsZi5rZXksIGxlbmd0aCBeIHNlbGYua2V5KSBmb3Igb2Zmc2V0LCBsZW5ndGggaW4gb2JmdXNjYXRlZF9pbmRleGVzW2ldIF0KICAgICAgICAgICAgICAgICAgICBlbHNlOgogICAgICAgICAgICAgICAgICAgICAgICBpbmRleGVzW2ldID0gWyAob2Zmc2V0IF4gc2VsZi5rZXksIGxlbmd0aCBeIHNlbGYua2V5LCBwcmVmaXgpIGZvciBvZmZzZXQsIGxlbmd0aCwgcHJlZml4IGluIG9iZnVzY2F0ZWRfaW5kZXhlc1tpXSBdCiAgICAgICAgZWxzZToKICAgICAgICAgICAgaW5kZXhlcyA9IHBpY2tsZS5sb2Fkcyhjb2RlY3MuZGVjb2RlKHNlbGYuaGFuZGxlLnJlYWQoKSwgJ3psaWInKSkKCiAgICAgICAgcmV0dXJuIGluZGV4ZXMKCiAgICAjIEdlbmVyYXRlIHBzZXVkb3JhbmRvbSBwYWRkaW5nIChmb3Igd2hhdGV2ZXIgcmVhc29uKS4KICAgIGRlZiBnZW5lcmF0ZV9wYWRkaW5nKHNlbGYpOgogICAgICAgIGxlbmd0aCA9IHJhbmRvbS5yYW5kaW50KDEsIHNlbGYucGFkbGVuZ3RoKQoKICAgICAgICBwYWRkaW5nID0gJycKICAgICAgICB3aGlsZSBsZW5ndGggPiAwOgogICAgICAgICAgICBwYWRkaW5nICs9IGNocihyYW5kb20ucmFuZGludCgxLCAyNTUpKQogICAgICAgICAgICBsZW5ndGggLT0gMQoKICAgICAgICByZXR1cm4gYnl0ZXMocGFkZGluZywgJ3V0
-set rpatool-new04=Zi04JykKCiAgICAjIENvbnZlcnRzIGEgZmlsZW5hbWUgdG8gYXJjaGl2ZSBmb3JtYXQuCiAgICBkZWYgY29udmVydF9maWxlbmFtZShzZWxmLCBmaWxlbmFtZSk6CiAgICAgICAgKGRyaXZlLCBmaWxlbmFtZSkgPSBvcy5wYXRoLnNwbGl0ZHJpdmUob3MucGF0aC5ub3JtcGF0aChmaWxlbmFtZSkucmVwbGFjZShvcy5zZXAsICcvJykpCiAgICAgICAgcmV0dXJuIGZpbGVuYW1lCgogICAgIyBEZWJ1ZyAodmVyYm9zZSkgbWVzc2FnZXMuCiAgICBkZWYgdmVyYm9zZV9wcmludChzZWxmLCBtZXNzYWdlKToKICAgICAgICBpZiBzZWxmLnZlcmJvc2U6CiAgICAgICAgICAgIHByaW50KG1lc3NhZ2UpCgoKICAgICMgTGlzdCBmaWxlcyBpbiBhcmNoaXZlIGFuZCBjdXJyZW50IGludGVybmFsIHN0b3JhZ2UuCiAgICBkZWYgbGlzdChzZWxmKToKICAgICAgICByZXR1cm4gbGlzdChzZWxmLmluZGV4ZXMua2V5cygpKSArIGxpc3Qoc2VsZi5maWxlcy5rZXlzKCkpCgogICAgIyBDaGVjayBpZiBhIGZpbGUgZXhpc3RzIGluIHRoZSBhcmNoaXZlLgogICAgZGVmIGhhc19maWxlKHNlbGYsIGZpbGVuYW1lKToKICAgICAgICBmaWxlbmFtZSA9IF91bmljb2RlKGZpbGVuYW1lKQogICAgICAgIHJldHVybiBmaWxlbmFtZSBpbiBzZWxmLmluZGV4ZXMua2V5cygpIG9yIGZpbGVuYW1lIGluIHNlbGYuZmlsZXMua2V5cygpCgogICAgIyBSZWFkIGZpbGUgZnJvbSBhcmNoaXZlIG9yIGludGVybmFsIHN0b3JhZ2UuCiAgICBkZWYgcmVhZChzZWxmLCBmaWxlbmFtZSk6CiAgICAgICAgZmlsZW5hbWUgPSBzZWxmLmNvbnZlcnRfZmlsZW5hbWUoX3VuaWNvZGUoZmlsZW5hbWUpKQoKICAgICAgICAjIENoZWNrIGlmIHRoZSBmaWxlIGV4aXN0cyBpbiBvdXIgaW5kZXhlcy4KICAgICAgICBpZiBmaWxlbmFtZSBub3QgaW4gc2VsZi5maWxlcyBhbmQgZmlsZW5hbWUgbm90IGluIHNlbGYuaW5kZXhlczoKICAgICAgICAgICAgcmFpc2UgSU9FcnJvcihlcnJuby5FTk9FTlQsICd0aGUgcmVxdWVzdGVkIGZpbGUgezB9IGRvZXMgbm90IGV4aXN0IGluIHRoZSBnaXZlbiBSZW5cJ1B5IGFyY2hpdmUnLmZvcm1hdCgKICAgICAgICAgICAgICAgIF9wcmludGFibGUoZmlsZW5hbWUpKSkKCiAgICAgICAgIyBJZiBpdCdzIGluIG91ciBvcGVuZWQgYXJjaGl2ZSBpbmRleCwgYW5kIG91ciBhcmNoaXZlIGhhbmRsZSBpc24ndCB2YWxpZCwgc29tZXRoaW5nIGlzIG9idmlvdXNseSB3cm9uZy4KICAgICAgICBpZiBmaWxlbmFtZSBub3QgaW4gc2VsZi5maWxlcyBhbmQgZmlsZW5hbWUgaW4gc2VsZi5pbmRleGVzIGFuZCBzZWxmLmhhbmRsZSBpcyBOb25lOgogICAgICAgICAgICByYWlzZSBJT0Vycm9yKGVycm5vLkVOT0VOVCwgJ3RoZSByZXF1ZXN0ZWQgZmlsZSB7MH0gZG9lcyBub3QgZXhpc3QgaW4gdGhlIGdpdmVuIFJlblwnUHkgYXJjaGl2ZScuZm9ybWF0KAogICAgICAgICAgICAgICAgX3ByaW50YWJsZShmaWxlbmFtZSkpKQoKICAgICAgICAjIENoZWNrIG91ciBzaW1wbGlmaWVkIGludGVybmFsIGluZGV4ZXMgZmlyc3QsIGluIGNhc2Ugc29tZW9u
-set rpatool-new05=ZSB3YW50cyB0byByZWFkIGEgZmlsZSB0aGV5IGFkZGVkIGJlZm9yZSB3aXRob3V0IHNhdmluZywgZm9yIHNvbWUgdW5ob2x5IHJlYXNvbi4KICAgICAgICBpZiBmaWxlbmFtZSBpbiBzZWxmLmZpbGVzOgogICAgICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1JlYWRpbmcgZmlsZSB7MH0gZnJvbSBpbnRlcm5hbCBzdG9yYWdlLi4uJy5mb3JtYXQoX3ByaW50YWJsZShmaWxlbmFtZSkpKQogICAgICAgICAgICByZXR1cm4gc2VsZi5maWxlc1tmaWxlbmFtZV0KICAgICAgICAjIFdlIG5lZWQgdG8gcmVhZCB0aGUgZmlsZSBmcm9tIG91ciBvcGVuIGFyY2hpdmUuCiAgICAgICAgZWxzZToKICAgICAgICAgICAgIyBSZWFkIG9mZnNldCBhbmQgbGVuZ3RoLCBzZWVrIHRvIHRoZSBvZmZzZXQgYW5kIHJlYWQgdGhlIGZpbGUgY29udGVudHMuCiAgICAgICAgICAgIGlmIGxlbihzZWxmLmluZGV4ZXNbZmlsZW5hbWVdWzBdKSA9PSAzOgogICAgICAgICAgICAgICAgKG9mZnNldCwgbGVuZ3RoLCBwcmVmaXgpID0gc2VsZi5pbmRleGVzW2ZpbGVuYW1lXVswXQogICAgICAgICAgICBlbHNlOgogICAgICAgICAgICAgICAgKG9mZnNldCwgbGVuZ3RoKSA9IHNlbGYuaW5kZXhlc1tmaWxlbmFtZV1bMF0KICAgICAgICAgICAgICAgIHByZWZpeCA9ICcnCgogICAgICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1JlYWRpbmcgZmlsZSB7MH0gZnJvbSBkYXRhIGZpbGUgezF9Li4uIChvZmZzZXQgPSB7Mn0sIGxlbmd0aCA9IHszfSBieXRlcyknLmZvcm1hdCgKICAgICAgICAgICAgICAgIF9wcmludGFibGUoZmlsZW5hbWUpLCBzZWxmLmZpbGUsIG9mZnNldCwgbGVuZ3RoKSkKICAgICAgICAgICAgc2VsZi5oYW5kbGUuc2VlayhvZmZzZXQpCiAgICAgICAgICAgIHJldHVybiBfdW5tYW5nbGUocHJlZml4KSArIHNlbGYuaGFuZGxlLnJlYWQobGVuZ3RoIC0gbGVuKHByZWZpeCkpCgogICAgIyBNb2RpZnkgYSBmaWxlIGluIGFyY2hpdmUgb3IgaW50ZXJuYWwgc3RvcmFnZS4KICAgIGRlZiBjaGFuZ2Uoc2VsZiwgZmlsZW5hbWUsIGNvbnRlbnRzKToKICAgICAgICBmaWxlbmFtZSA9IF91bmljb2RlKGZpbGVuYW1lKQoKICAgICAgICAjIE91ciAnY2hhbmdlJyBpcyBiYXNpY2FsbHkgcmVtb3ZpbmcgdGhlIGZpbGUgZnJvbSBvdXIgaW5kZXhlcyBmaXJzdCwgYW5kIHRoZW4gcmUtYWRkaW5nIGl0LgogICAgICAgIHNlbGYucmVtb3ZlKGZpbGVuYW1lKQogICAgICAgIHNlbGYuYWRkKGZpbGVuYW1lLCBjb250ZW50cykKCiAgICAjIEFkZCBhIGZpbGUgdG8gdGhlIGludGVybmFsIHN0b3JhZ2UuCiAgICBkZWYgYWRkKHNlbGYsIGZpbGVuYW1lLCBjb250ZW50cyk6CiAgICAgICAgZmlsZW5hbWUgPSBzZWxmLmNvbnZlcnRfZmlsZW5hbWUoX3VuaWNvZGUoZmlsZW5hbWUpKQogICAgICAgIGlmIGZpbGVuYW1lIGluIHNlbGYuZmlsZXMgb3IgZmlsZW5hbWUgaW4gc2VsZi5pbmRleGVzOgogICAgICAgICAgICByYWlzZSBWYWx1ZUVycm9yKCdmaWxlIHswfSBhbHJlYWR5IGV4aXN0cyBpbiBhcmNoaXZlJy5mb3JtYXQoX3ByaW50YWJsZShm
-set rpatool-new06=aWxlbmFtZSkpKQoKICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ0FkZGluZyBmaWxlIHswfSB0byBhcmNoaXZlLi4uIChsZW5ndGggPSB7MX0gYnl0ZXMpJy5mb3JtYXQoCiAgICAgICAgICAgIF9wcmludGFibGUoZmlsZW5hbWUpLCBsZW4oY29udGVudHMpKSkKICAgICAgICBzZWxmLmZpbGVzW2ZpbGVuYW1lXSA9IGNvbnRlbnRzCgogICAgIyBSZW1vdmUgYSBmaWxlIGZyb20gYXJjaGl2ZSBvciBpbnRlcm5hbCBzdG9yYWdlLgogICAgZGVmIHJlbW92ZShzZWxmLCBmaWxlbmFtZSk6CiAgICAgICAgZmlsZW5hbWUgPSBfdW5pY29kZShmaWxlbmFtZSkKICAgICAgICBpZiBmaWxlbmFtZSBpbiBzZWxmLmZpbGVzOgogICAgICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1JlbW92aW5nIGZpbGUgezB9IGZyb20gaW50ZXJuYWwgc3RvcmFnZS4uLicuZm9ybWF0KF9wcmludGFibGUoZmlsZW5hbWUpKSkKICAgICAgICAgICAgZGVsIHNlbGYuZmlsZXNbZmlsZW5hbWVdCiAgICAgICAgZWxpZiBmaWxlbmFtZSBpbiBzZWxmLmluZGV4ZXM6CiAgICAgICAgICAgIHNlbGYudmVyYm9zZV9wcmludCgnUmVtb3ZpbmcgZmlsZSB7MH0gZnJvbSBhcmNoaXZlIGluZGV4ZXMuLi4nLmZvcm1hdChfcHJpbnRhYmxlKGZpbGVuYW1lKSkpCiAgICAgICAgICAgIGRlbCBzZWxmLmluZGV4ZXNbZmlsZW5hbWVdCiAgICAgICAgZWxzZToKICAgICAgICAgICAgcmFpc2UgSU9FcnJvcihlcnJuby5FTk9FTlQsICd0aGUgcmVxdWVzdGVkIGZpbGUgezB9IGRvZXMgbm90IGV4aXN0IGluIHRoaXMgYXJjaGl2ZScuZm9ybWF0KF9wcmludGFibGUoZmlsZW5hbWUpKSkKCiAgICAjIExvYWQgYXJjaGl2ZS4KICAgIGRlZiBsb2FkKHNlbGYsIGZpbGVuYW1lKToKICAgICAgICBmaWxlbmFtZSA9IF91bmljb2RlKGZpbGVuYW1lKQoKICAgICAgICBpZiBzZWxmLmhhbmRsZSBpcyBub3QgTm9uZToKICAgICAgICAgICAgc2VsZi5oYW5kbGUuY2xvc2UoKQogICAgICAgIHNlbGYuZmlsZSA9IGZpbGVuYW1lCiAgICAgICAgc2VsZi5maWxlcyA9IHt9CiAgICAgICAgc2VsZi5oYW5kbGUgPSBvcGVuKHNlbGYuZmlsZSwgJ3JiJykKICAgICAgICBzZWxmLnZlcnNpb24gPSBzZWxmLmdldF92ZXJzaW9uKCkKICAgICAgICBzZWxmLmluZGV4ZXMgPSBzZWxmLmV4dHJhY3RfaW5kZXhlcygpCgogICAgIyBTYXZlIGN1cnJlbnQgc3RhdGUgaW50byBhIG5ldyBmaWxlLCBtZXJnaW5nIGFyY2hpdmUgYW5kIGludGVybmFsIHN0b3JhZ2UsIHJlYnVpbGRpbmcgaW5kZXhlcywgYW5kIG9wdGlvbmFsbHkgc2F2aW5nIGluIGFub3RoZXIgZm9ybWF0IHZlcnNpb24uCiAgICBkZWYgc2F2ZShzZWxmLCBmaWxlbmFtZSA9IE5vbmUpOgogICAgICAgIGZpbGVuYW1lID0gX3VuaWNvZGUoZmlsZW5hbWUpCgogICAgICAgIGlmIGZpbGVuYW1lIGlzIE5vbmU6CiAgICAgICAgICAgIGZpbGVuYW1lID0gc2VsZi5maWxlCiAgICAgICAgaWYgZmlsZW5hbWUgaXMgTm9uZToKICAgICAgICAgICAgcmFpc2UgVmFsdWVFcnJvcignbm8gdGFyZ2V0IGZpbGUgZm91bmQgZm9yIHNhdmlu
-set rpatool-new07=ZyBhcmNoaXZlJykKICAgICAgICBpZiBzZWxmLnZlcnNpb24gIT0gMiBhbmQgc2VsZi52ZXJzaW9uICE9IDM6CiAgICAgICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoJ3NhdmluZyBpcyBvbmx5IHN1cHBvcnRlZCBmb3IgdmVyc2lvbiAyIGFuZCAzIGFyY2hpdmVzJykKCiAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdSZWJ1aWxkaW5nIGFyY2hpdmUgaW5kZXguLi4nKQogICAgICAgICMgRmlsbCBvdXIgb3duIGZpbGVzIHN0cnVjdHVyZSB3aXRoIHRoZSBmaWxlcyBhZGRlZCBvciBjaGFuZ2VkIGluIHRoaXMgc2Vzc2lvbi4KICAgICAgICBmaWxlcyA9IHNlbGYuZmlsZXMKICAgICAgICAjIEZpcnN0LCByZWFkIGZpbGVzIGZyb20gdGhlIGN1cnJlbnQgYXJjaGl2ZSBpbnRvIG91ciBmaWxlcyBzdHJ1Y3R1cmUuCiAgICAgICAgZm9yIGZpbGUgaW4gbGlzdChzZWxmLmluZGV4ZXMua2V5cygpKToKICAgICAgICAgICAgY29udGVudCA9IHNlbGYucmVhZChmaWxlKQogICAgICAgICAgICAjIFJlbW92ZSBmcm9tIGluZGV4ZXMgYXJyYXkgb25jZSByZWFkLCBhZGQgdG8gb3VyIG93biBhcnJheS4KICAgICAgICAgICAgZGVsIHNlbGYuaW5kZXhlc1tmaWxlXQogICAgICAgICAgICBmaWxlc1tmaWxlXSA9IGNvbnRlbnQKCiAgICAgICAgIyBQcmVkaWN0IGhlYWRlciBsZW5ndGgsIHdlJ2xsIHdyaXRlIHRoYXQgb25lIGxhc3QuCiAgICAgICAgb2Zmc2V0ID0gMAogICAgICAgIGlmIHNlbGYudmVyc2lvbiA9PSAzOgogICAgICAgICAgICBvZmZzZXQgPSAzNAogICAgICAgIGVsaWYgc2VsZi52ZXJzaW9uID09IDI6CiAgICAgICAgICAgIG9mZnNldCA9IDI1CiAgICAgICAgYXJjaGl2ZSA9IG9wZW4oZmlsZW5hbWUsICd3YicpCiAgICAgICAgYXJjaGl2ZS5zZWVrKG9mZnNldCkKCiAgICAgICAgIyBCdWlsZCBvdXIgb3duIGluZGV4ZXMgd2hpbGUgd3JpdGluZyBmaWxlcyB0byB0aGUgYXJjaGl2ZS4KICAgICAgICBpbmRleGVzID0ge30KICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1dyaXRpbmcgZmlsZXMgdG8gYXJjaGl2ZSBmaWxlLi4uJykKICAgICAgICBmb3IgZmlsZSwgY29udGVudCBpbiBmaWxlcy5pdGVtcygpOgogICAgICAgICAgICAjIEdlbmVyYXRlIHJhbmRvbSBwYWRkaW5nLCBmb3Igd2hhdGV2ZXIgcmVhc29uLgogICAgICAgICAgICBpZiBzZWxmLnBhZGxlbmd0aCA+IDA6CiAgICAgICAgICAgICAgICBwYWRkaW5nID0gc2VsZi5nZW5lcmF0ZV9wYWRkaW5nKCkKICAgICAgICAgICAgICAgIGFyY2hpdmUud3JpdGUocGFkZGluZykKICAgICAgICAgICAgICAgIG9mZnNldCArPSBsZW4ocGFkZGluZykKCiAgICAgICAgICAgIGFyY2hpdmUud3JpdGUoY29udGVudCkKICAgICAgICAgICAgIyBVcGRhdGUgaW5kZXguCiAgICAgICAgICAgIGlmIHNlbGYudmVyc2lvbiA9PSAzOgogICAgICAgICAgICAgICAgaW5kZXhlc1tmaWxlXSA9IFsgKG9mZnNldCBeIHNlbGYua2V5LCBsZW4oY29udGVudCkgXiBzZWxmLmtleSkgXQogICAgICAgICAgICBlbGlmIHNlbGYudmVyc2lvbiA9PSAyOgogICAgICAgICAgICAg
-set rpatool-new08=ICAgaW5kZXhlc1tmaWxlXSA9IFsgKG9mZnNldCwgbGVuKGNvbnRlbnQpKSBdCiAgICAgICAgICAgIG9mZnNldCArPSBsZW4oY29udGVudCkKCiAgICAgICAgIyBXcml0ZSB0aGUgaW5kZXhlcy4KICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1dyaXRpbmcgYXJjaGl2ZSBpbmRleCB0byBhcmNoaXZlIGZpbGUuLi4nKQogICAgICAgIGFyY2hpdmUud3JpdGUoY29kZWNzLmVuY29kZShwaWNrbGUuZHVtcHMoaW5kZXhlcywgc2VsZi5QSUNLTEVfUFJPVE9DT0wpLCAnemxpYicpKQogICAgICAgICMgTm93IHdyaXRlIHRoZSBoZWFkZXIuCiAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdXcml0aW5nIGhlYWRlciB0byBhcmNoaXZlIGZpbGUuLi4gKHZlcnNpb24gPSBSUEF2ezB9KScuZm9ybWF0KHNlbGYudmVyc2lvbikpCiAgICAgICAgYXJjaGl2ZS5zZWVrKDApCiAgICAgICAgaWYgc2VsZi52ZXJzaW9uID09IDM6CiAgICAgICAgICAgIGFyY2hpdmUud3JpdGUoY29kZWNzLmVuY29kZSgne317OjAxNnh9IHs6MDh4fVxuJy5mb3JtYXQoc2VsZi5SUEEzX01BR0lDLCBvZmZzZXQsIHNlbGYua2V5KSkpCiAgICAgICAgZWxzZToKICAgICAgICAgICAgYXJjaGl2ZS53cml0ZShjb2RlY3MuZW5jb2RlKCd7fXs6MDE2eH1cbicuZm9ybWF0KHNlbGYuUlBBMl9NQUdJQywgb2Zmc2V0KSkpCiAgICAgICAgIyBXZSdyZSBkb25lLCBjbG9zZSBpdC4KICAgICAgICBhcmNoaXZlLmNsb3NlKCkKCiAgICAgICAgIyBSZWxvYWQgdGhlIGZpbGUgaW4gb3VyIGlubmVyIGRhdGFiYXNlLgogICAgICAgIHNlbGYubG9hZChmaWxlbmFtZSkKCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6CiAgICBpbXBvcnQgYXJncGFyc2UKCiAgICBwYXJzZXIgPSBhcmdwYXJzZS5Bcmd1bWVudFBhcnNlcigKICAgICAgICBkZXNjcmlwdGlvbj0nQSB0b29sIGZvciB3b3JraW5nIHdpdGggUmVuXCdQeSBhcmNoaXZlIGZpbGVzLicsCiAgICAgICAgZXBpbG9nPSdUaGUgRklMRSBhcmd1bWVudCBjYW4gb3B0aW9uYWxseSBiZSBpbiBBUkNISVZFPVJFQUwgZm9ybWF0LCBtYXBwaW5nIGEgZmlsZSBpbiB0aGUgYXJjaGl2ZSBmaWxlIHN5c3RlbSB0byBhIGZpbGUgb24geW91ciByZWFsIGZpbGUgc3lzdGVtLiBBbiBleGFtcGxlIG9mIHRoaXM6IHJwYXRvb2wgLXggdGVzdC5ycGEgc2NyaXB0LnJweWM9L2hvbWUvZm9vL3Rlc3QucnB5YycsCiAgICAgICAgYWRkX2hlbHA9RmFsc2UpCgogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnYXJjaGl2ZScsIG1ldGF2YXI9J0FSQ0hJVkUnLCBoZWxwPSdUaGUgUmVuXCdweSBhcmNoaXZlIGZpbGUgdG8gb3BlcmF0ZSBvbi4nKQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnZmlsZXMnLCBtZXRhdmFyPSdGSUxFJywgbmFyZ3M9JyonLCBhY3Rpb249J2FwcGVuZCcsIGhlbHA9J1plcm8gb3IgbW9yZSBmaWxlcyB0byBvcGVyYXRlIG9uLicpCgogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWwnLCAnLS1saXN0JywgYWN0aW9uPSdzdG9yZV90cnVlJywgaGVscD0nTGlzdCBmaWxlcyBpbiBhcmNoaXZlIEFSQ0hJVkUuJykK
-set rpatool-new09=ICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy14JywgJy0tZXh0cmFjdCcsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J0V4dHJhY3QgRklMRXMgZnJvbSBBUkNISVZFLicpCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctYycsICctLWNyZWF0ZScsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J0NyZWF0aXZlIEFSQ0hJVkUgZnJvbSBGSUxFcy4nKQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWQnLCAnLS1kZWxldGUnLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdEZWxldGUgRklMRXMgZnJvbSBBUkNISVZFLicpCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctYScsICctLWFwcGVuZCcsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J0FwcGVuZCBGSUxFcyB0byBBUkNISVZFLicpCgogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLTInLCAnLS10d28nLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdVc2UgdGhlIFJQQXYyIGZvcm1hdCBmb3IgY3JlYXRpbmcvYXBwZW5kaW5nIHRvIGFyY2hpdmVzLicpCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctMycsICctLXRocmVlJywgYWN0aW9uPSdzdG9yZV90cnVlJywgaGVscD0nVXNlIHRoZSBSUEF2MyBmb3JtYXQgZm9yIGNyZWF0aW5nL2FwcGVuZGluZyB0byBhcmNoaXZlcyAoZGVmYXVsdCkuJykKCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctaycsICctLWtleScsIG1ldGF2YXI9J0tFWScsIGhlbHA9J1RoZSBvYmZ1c2NhdGlvbiBrZXkgdXNlZCBmb3IgY3JlYXRpbmcgUlBBdjMgYXJjaGl2ZXMsIGluIGhleGFkZWNpbWFsIChkZWZhdWx0OiAweERFQURCRUVGKS4nKQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLXAnLCAnLS1wYWRkaW5nJywgbWV0YXZhcj0nQ09VTlQnLCBoZWxwPSdUaGUgbWF4aW11bSBudW1iZXIgb2YgYnl0ZXMgb2YgcGFkZGluZyB0byBhZGQgYmV0d2VlbiBmaWxlcyAoZGVmYXVsdDogMCkuJykKICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1vJywgJy0tb3V0ZmlsZScsIGhlbHA9J0FuIGFsdGVybmF0aXZlIG91dHB1dCBhcmNoaXZlIGZpbGUgd2hlbiBhcHBlbmRpbmcgdG8gb3IgZGVsZXRpbmcgZnJvbSBhcmNoaXZlcywgb3Igb3V0cHV0IGRpcmVjdG9yeSB3aGVuIGV4dHJhY3RpbmcuJykKCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctaCcsICctLWhlbHAnLCBhY3Rpb249J2hlbHAnLCBoZWxwPSdQcmludCB0aGlzIGhlbHAgYW5kIGV4aXQuJykKICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy12JywgJy0tdmVyYm9zZScsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J0JlIGEgYml0IG1vcmUgdmVyYm9zZSB3aGlsZSBwZXJmb3JtaW5nIG9wZXJhdGlvbnMuJykKICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1WJywgJy0tdmVyc2lvbicsIGFjdGlvbj0ndmVyc2lvbicsIHZlcnNpb249J3JwYXRvb2wgdjAuOCcsIGhlbHA9J1Nob3cgdmVyc2lvbiBpbmZvcm1hdGlvbi4nKQogICAgYXJndW1lbnRzID0gcGFyc2VyLnBhcnNlX2FyZ3MoKQoKICAgICMgRGV0ZXJtaW5lIFJQQSB2ZXJzaW9uLgogICAgaWYgYXJndW1lbnRz
-set rpatool-new10=LnR3bzoKICAgICAgICB2ZXJzaW9uID0gMgogICAgZWxzZToKICAgICAgICB2ZXJzaW9uID0gMwoKICAgICMgRGV0ZXJtaW5lIFJQQXYzIGtleS4KICAgIGlmICdrZXknIGluIGFyZ3VtZW50cyBhbmQgYXJndW1lbnRzLmtleSBpcyBub3QgTm9uZToKICAgICAgICBrZXkgPSBpbnQoYXJndW1lbnRzLmtleSwgMTYpCiAgICBlbHNlOgogICAgICAgIGtleSA9IDB4REVBREJFRUYKCiAgICAjIERldGVybWluZSBwYWRkaW5nIGJ5dGVzLgogICAgaWYgJ3BhZGRpbmcnIGluIGFyZ3VtZW50cyBhbmQgYXJndW1lbnRzLnBhZGRpbmcgaXMgbm90IE5vbmU6CiAgICAgICAgcGFkZGluZyA9IGludChhcmd1bWVudHMucGFkZGluZykKICAgIGVsc2U6CiAgICAgICAgcGFkZGluZyA9IDAKCiAgICAjIERldGVybWluZSBvdXRwdXQgZmlsZS9kaXJlY3RvcnkgYW5kIGlucHV0IGFyY2hpdmUKICAgIGlmIGFyZ3VtZW50cy5jcmVhdGU6CiAgICAgICAgYXJjaGl2ZSA9IE5vbmUKICAgICAgICBvdXRwdXQgPSBfdW5pY29kZShhcmd1bWVudHMuYXJjaGl2ZSkKICAgIGVsc2U6CiAgICAgICAgYXJjaGl2ZSA9IF91bmljb2RlKGFyZ3VtZW50cy5hcmNoaXZlKQogICAgICAgIGlmICdvdXRmaWxlJyBpbiBhcmd1bWVudHMgYW5kIGFyZ3VtZW50cy5vdXRmaWxlIGlzIG5vdCBOb25lOgogICAgICAgICAgICBvdXRwdXQgPSBfdW5pY29kZShhcmd1bWVudHMub3V0ZmlsZSkKICAgICAgICBlbHNlOgogICAgICAgICAgICAjIERlZmF1bHQgb3V0cHV0IGRpcmVjdG9yeSBmb3IgZXh0cmFjdGlvbiBpcyB0aGUgY3VycmVudCBkaXJlY3RvcnkuCiAgICAgICAgICAgIGlmIGFyZ3VtZW50cy5leHRyYWN0OgogICAgICAgICAgICAgICAgb3V0cHV0ID0gJy4nCiAgICAgICAgICAgIGVsc2U6CiAgICAgICAgICAgICAgICBvdXRwdXQgPSBfdW5pY29kZShhcmd1bWVudHMuYXJjaGl2ZSkKCiAgICAjIE5vcm1hbGl6ZSBmaWxlcy4KICAgIGlmIGxlbihhcmd1bWVudHMuZmlsZXMpID4gMCBhbmQgaXNpbnN0YW5jZShhcmd1bWVudHMuZmlsZXNbMF0sIGxpc3QpOgogICAgICAgIGFyZ3VtZW50cy5maWxlcyA9IGFyZ3VtZW50cy5maWxlc1swXQoKICAgIHRyeToKICAgICAgICBhcmNoaXZlID0gUmVuUHlBcmNoaXZlKGFyY2hpdmUsIHBhZGxlbmd0aD1wYWRkaW5nLCBrZXk9a2V5LCB2ZXJzaW9uPXZlcnNpb24sIHZlcmJvc2U9YXJndW1lbnRzLnZlcmJvc2UpCiAgICBleGNlcHQgSU9FcnJvciBhcyBlOgogICAgICAgIHByaW50KCdDb3VsZCBub3Qgb3BlbiBhcmNoaXZlIGZpbGUgezB9IGZvciByZWFkaW5nOiB7MX0nLmZvcm1hdChhcmNoaXZlLCBlKSwgZmlsZT1zeXMuc3RkZXJyKQogICAgICAgIHN5cy5leGl0KDEpCgogICAgaWYgYXJndW1lbnRzLmNyZWF0ZSBvciBhcmd1bWVudHMuYXBwZW5kOgogICAgICAgICMgV2UgbmVlZCB0aGlzIHNlcGVyYXRlIGZ1bmN0aW9uIHRvIHJlY3Vyc2l2ZWx5IHByb2Nlc3MgZGlyZWN0b3JpZXMuCiAgICAgICAgZGVmIGFkZF9maWxlKGZpbGVuYW1lKToKICAgICAgICAgICAgIyBJZiB0aGUgYXJjaGl2ZSBwYXRoIGRp
-set rpatool-new11=ZmZlcnMgZnJvbSB0aGUgYWN0dWFsIGZpbGUgcGF0aCwgYXMgZ2l2ZW4gaW4gdGhlIGFyZ3VtZW50LAogICAgICAgICAgICAjIGV4dHJhY3QgdGhlIGFyY2hpdmUgcGF0aCBhbmQgYWN0dWFsIGZpbGUgcGF0aC4KICAgICAgICAgICAgaWYgZmlsZW5hbWUuZmluZCgnPScpICE9IC0xOgogICAgICAgICAgICAgICAgKG91dGZpbGUsIGZpbGVuYW1lKSA9IGZpbGVuYW1lLnNwbGl0KCc9JywgMikKICAgICAgICAgICAgZWxzZToKICAgICAgICAgICAgICAgIG91dGZpbGUgPSBmaWxlbmFtZQoKICAgICAgICAgICAgaWYgb3MucGF0aC5pc2RpcihmaWxlbmFtZSk6CiAgICAgICAgICAgICAgICBmb3IgZmlsZSBpbiBvcy5saXN0ZGlyKGZpbGVuYW1lKToKICAgICAgICAgICAgICAgICAgICAjIFdlIG5lZWQgdG8gZG8gdGhpcyBpbiBvcmRlciB0byBtYWludGFpbiBhIHBvc3NpYmxlIEFSQ0hJVkU9UkVBTCBtYXBwaW5nIGJldHdlZW4gZGlyZWN0b3JpZXMuCiAgICAgICAgICAgICAgICAgICAgYWRkX2ZpbGUob3V0ZmlsZSArIG9zLnNlcCArIGZpbGUgKyAnPScgKyBmaWxlbmFtZSArIG9zLnNlcCArIGZpbGUpCiAgICAgICAgICAgIGVsc2U6CiAgICAgICAgICAgICAgICB0cnk6CiAgICAgICAgICAgICAgICAgICAgd2l0aCBvcGVuKGZpbGVuYW1lLCAncmInKSBhcyBmaWxlOgogICAgICAgICAgICAgICAgICAgICAgICBhcmNoaXZlLmFkZChvdXRmaWxlLCBmaWxlLnJlYWQoKSkKICAgICAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgICAgICAgICAgICAgICAgICBwcmludCgnQ291bGQgbm90IGFkZCBmaWxlIHswfSB0byBhcmNoaXZlOiB7MX0nLmZvcm1hdChmaWxlbmFtZSwgZSksIGZpbGU9c3lzLnN0ZGVycikKCiAgICAgICAgIyBJdGVyYXRlIG92ZXIgdGhlIGdpdmVuIGZpbGVzIHRvIGFkZCB0byBhcmNoaXZlLgogICAgICAgIGZvciBmaWxlbmFtZSBpbiBhcmd1bWVudHMuZmlsZXM6CiAgICAgICAgICAgIGFkZF9maWxlKF91bmljb2RlKGZpbGVuYW1lKSkKCiAgICAgICAgIyBTZXQgdmVyc2lvbiBmb3Igc2F2aW5nLCBhbmQgc2F2ZS4KICAgICAgICBhcmNoaXZlLnZlcnNpb24gPSB2ZXJzaW9uCiAgICAgICAgdHJ5OgogICAgICAgICAgICBhcmNoaXZlLnNhdmUob3V0cHV0KQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgICAgICAgICAgcHJpbnQoJ0NvdWxkIG5vdCBzYXZlIGFyY2hpdmUgZmlsZTogezB9Jy5mb3JtYXQoZSksIGZpbGU9c3lzLnN0ZGVycikKICAgIGVsaWYgYXJndW1lbnRzLmRlbGV0ZToKICAgICAgICAjIEl0ZXJhdGUgb3ZlciB0aGUgZ2l2ZW4gZmlsZXMgdG8gZGVsZXRlIGZyb20gdGhlIGFyY2hpdmUuCiAgICAgICAgZm9yIGZpbGVuYW1lIGluIGFyZ3VtZW50cy5maWxlczoKICAgICAgICAgICAgdHJ5OgogICAgICAgICAgICAgICAgYXJjaGl2ZS5yZW1vdmUoZmlsZW5hbWUpCiAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgICAgICAgICAgICAgIHByaW50KCdDb3VsZCBub3QgZGVsZXRlIGZpbGUgezB9IGZyb20gYXJjaGl2ZTogezF9
-set rpatool-new12=Jy5mb3JtYXQoZmlsZW5hbWUsIGUpLCBmaWxlPXN5cy5zdGRlcnIpCgogICAgICAgICMgU2V0IHZlcnNpb24gZm9yIHNhdmluZywgYW5kIHNhdmUuCiAgICAgICAgYXJjaGl2ZS52ZXJzaW9uID0gdmVyc2lvbgogICAgICAgIHRyeToKICAgICAgICAgICAgYXJjaGl2ZS5zYXZlKG91dHB1dCkKICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGU6CiAgICAgICAgICAgIHByaW50KCdDb3VsZCBub3Qgc2F2ZSBhcmNoaXZlIGZpbGU6IHswfScuZm9ybWF0KGUpLCBmaWxlPXN5cy5zdGRlcnIpCiAgICBlbGlmIGFyZ3VtZW50cy5leHRyYWN0OgogICAgICAgICMgRWl0aGVyIGV4dHJhY3QgdGhlIGdpdmVuIGZpbGVzLCBvciBhbGwgZmlsZXMgaWYgbm8gZmlsZXMgYXJlIGdpdmVuLgogICAgICAgIGlmIGxlbihhcmd1bWVudHMuZmlsZXMpID4gMDoKICAgICAgICAgICAgZmlsZXMgPSBhcmd1bWVudHMuZmlsZXMKICAgICAgICBlbHNlOgogICAgICAgICAgICBmaWxlcyA9IGFyY2hpdmUubGlzdCgpCgogICAgICAgICMgQ3JlYXRlIG91dHB1dCBkaXJlY3RvcnkgaWYgbm90IHByZXNlbnQuCiAgICAgICAgaWYgbm90IG9zLnBhdGguZXhpc3RzKG91dHB1dCk6CiAgICAgICAgICAgIG9zLm1ha2VkaXJzKG91dHB1dCkKCiAgICAgICAgIyBJdGVyYXRlIG92ZXIgZmlsZXMgdG8gZXh0cmFjdC4KICAgICAgICBmb3IgZmlsZW5hbWUgaW4gZmlsZXM6CiAgICAgICAgICAgIGlmIGZpbGVuYW1lLmZpbmQoJz0nKSAhPSAtMToKICAgICAgICAgICAgICAgIChvdXRmaWxlLCBmaWxlbmFtZSkgPSBmaWxlbmFtZS5zcGxpdCgnPScsIDIpCiAgICAgICAgICAgIGVsc2U6CiAgICAgICAgICAgICAgICBvdXRmaWxlID0gZmlsZW5hbWUKCiAgICAgICAgICAgIHRyeToKICAgICAgICAgICAgICAgIGNvbnRlbnRzID0gYXJjaGl2ZS5yZWFkKGZpbGVuYW1lKQoKICAgICAgICAgICAgICAgICMgQ3JlYXRlIG91dHB1dCBkaXJlY3RvcnkgZm9yIGZpbGUgaWYgbm90IHByZXNlbnQuCiAgICAgICAgICAgICAgICBpZiBub3Qgb3MucGF0aC5leGlzdHMob3MucGF0aC5kaXJuYW1lKG9zLnBhdGguam9pbihvdXRwdXQsIG91dGZpbGUpKSk6CiAgICAgICAgICAgICAgICAgICAgb3MubWFrZWRpcnMob3MucGF0aC5kaXJuYW1lKG9zLnBhdGguam9pbihvdXRwdXQsIG91dGZpbGUpKSkKCiAgICAgICAgICAgICAgICB3aXRoIG9wZW4ob3MucGF0aC5qb2luKG91dHB1dCwgb3V0ZmlsZSksICd3YicpIGFzIGZpbGU6CiAgICAgICAgICAgICAgICAgICAgZmlsZS53cml0ZShjb250ZW50cykKICAgICAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOgogICAgICAgICAgICAgICAgcHJpbnQoJ0NvdWxkIG5vdCBleHRyYWN0IGZpbGUgezB9IGZyb20gYXJjaGl2ZTogezF9Jy5mb3JtYXQoZmlsZW5hbWUsIGUpLCBmaWxlPXN5cy5zdGRlcnIpCiAgICBlbGlmIGFyZ3VtZW50cy5saXN0OgogICAgICAgICMgUHJpbnQgdGhlIHNvcnRlZCBmaWxlIGxpc3QuCiAgICAgICAgbGlzdCA9IGFyY2hpdmUubGlzdCgpCiAgICAgICAgbGlzdC5zb3J0KCkKICAgICAgICBm
-set rpatool-new13=b3IgZmlsZSBpbiBsaXN0OgogICAgICAgICAgICBwcmludChmaWxlKQogICAgZWxzZToKICAgICAgICBwcmludCgnTm8gb3BlcmF0aW9uIGdpdmVuIDooJykKICAgICAgICBwcmludCgnVXNlIHswfSAtLWhlbHAgZm9yIHVzYWdlIGRldGFpbHMuJy5mb3JtYXQoc3lzLmFyZ3ZbMF0pKQoK
+:: rpatool by Shizmob 9a58396 2019-02-22T17:31:07.000Z
+::	https://github.com/Shizmob/rpatool
+:: Require Python ^>= 3.8
+set RPATOOL-NEW01=IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwoKZnJvbSBfX2Z1dHVyZV9fIGltcG9ydCBwcmludF9mdW5jdGlvbgoKaW1wb3J0IHN5cwppbXBvcnQgb3MKaW1wb3J0IGNvZGVjcwppbXBvcnQgcGlja2xlCmltcG9ydCBlcnJubwppbXBvcnQgcmFuZG9tCnRyeToKICAgIGltcG9ydCBwaWNrbGU1IGFzIHBpY2tsZQpleGNlcHQ6CiAgICBpbXBvcnQgcGlja2xlCiAgICBpZiBzeXMudmVyc2lvbl9pbmZvIDwgKDMsIDgpOgogICAgICAgIHByaW50KCd3YXJuaW5nOiBwaWNrbGU1IG1vZHVsZSBjb3VsZCBub3QgYmUgbG9hZGVkIGFuZCBQeXRob24gdmVyc2lvbiBpcyA8IDMuOCwnLCBmaWxlPXN5cy5zdGRlcnIpCiAgICAgICAgcHJpbnQoJyAgICAgICAgIG5ld2VyIFJlblwnUHkgZ2FtZXMgbWF5IGZhaWwgdG8gdW5wYWNrIScsIGZpbGU9c3lzLnN0ZGVycikKICAgICAgICBpZiBzeXMudmVyc2lvbl9pbmZvID49ICgzLCA1KToKICAgICAgICAgICAgcHJpbnQoJyAgICAgICAgIGlmIHRoaXMgb2NjdXJzLCBmaXggaXQgYnkgaW5zdGFsbGluZyBwaWNrbGU1OicsIGZpbGU9c3lzLnN0ZGVycikKICAgICAgICAgICAgcHJpbnQoJyAgICAgICAgICAgICB7fSAtbSBwaXAgaW5zdGFsbCBwaWNrbGU1Jy5mb3JtYXQoc3lzLmV4ZWN1dGFibGUpLCBmaWxlPXN5cy5zdGRlcnIpCiAgICAgICAgZWxzZToKICAgICAgICAgICAgcHJpbnQoJyAgICAgICAgIGlmIHRoaXMgb2NjdXJzLCBwbGVhc2UgdXBncmFkZSB0byBhIG5ld2VyIFB5dGhvbiAoPj0gMy41KS4nLCBmaWxlPXN5cy5zdGRlcnIpCiAgICAgICAgcHJpbnQoZmlsZT1zeXMuc3RkZXJyKQoKCmlmIHN5cy52ZXJzaW9uX2luZm9bMF0gPj0gMzoKICAgIGRlZiBfdW5pY29kZSh0ZXh0KToKICAgICAgICByZXR1cm4gdGV4dAoKICAgIGRlZiBfcHJpbnRhYmxlKHRleHQpOgogICAgICAgIHJldHVybiB0ZXh0CgogICAgZGVmIF91bm1hbmdsZShkYXRhKToKICAgICAgICBpZiB0eXBlKGRhdGEpID09IGJ5dGVzOgogICAgICAgICAgICByZXR1cm4gZGF0YQogICAgICAgIGVsc2U6CiAgICAgICAgICAgIHJldHVybiBkYXRhLmVuY29kZSgnbGF0aW4xJykKCiAgICBkZWYgX3VucGlja2xlKGRhdGEpOgogICAgICAgICMgU3BlY2lmeSBsYXRpbjEgZW5jb2RpbmcgdG8gcHJldmVudCByYXcgYnl0ZSB2YWx1ZXMgZnJvbSBjYXVzaW5nIGFuIEFTQ0lJIGRlY29kZSBlcnJvci4KICAgICAgICByZXR1cm4gcGlja2xlLmxvYWRzKGRhdGEsIGVuY29kaW5nPSdsYXRpbjEnKQplbGlmIHN5cy52ZXJzaW9uX2luZm9bMF0gPT0gMjoKICAgIGRlZiBfdW5pY29kZSh0ZXh0KToKICAgICAgICBpZiBpc2luc3RhbmNlKHRleHQsIHVuaWNvZGUpOgogICAgICAgICAgICByZXR1cm4gdGV4dAogICAgICAgIHJldHVybiB0ZXh0LmRlY29kZSgndXRmLTgnKQoKICAgIGRlZiBfcHJpbnRhYmxlKHRleHQpOgogICAgICAgIHJldHVybiB0ZXh0LmVuY29kZSgndXRmLTgnKQoKICAgIGRlZiBfdW5tYW5nbGUoZGF0YSk6CiAgICAgICAgcmV0dXJuIGRhdGEKCiAgICBkZWYgX3VucGlja2xlKGRhdGEpOgogICAgICAg
+set RPATOOL-NEW02=IHJldHVybiBwaWNrbGUubG9hZHMoZGF0YSkKCmNsYXNzIFJlblB5QXJjaGl2ZToKICAgIGZpbGUgPSBOb25lCiAgICBoYW5kbGUgPSBOb25lCgogICAgZmlsZXMgPSB7fQogICAgaW5kZXhlcyA9IHt9CgogICAgdmVyc2lvbiA9IE5vbmUKICAgIHBhZGxlbmd0aCA9IDAKICAgIGtleSA9IE5vbmUKICAgIHZlcmJvc2UgPSBGYWxzZQoKICAgIFJQQTJfTUFHSUMgPSAnUlBBLTIuMCAnCiAgICBSUEEzX01BR0lDID0gJ1JQQS0zLjAgJwogICAgUlBBM18yX01BR0lDID0gJ1JQQS0zLjIgJwoKICAgICMgRm9yIGJhY2t3YXJkIGNvbXBhdGliaWxpdHksIG90aGVyd2lzZSBQeXRob24zLXBhY2tlZCBhcmNoaXZlcyB3b24ndCBiZSByZWFkIGJ5IFB5dGhvbjIKICAgIFBJQ0tMRV9QUk9UT0NPTCA9IDIKCiAgICBkZWYgX19pbml0X18oc2VsZiwgZmlsZSA9IE5vbmUsIHZlcnNpb24gPSAzLCBwYWRsZW5ndGggPSAwLCBrZXkgPSAweERFQURCRUVGLCB2ZXJib3NlID0gRmFsc2UpOgogICAgICAgIHNlbGYucGFkbGVuZ3RoID0gcGFkbGVuZ3RoCiAgICAgICAgc2VsZi5rZXkgPSBrZXkKICAgICAgICBzZWxmLnZlcmJvc2UgPSB2ZXJib3NlCgogICAgICAgIGlmIGZpbGUgaXMgbm90IE5vbmU6CiAgICAgICAgICAgIHNlbGYubG9hZChmaWxlKQogICAgICAgIGVsc2U6CiAgICAgICAgICAgIHNlbGYudmVyc2lvbiA9IHZlcnNpb24KCiAgICBkZWYgX19kZWxfXyhzZWxmKToKICAgICAgICBpZiBzZWxmLmhhbmRsZSBpcyBub3QgTm9uZToKICAgICAgICAgICAgc2VsZi5oYW5kbGUuY2xvc2UoKQoKICAgICMgRGV0ZXJtaW5lIGFyY2hpdmUgdmVyc2lvbi4KICAgIGRlZiBnZXRfdmVyc2lvbihzZWxmKToKICAgICAgICBzZWxmLmhhbmRsZS5zZWVrKDApCiAgICAgICAgbWFnaWMgPSBzZWxmLmhhbmRsZS5yZWFkbGluZSgpLmRlY29kZSgndXRmLTgnKQoKICAgICAgICBpZiBtYWdpYy5zdGFydHN3aXRoKHNlbGYuUlBBM18yX01BR0lDKToKICAgICAgICAgICAgcmV0dXJuIDMuMgogICAgICAgIGVsaWYgbWFnaWMuc3RhcnRzd2l0aChzZWxmLlJQQTNfTUFHSUMpOgogICAgICAgICAgICByZXR1cm4gMwogICAgICAgIGVsaWYgbWFnaWMuc3RhcnRzd2l0aChzZWxmLlJQQTJfTUFHSUMpOgogICAgICAgICAgICByZXR1cm4gMgogICAgICAgIGVsaWYgc2VsZi5maWxlLmVuZHN3aXRoKCcucnBpJyk6CiAgICAgICAgICAgIHJldHVybiAxCgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoJ3RoZSBnaXZlbiBmaWxlIGlzIG5vdCBhIHZhbGlkIFJlblwnUHkgYXJjaGl2ZSwgb3IgYW4gdW5zdXBwb3J0ZWQgdmVyc2lvbicpCgogICAgIyBFeHRyYWN0IGZpbGUgaW5kZXhlcyBmcm9tIG9wZW5lZCBhcmNoaXZlLgogICAgZGVmIGV4dHJhY3RfaW5kZXhlcyhzZWxmKToKICAgICAgICBzZWxmLmhhbmRsZS5zZWVrKDApCiAgICAgICAgaW5kZXhlcyA9IE5vbmUKCiAgICAgICAgaWYgc2VsZi52ZXJzaW9uIGluIFsyLCAzLCAzLjJdOgogICAgICAgICAgICAjIEZldGNoIG1ldGFkYXRhLgogICAgICAgICAgICBtZXRhZGF0YSA9IHNlbGYuaGFuZGxl
+set RPATOOL-NEW03=LnJlYWRsaW5lKCkKICAgICAgICAgICAgdmFscyA9IG1ldGFkYXRhLnNwbGl0KCkKICAgICAgICAgICAgb2Zmc2V0ID0gaW50KHZhbHNbMV0sIDE2KQogICAgICAgICAgICBpZiBzZWxmLnZlcnNpb24gPT0gMzoKICAgICAgICAgICAgICAgIHNlbGYua2V5ID0gMAogICAgICAgICAgICAgICAgZm9yIHN1YmtleSBpbiB2YWxzWzI6XToKICAgICAgICAgICAgICAgICAgICBzZWxmLmtleSBePSBpbnQoc3Via2V5LCAxNikKICAgICAgICAgICAgZWxpZiBzZWxmLnZlcnNpb24gPT0gMy4yOgogICAgICAgICAgICAgICAgc2VsZi5rZXkgPSAwCiAgICAgICAgICAgICAgICBmb3Igc3Via2V5IGluIHZhbHNbMzpdOgogICAgICAgICAgICAgICAgICAgIHNlbGYua2V5IF49IGludChzdWJrZXksIDE2KQoKICAgICAgICAgICAgIyBMb2FkIGluIGluZGV4ZXMuCiAgICAgICAgICAgIHNlbGYuaGFuZGxlLnNlZWsob2Zmc2V0KQogICAgICAgICAgICBjb250ZW50cyA9IGNvZGVjcy5kZWNvZGUoc2VsZi5oYW5kbGUucmVhZCgpLCAnemxpYicpCiAgICAgICAgICAgIGluZGV4ZXMgPSBfdW5waWNrbGUoY29udGVudHMpCgogICAgICAgICAgICAjIERlb2JmdXNjYXRlIGluZGV4ZXMuCiAgICAgICAgICAgIGlmIHNlbGYudmVyc2lvbiBpbiBbMywgMy4yXToKICAgICAgICAgICAgICAgIG9iZnVzY2F0ZWRfaW5kZXhlcyA9IGluZGV4ZXMKICAgICAgICAgICAgICAgIGluZGV4ZXMgPSB7fQogICAgICAgICAgICAgICAgZm9yIGkgaW4gb2JmdXNjYXRlZF9pbmRleGVzLmtleXMoKToKICAgICAgICAgICAgICAgICAgICBpZiBsZW4ob2JmdXNjYXRlZF9pbmRleGVzW2ldWzBdKSA9PSAyOgogICAgICAgICAgICAgICAgICAgICAgICBpbmRleGVzW2ldID0gWyAob2Zmc2V0IF4gc2VsZi5rZXksIGxlbmd0aCBeIHNlbGYua2V5KSBmb3Igb2Zmc2V0LCBsZW5ndGggaW4gb2JmdXNjYXRlZF9pbmRleGVzW2ldIF0KICAgICAgICAgICAgICAgICAgICBlbHNlOgogICAgICAgICAgICAgICAgICAgICAgICBpbmRleGVzW2ldID0gWyAob2Zmc2V0IF4gc2VsZi5rZXksIGxlbmd0aCBeIHNlbGYua2V5LCBwcmVmaXgpIGZvciBvZmZzZXQsIGxlbmd0aCwgcHJlZml4IGluIG9iZnVzY2F0ZWRfaW5kZXhlc1tpXSBdCiAgICAgICAgZWxzZToKICAgICAgICAgICAgaW5kZXhlcyA9IHBpY2tsZS5sb2Fkcyhjb2RlY3MuZGVjb2RlKHNlbGYuaGFuZGxlLnJlYWQoKSwgJ3psaWInKSkKCiAgICAgICAgcmV0dXJuIGluZGV4ZXMKCiAgICAjIEdlbmVyYXRlIHBzZXVkb3JhbmRvbSBwYWRkaW5nIChmb3Igd2hhdGV2ZXIgcmVhc29uKS4KICAgIGRlZiBnZW5lcmF0ZV9wYWRkaW5nKHNlbGYpOgogICAgICAgIGxlbmd0aCA9IHJhbmRvbS5yYW5kaW50KDEsIHNlbGYucGFkbGVuZ3RoKQoKICAgICAgICBwYWRkaW5nID0gJycKICAgICAgICB3aGlsZSBsZW5ndGggPiAwOgogICAgICAgICAgICBwYWRkaW5nICs9IGNocihyYW5kb20ucmFuZGludCgxLCAyNTUpKQogICAgICAgICAgICBsZW5ndGggLT0gMQoKICAgICAgICByZXR1cm4gYnl0ZXMocGFkZGluZywgJ3V0
+set RPATOOL-NEW04=Zi04JykKCiAgICAjIENvbnZlcnRzIGEgZmlsZW5hbWUgdG8gYXJjaGl2ZSBmb3JtYXQuCiAgICBkZWYgY29udmVydF9maWxlbmFtZShzZWxmLCBmaWxlbmFtZSk6CiAgICAgICAgKGRyaXZlLCBmaWxlbmFtZSkgPSBvcy5wYXRoLnNwbGl0ZHJpdmUob3MucGF0aC5ub3JtcGF0aChmaWxlbmFtZSkucmVwbGFjZShvcy5zZXAsICcvJykpCiAgICAgICAgcmV0dXJuIGZpbGVuYW1lCgogICAgIyBEZWJ1ZyAodmVyYm9zZSkgbWVzc2FnZXMuCiAgICBkZWYgdmVyYm9zZV9wcmludChzZWxmLCBtZXNzYWdlKToKICAgICAgICBpZiBzZWxmLnZlcmJvc2U6CiAgICAgICAgICAgIHByaW50KG1lc3NhZ2UpCgoKICAgICMgTGlzdCBmaWxlcyBpbiBhcmNoaXZlIGFuZCBjdXJyZW50IGludGVybmFsIHN0b3JhZ2UuCiAgICBkZWYgbGlzdChzZWxmKToKICAgICAgICByZXR1cm4gbGlzdChzZWxmLmluZGV4ZXMua2V5cygpKSArIGxpc3Qoc2VsZi5maWxlcy5rZXlzKCkpCgogICAgIyBDaGVjayBpZiBhIGZpbGUgZXhpc3RzIGluIHRoZSBhcmNoaXZlLgogICAgZGVmIGhhc19maWxlKHNlbGYsIGZpbGVuYW1lKToKICAgICAgICBmaWxlbmFtZSA9IF91bmljb2RlKGZpbGVuYW1lKQogICAgICAgIHJldHVybiBmaWxlbmFtZSBpbiBzZWxmLmluZGV4ZXMua2V5cygpIG9yIGZpbGVuYW1lIGluIHNlbGYuZmlsZXMua2V5cygpCgogICAgIyBSZWFkIGZpbGUgZnJvbSBhcmNoaXZlIG9yIGludGVybmFsIHN0b3JhZ2UuCiAgICBkZWYgcmVhZChzZWxmLCBmaWxlbmFtZSk6CiAgICAgICAgZmlsZW5hbWUgPSBzZWxmLmNvbnZlcnRfZmlsZW5hbWUoX3VuaWNvZGUoZmlsZW5hbWUpKQoKICAgICAgICAjIENoZWNrIGlmIHRoZSBmaWxlIGV4aXN0cyBpbiBvdXIgaW5kZXhlcy4KICAgICAgICBpZiBmaWxlbmFtZSBub3QgaW4gc2VsZi5maWxlcyBhbmQgZmlsZW5hbWUgbm90IGluIHNlbGYuaW5kZXhlczoKICAgICAgICAgICAgcmFpc2UgSU9FcnJvcihlcnJuby5FTk9FTlQsICd0aGUgcmVxdWVzdGVkIGZpbGUgezB9IGRvZXMgbm90IGV4aXN0IGluIHRoZSBnaXZlbiBSZW5cJ1B5IGFyY2hpdmUnLmZvcm1hdCgKICAgICAgICAgICAgICAgIF9wcmludGFibGUoZmlsZW5hbWUpKSkKCiAgICAgICAgIyBJZiBpdCdzIGluIG91ciBvcGVuZWQgYXJjaGl2ZSBpbmRleCwgYW5kIG91ciBhcmNoaXZlIGhhbmRsZSBpc24ndCB2YWxpZCwgc29tZXRoaW5nIGlzIG9idmlvdXNseSB3cm9uZy4KICAgICAgICBpZiBmaWxlbmFtZSBub3QgaW4gc2VsZi5maWxlcyBhbmQgZmlsZW5hbWUgaW4gc2VsZi5pbmRleGVzIGFuZCBzZWxmLmhhbmRsZSBpcyBOb25lOgogICAgICAgICAgICByYWlzZSBJT0Vycm9yKGVycm5vLkVOT0VOVCwgJ3RoZSByZXF1ZXN0ZWQgZmlsZSB7MH0gZG9lcyBub3QgZXhpc3QgaW4gdGhlIGdpdmVuIFJlblwnUHkgYXJjaGl2ZScuZm9ybWF0KAogICAgICAgICAgICAgICAgX3ByaW50YWJsZShmaWxlbmFtZSkpKQoKICAgICAgICAjIENoZWNrIG91ciBzaW1wbGlmaWVkIGludGVybmFsIGluZGV4ZXMgZmlyc3QsIGluIGNhc2Ugc29tZW9u
+set RPATOOL-NEW05=ZSB3YW50cyB0byByZWFkIGEgZmlsZSB0aGV5IGFkZGVkIGJlZm9yZSB3aXRob3V0IHNhdmluZywgZm9yIHNvbWUgdW5ob2x5IHJlYXNvbi4KICAgICAgICBpZiBmaWxlbmFtZSBpbiBzZWxmLmZpbGVzOgogICAgICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1JlYWRpbmcgZmlsZSB7MH0gZnJvbSBpbnRlcm5hbCBzdG9yYWdlLi4uJy5mb3JtYXQoX3ByaW50YWJsZShmaWxlbmFtZSkpKQogICAgICAgICAgICByZXR1cm4gc2VsZi5maWxlc1tmaWxlbmFtZV0KICAgICAgICAjIFdlIG5lZWQgdG8gcmVhZCB0aGUgZmlsZSBmcm9tIG91ciBvcGVuIGFyY2hpdmUuCiAgICAgICAgZWxzZToKICAgICAgICAgICAgIyBSZWFkIG9mZnNldCBhbmQgbGVuZ3RoLCBzZWVrIHRvIHRoZSBvZmZzZXQgYW5kIHJlYWQgdGhlIGZpbGUgY29udGVudHMuCiAgICAgICAgICAgIGlmIGxlbihzZWxmLmluZGV4ZXNbZmlsZW5hbWVdWzBdKSA9PSAzOgogICAgICAgICAgICAgICAgKG9mZnNldCwgbGVuZ3RoLCBwcmVmaXgpID0gc2VsZi5pbmRleGVzW2ZpbGVuYW1lXVswXQogICAgICAgICAgICBlbHNlOgogICAgICAgICAgICAgICAgKG9mZnNldCwgbGVuZ3RoKSA9IHNlbGYuaW5kZXhlc1tmaWxlbmFtZV1bMF0KICAgICAgICAgICAgICAgIHByZWZpeCA9ICcnCgogICAgICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1JlYWRpbmcgZmlsZSB7MH0gZnJvbSBkYXRhIGZpbGUgezF9Li4uIChvZmZzZXQgPSB7Mn0sIGxlbmd0aCA9IHszfSBieXRlcyknLmZvcm1hdCgKICAgICAgICAgICAgICAgIF9wcmludGFibGUoZmlsZW5hbWUpLCBzZWxmLmZpbGUsIG9mZnNldCwgbGVuZ3RoKSkKICAgICAgICAgICAgc2VsZi5oYW5kbGUuc2VlayhvZmZzZXQpCiAgICAgICAgICAgIHJldHVybiBfdW5tYW5nbGUocHJlZml4KSArIHNlbGYuaGFuZGxlLnJlYWQobGVuZ3RoIC0gbGVuKHByZWZpeCkpCgogICAgIyBNb2RpZnkgYSBmaWxlIGluIGFyY2hpdmUgb3IgaW50ZXJuYWwgc3RvcmFnZS4KICAgIGRlZiBjaGFuZ2Uoc2VsZiwgZmlsZW5hbWUsIGNvbnRlbnRzKToKICAgICAgICBmaWxlbmFtZSA9IF91bmljb2RlKGZpbGVuYW1lKQoKICAgICAgICAjIE91ciAnY2hhbmdlJyBpcyBiYXNpY2FsbHkgcmVtb3ZpbmcgdGhlIGZpbGUgZnJvbSBvdXIgaW5kZXhlcyBmaXJzdCwgYW5kIHRoZW4gcmUtYWRkaW5nIGl0LgogICAgICAgIHNlbGYucmVtb3ZlKGZpbGVuYW1lKQogICAgICAgIHNlbGYuYWRkKGZpbGVuYW1lLCBjb250ZW50cykKCiAgICAjIEFkZCBhIGZpbGUgdG8gdGhlIGludGVybmFsIHN0b3JhZ2UuCiAgICBkZWYgYWRkKHNlbGYsIGZpbGVuYW1lLCBjb250ZW50cyk6CiAgICAgICAgZmlsZW5hbWUgPSBzZWxmLmNvbnZlcnRfZmlsZW5hbWUoX3VuaWNvZGUoZmlsZW5hbWUpKQogICAgICAgIGlmIGZpbGVuYW1lIGluIHNlbGYuZmlsZXMgb3IgZmlsZW5hbWUgaW4gc2VsZi5pbmRleGVzOgogICAgICAgICAgICByYWlzZSBWYWx1ZUVycm9yKCdmaWxlIHswfSBhbHJlYWR5IGV4aXN0cyBpbiBhcmNoaXZlJy5mb3JtYXQoX3ByaW50YWJsZShm
+set RPATOOL-NEW06=aWxlbmFtZSkpKQoKICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ0FkZGluZyBmaWxlIHswfSB0byBhcmNoaXZlLi4uIChsZW5ndGggPSB7MX0gYnl0ZXMpJy5mb3JtYXQoCiAgICAgICAgICAgIF9wcmludGFibGUoZmlsZW5hbWUpLCBsZW4oY29udGVudHMpKSkKICAgICAgICBzZWxmLmZpbGVzW2ZpbGVuYW1lXSA9IGNvbnRlbnRzCgogICAgIyBSZW1vdmUgYSBmaWxlIGZyb20gYXJjaGl2ZSBvciBpbnRlcm5hbCBzdG9yYWdlLgogICAgZGVmIHJlbW92ZShzZWxmLCBmaWxlbmFtZSk6CiAgICAgICAgZmlsZW5hbWUgPSBfdW5pY29kZShmaWxlbmFtZSkKICAgICAgICBpZiBmaWxlbmFtZSBpbiBzZWxmLmZpbGVzOgogICAgICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1JlbW92aW5nIGZpbGUgezB9IGZyb20gaW50ZXJuYWwgc3RvcmFnZS4uLicuZm9ybWF0KF9wcmludGFibGUoZmlsZW5hbWUpKSkKICAgICAgICAgICAgZGVsIHNlbGYuZmlsZXNbZmlsZW5hbWVdCiAgICAgICAgZWxpZiBmaWxlbmFtZSBpbiBzZWxmLmluZGV4ZXM6CiAgICAgICAgICAgIHNlbGYudmVyYm9zZV9wcmludCgnUmVtb3ZpbmcgZmlsZSB7MH0gZnJvbSBhcmNoaXZlIGluZGV4ZXMuLi4nLmZvcm1hdChfcHJpbnRhYmxlKGZpbGVuYW1lKSkpCiAgICAgICAgICAgIGRlbCBzZWxmLmluZGV4ZXNbZmlsZW5hbWVdCiAgICAgICAgZWxzZToKICAgICAgICAgICAgcmFpc2UgSU9FcnJvcihlcnJuby5FTk9FTlQsICd0aGUgcmVxdWVzdGVkIGZpbGUgezB9IGRvZXMgbm90IGV4aXN0IGluIHRoaXMgYXJjaGl2ZScuZm9ybWF0KF9wcmludGFibGUoZmlsZW5hbWUpKSkKCiAgICAjIExvYWQgYXJjaGl2ZS4KICAgIGRlZiBsb2FkKHNlbGYsIGZpbGVuYW1lKToKICAgICAgICBmaWxlbmFtZSA9IF91bmljb2RlKGZpbGVuYW1lKQoKICAgICAgICBpZiBzZWxmLmhhbmRsZSBpcyBub3QgTm9uZToKICAgICAgICAgICAgc2VsZi5oYW5kbGUuY2xvc2UoKQogICAgICAgIHNlbGYuZmlsZSA9IGZpbGVuYW1lCiAgICAgICAgc2VsZi5maWxlcyA9IHt9CiAgICAgICAgc2VsZi5oYW5kbGUgPSBvcGVuKHNlbGYuZmlsZSwgJ3JiJykKICAgICAgICBzZWxmLnZlcnNpb24gPSBzZWxmLmdldF92ZXJzaW9uKCkKICAgICAgICBzZWxmLmluZGV4ZXMgPSBzZWxmLmV4dHJhY3RfaW5kZXhlcygpCgogICAgIyBTYXZlIGN1cnJlbnQgc3RhdGUgaW50byBhIG5ldyBmaWxlLCBtZXJnaW5nIGFyY2hpdmUgYW5kIGludGVybmFsIHN0b3JhZ2UsIHJlYnVpbGRpbmcgaW5kZXhlcywgYW5kIG9wdGlvbmFsbHkgc2F2aW5nIGluIGFub3RoZXIgZm9ybWF0IHZlcnNpb24uCiAgICBkZWYgc2F2ZShzZWxmLCBmaWxlbmFtZSA9IE5vbmUpOgogICAgICAgIGZpbGVuYW1lID0gX3VuaWNvZGUoZmlsZW5hbWUpCgogICAgICAgIGlmIGZpbGVuYW1lIGlzIE5vbmU6CiAgICAgICAgICAgIGZpbGVuYW1lID0gc2VsZi5maWxlCiAgICAgICAgaWYgZmlsZW5hbWUgaXMgTm9uZToKICAgICAgICAgICAgcmFpc2UgVmFsdWVFcnJvcignbm8gdGFyZ2V0IGZpbGUgZm91bmQgZm9yIHNhdmlu
+set RPATOOL-NEW07=ZyBhcmNoaXZlJykKICAgICAgICBpZiBzZWxmLnZlcnNpb24gIT0gMiBhbmQgc2VsZi52ZXJzaW9uICE9IDM6CiAgICAgICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoJ3NhdmluZyBpcyBvbmx5IHN1cHBvcnRlZCBmb3IgdmVyc2lvbiAyIGFuZCAzIGFyY2hpdmVzJykKCiAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdSZWJ1aWxkaW5nIGFyY2hpdmUgaW5kZXguLi4nKQogICAgICAgICMgRmlsbCBvdXIgb3duIGZpbGVzIHN0cnVjdHVyZSB3aXRoIHRoZSBmaWxlcyBhZGRlZCBvciBjaGFuZ2VkIGluIHRoaXMgc2Vzc2lvbi4KICAgICAgICBmaWxlcyA9IHNlbGYuZmlsZXMKICAgICAgICAjIEZpcnN0LCByZWFkIGZpbGVzIGZyb20gdGhlIGN1cnJlbnQgYXJjaGl2ZSBpbnRvIG91ciBmaWxlcyBzdHJ1Y3R1cmUuCiAgICAgICAgZm9yIGZpbGUgaW4gbGlzdChzZWxmLmluZGV4ZXMua2V5cygpKToKICAgICAgICAgICAgY29udGVudCA9IHNlbGYucmVhZChmaWxlKQogICAgICAgICAgICAjIFJlbW92ZSBmcm9tIGluZGV4ZXMgYXJyYXkgb25jZSByZWFkLCBhZGQgdG8gb3VyIG93biBhcnJheS4KICAgICAgICAgICAgZGVsIHNlbGYuaW5kZXhlc1tmaWxlXQogICAgICAgICAgICBmaWxlc1tmaWxlXSA9IGNvbnRlbnQKCiAgICAgICAgIyBQcmVkaWN0IGhlYWRlciBsZW5ndGgsIHdlJ2xsIHdyaXRlIHRoYXQgb25lIGxhc3QuCiAgICAgICAgb2Zmc2V0ID0gMAogICAgICAgIGlmIHNlbGYudmVyc2lvbiA9PSAzOgogICAgICAgICAgICBvZmZzZXQgPSAzNAogICAgICAgIGVsaWYgc2VsZi52ZXJzaW9uID09IDI6CiAgICAgICAgICAgIG9mZnNldCA9IDI1CiAgICAgICAgYXJjaGl2ZSA9IG9wZW4oZmlsZW5hbWUsICd3YicpCiAgICAgICAgYXJjaGl2ZS5zZWVrKG9mZnNldCkKCiAgICAgICAgIyBCdWlsZCBvdXIgb3duIGluZGV4ZXMgd2hpbGUgd3JpdGluZyBmaWxlcyB0byB0aGUgYXJjaGl2ZS4KICAgICAgICBpbmRleGVzID0ge30KICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1dyaXRpbmcgZmlsZXMgdG8gYXJjaGl2ZSBmaWxlLi4uJykKICAgICAgICBmb3IgZmlsZSwgY29udGVudCBpbiBmaWxlcy5pdGVtcygpOgogICAgICAgICAgICAjIEdlbmVyYXRlIHJhbmRvbSBwYWRkaW5nLCBmb3Igd2hhdGV2ZXIgcmVhc29uLgogICAgICAgICAgICBpZiBzZWxmLnBhZGxlbmd0aCA+IDA6CiAgICAgICAgICAgICAgICBwYWRkaW5nID0gc2VsZi5nZW5lcmF0ZV9wYWRkaW5nKCkKICAgICAgICAgICAgICAgIGFyY2hpdmUud3JpdGUocGFkZGluZykKICAgICAgICAgICAgICAgIG9mZnNldCArPSBsZW4ocGFkZGluZykKCiAgICAgICAgICAgIGFyY2hpdmUud3JpdGUoY29udGVudCkKICAgICAgICAgICAgIyBVcGRhdGUgaW5kZXguCiAgICAgICAgICAgIGlmIHNlbGYudmVyc2lvbiA9PSAzOgogICAgICAgICAgICAgICAgaW5kZXhlc1tmaWxlXSA9IFsgKG9mZnNldCBeIHNlbGYua2V5LCBsZW4oY29udGVudCkgXiBzZWxmLmtleSkgXQogICAgICAgICAgICBlbGlmIHNlbGYudmVyc2lvbiA9PSAyOgogICAgICAgICAgICAg
+set RPATOOL-NEW08=ICAgaW5kZXhlc1tmaWxlXSA9IFsgKG9mZnNldCwgbGVuKGNvbnRlbnQpKSBdCiAgICAgICAgICAgIG9mZnNldCArPSBsZW4oY29udGVudCkKCiAgICAgICAgIyBXcml0ZSB0aGUgaW5kZXhlcy4KICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1dyaXRpbmcgYXJjaGl2ZSBpbmRleCB0byBhcmNoaXZlIGZpbGUuLi4nKQogICAgICAgIGFyY2hpdmUud3JpdGUoY29kZWNzLmVuY29kZShwaWNrbGUuZHVtcHMoaW5kZXhlcywgc2VsZi5QSUNLTEVfUFJPVE9DT0wpLCAnemxpYicpKQogICAgICAgICMgTm93IHdyaXRlIHRoZSBoZWFkZXIuCiAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdXcml0aW5nIGhlYWRlciB0byBhcmNoaXZlIGZpbGUuLi4gKHZlcnNpb24gPSBSUEF2ezB9KScuZm9ybWF0KHNlbGYudmVyc2lvbikpCiAgICAgICAgYXJjaGl2ZS5zZWVrKDApCiAgICAgICAgaWYgc2VsZi52ZXJzaW9uID09IDM6CiAgICAgICAgICAgIGFyY2hpdmUud3JpdGUoY29kZWNzLmVuY29kZSgne317OjAxNnh9IHs6MDh4fVxuJy5mb3JtYXQoc2VsZi5SUEEzX01BR0lDLCBvZmZzZXQsIHNlbGYua2V5KSkpCiAgICAgICAgZWxzZToKICAgICAgICAgICAgYXJjaGl2ZS53cml0ZShjb2RlY3MuZW5jb2RlKCd7fXs6MDE2eH1cbicuZm9ybWF0KHNlbGYuUlBBMl9NQUdJQywgb2Zmc2V0KSkpCiAgICAgICAgIyBXZSdyZSBkb25lLCBjbG9zZSBpdC4KICAgICAgICBhcmNoaXZlLmNsb3NlKCkKCiAgICAgICAgIyBSZWxvYWQgdGhlIGZpbGUgaW4gb3VyIGlubmVyIGRhdGFiYXNlLgogICAgICAgIHNlbGYubG9hZChmaWxlbmFtZSkKCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6CiAgICBpbXBvcnQgYXJncGFyc2UKCiAgICBwYXJzZXIgPSBhcmdwYXJzZS5Bcmd1bWVudFBhcnNlcigKICAgICAgICBkZXNjcmlwdGlvbj0nQSB0b29sIGZvciB3b3JraW5nIHdpdGggUmVuXCdQeSBhcmNoaXZlIGZpbGVzLicsCiAgICAgICAgZXBpbG9nPSdUaGUgRklMRSBhcmd1bWVudCBjYW4gb3B0aW9uYWxseSBiZSBpbiBBUkNISVZFPVJFQUwgZm9ybWF0LCBtYXBwaW5nIGEgZmlsZSBpbiB0aGUgYXJjaGl2ZSBmaWxlIHN5c3RlbSB0byBhIGZpbGUgb24geW91ciByZWFsIGZpbGUgc3lzdGVtLiBBbiBleGFtcGxlIG9mIHRoaXM6IHJwYXRvb2wgLXggdGVzdC5ycGEgc2NyaXB0LnJweWM9L2hvbWUvZm9vL3Rlc3QucnB5YycsCiAgICAgICAgYWRkX2hlbHA9RmFsc2UpCgogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnYXJjaGl2ZScsIG1ldGF2YXI9J0FSQ0hJVkUnLCBoZWxwPSdUaGUgUmVuXCdweSBhcmNoaXZlIGZpbGUgdG8gb3BlcmF0ZSBvbi4nKQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnZmlsZXMnLCBtZXRhdmFyPSdGSUxFJywgbmFyZ3M9JyonLCBhY3Rpb249J2FwcGVuZCcsIGhlbHA9J1plcm8gb3IgbW9yZSBmaWxlcyB0byBvcGVyYXRlIG9uLicpCgogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWwnLCAnLS1saXN0JywgYWN0aW9uPSdzdG9yZV90cnVlJywgaGVscD0nTGlzdCBmaWxlcyBpbiBhcmNoaXZlIEFSQ0hJVkUuJykK
+set RPATOOL-NEW09=ICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy14JywgJy0tZXh0cmFjdCcsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J0V4dHJhY3QgRklMRXMgZnJvbSBBUkNISVZFLicpCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctYycsICctLWNyZWF0ZScsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J0NyZWF0aXZlIEFSQ0hJVkUgZnJvbSBGSUxFcy4nKQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWQnLCAnLS1kZWxldGUnLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdEZWxldGUgRklMRXMgZnJvbSBBUkNISVZFLicpCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctYScsICctLWFwcGVuZCcsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J0FwcGVuZCBGSUxFcyB0byBBUkNISVZFLicpCgogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLTInLCAnLS10d28nLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdVc2UgdGhlIFJQQXYyIGZvcm1hdCBmb3IgY3JlYXRpbmcvYXBwZW5kaW5nIHRvIGFyY2hpdmVzLicpCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctMycsICctLXRocmVlJywgYWN0aW9uPSdzdG9yZV90cnVlJywgaGVscD0nVXNlIHRoZSBSUEF2MyBmb3JtYXQgZm9yIGNyZWF0aW5nL2FwcGVuZGluZyB0byBhcmNoaXZlcyAoZGVmYXVsdCkuJykKCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctaycsICctLWtleScsIG1ldGF2YXI9J0tFWScsIGhlbHA9J1RoZSBvYmZ1c2NhdGlvbiBrZXkgdXNlZCBmb3IgY3JlYXRpbmcgUlBBdjMgYXJjaGl2ZXMsIGluIGhleGFkZWNpbWFsIChkZWZhdWx0OiAweERFQURCRUVGKS4nKQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLXAnLCAnLS1wYWRkaW5nJywgbWV0YXZhcj0nQ09VTlQnLCBoZWxwPSdUaGUgbWF4aW11bSBudW1iZXIgb2YgYnl0ZXMgb2YgcGFkZGluZyB0byBhZGQgYmV0d2VlbiBmaWxlcyAoZGVmYXVsdDogMCkuJykKICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1vJywgJy0tb3V0ZmlsZScsIGhlbHA9J0FuIGFsdGVybmF0aXZlIG91dHB1dCBhcmNoaXZlIGZpbGUgd2hlbiBhcHBlbmRpbmcgdG8gb3IgZGVsZXRpbmcgZnJvbSBhcmNoaXZlcywgb3Igb3V0cHV0IGRpcmVjdG9yeSB3aGVuIGV4dHJhY3RpbmcuJykKCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctaCcsICctLWhlbHAnLCBhY3Rpb249J2hlbHAnLCBoZWxwPSdQcmludCB0aGlzIGhlbHAgYW5kIGV4aXQuJykKICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy12JywgJy0tdmVyYm9zZScsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J0JlIGEgYml0IG1vcmUgdmVyYm9zZSB3aGlsZSBwZXJmb3JtaW5nIG9wZXJhdGlvbnMuJykKICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1WJywgJy0tdmVyc2lvbicsIGFjdGlvbj0ndmVyc2lvbicsIHZlcnNpb249J3JwYXRvb2wgdjAuOCcsIGhlbHA9J1Nob3cgdmVyc2lvbiBpbmZvcm1hdGlvbi4nKQogICAgYXJndW1lbnRzID0gcGFyc2VyLnBhcnNlX2FyZ3MoKQoKICAgICMgRGV0ZXJtaW5lIFJQQSB2ZXJzaW9uLgogICAgaWYgYXJndW1lbnRz
+set RPATOOL-NEW10=LnR3bzoKICAgICAgICB2ZXJzaW9uID0gMgogICAgZWxzZToKICAgICAgICB2ZXJzaW9uID0gMwoKICAgICMgRGV0ZXJtaW5lIFJQQXYzIGtleS4KICAgIGlmICdrZXknIGluIGFyZ3VtZW50cyBhbmQgYXJndW1lbnRzLmtleSBpcyBub3QgTm9uZToKICAgICAgICBrZXkgPSBpbnQoYXJndW1lbnRzLmtleSwgMTYpCiAgICBlbHNlOgogICAgICAgIGtleSA9IDB4REVBREJFRUYKCiAgICAjIERldGVybWluZSBwYWRkaW5nIGJ5dGVzLgogICAgaWYgJ3BhZGRpbmcnIGluIGFyZ3VtZW50cyBhbmQgYXJndW1lbnRzLnBhZGRpbmcgaXMgbm90IE5vbmU6CiAgICAgICAgcGFkZGluZyA9IGludChhcmd1bWVudHMucGFkZGluZykKICAgIGVsc2U6CiAgICAgICAgcGFkZGluZyA9IDAKCiAgICAjIERldGVybWluZSBvdXRwdXQgZmlsZS9kaXJlY3RvcnkgYW5kIGlucHV0IGFyY2hpdmUKICAgIGlmIGFyZ3VtZW50cy5jcmVhdGU6CiAgICAgICAgYXJjaGl2ZSA9IE5vbmUKICAgICAgICBvdXRwdXQgPSBfdW5pY29kZShhcmd1bWVudHMuYXJjaGl2ZSkKICAgIGVsc2U6CiAgICAgICAgYXJjaGl2ZSA9IF91bmljb2RlKGFyZ3VtZW50cy5hcmNoaXZlKQogICAgICAgIGlmICdvdXRmaWxlJyBpbiBhcmd1bWVudHMgYW5kIGFyZ3VtZW50cy5vdXRmaWxlIGlzIG5vdCBOb25lOgogICAgICAgICAgICBvdXRwdXQgPSBfdW5pY29kZShhcmd1bWVudHMub3V0ZmlsZSkKICAgICAgICBlbHNlOgogICAgICAgICAgICAjIERlZmF1bHQgb3V0cHV0IGRpcmVjdG9yeSBmb3IgZXh0cmFjdGlvbiBpcyB0aGUgY3VycmVudCBkaXJlY3RvcnkuCiAgICAgICAgICAgIGlmIGFyZ3VtZW50cy5leHRyYWN0OgogICAgICAgICAgICAgICAgb3V0cHV0ID0gJy4nCiAgICAgICAgICAgIGVsc2U6CiAgICAgICAgICAgICAgICBvdXRwdXQgPSBfdW5pY29kZShhcmd1bWVudHMuYXJjaGl2ZSkKCiAgICAjIE5vcm1hbGl6ZSBmaWxlcy4KICAgIGlmIGxlbihhcmd1bWVudHMuZmlsZXMpID4gMCBhbmQgaXNpbnN0YW5jZShhcmd1bWVudHMuZmlsZXNbMF0sIGxpc3QpOgogICAgICAgIGFyZ3VtZW50cy5maWxlcyA9IGFyZ3VtZW50cy5maWxlc1swXQoKICAgIHRyeToKICAgICAgICBhcmNoaXZlID0gUmVuUHlBcmNoaXZlKGFyY2hpdmUsIHBhZGxlbmd0aD1wYWRkaW5nLCBrZXk9a2V5LCB2ZXJzaW9uPXZlcnNpb24sIHZlcmJvc2U9YXJndW1lbnRzLnZlcmJvc2UpCiAgICBleGNlcHQgSU9FcnJvciBhcyBlOgogICAgICAgIHByaW50KCdDb3VsZCBub3Qgb3BlbiBhcmNoaXZlIGZpbGUgezB9IGZvciByZWFkaW5nOiB7MX0nLmZvcm1hdChhcmNoaXZlLCBlKSwgZmlsZT1zeXMuc3RkZXJyKQogICAgICAgIHN5cy5leGl0KDEpCgogICAgaWYgYXJndW1lbnRzLmNyZWF0ZSBvciBhcmd1bWVudHMuYXBwZW5kOgogICAgICAgICMgV2UgbmVlZCB0aGlzIHNlcGVyYXRlIGZ1bmN0aW9uIHRvIHJlY3Vyc2l2ZWx5IHByb2Nlc3MgZGlyZWN0b3JpZXMuCiAgICAgICAgZGVmIGFkZF9maWxlKGZpbGVuYW1lKToKICAgICAgICAgICAgIyBJZiB0aGUgYXJjaGl2ZSBwYXRoIGRp
+set RPATOOL-NEW11=ZmZlcnMgZnJvbSB0aGUgYWN0dWFsIGZpbGUgcGF0aCwgYXMgZ2l2ZW4gaW4gdGhlIGFyZ3VtZW50LAogICAgICAgICAgICAjIGV4dHJhY3QgdGhlIGFyY2hpdmUgcGF0aCBhbmQgYWN0dWFsIGZpbGUgcGF0aC4KICAgICAgICAgICAgaWYgZmlsZW5hbWUuZmluZCgnPScpICE9IC0xOgogICAgICAgICAgICAgICAgKG91dGZpbGUsIGZpbGVuYW1lKSA9IGZpbGVuYW1lLnNwbGl0KCc9JywgMikKICAgICAgICAgICAgZWxzZToKICAgICAgICAgICAgICAgIG91dGZpbGUgPSBmaWxlbmFtZQoKICAgICAgICAgICAgaWYgb3MucGF0aC5pc2RpcihmaWxlbmFtZSk6CiAgICAgICAgICAgICAgICBmb3IgZmlsZSBpbiBvcy5saXN0ZGlyKGZpbGVuYW1lKToKICAgICAgICAgICAgICAgICAgICAjIFdlIG5lZWQgdG8gZG8gdGhpcyBpbiBvcmRlciB0byBtYWludGFpbiBhIHBvc3NpYmxlIEFSQ0hJVkU9UkVBTCBtYXBwaW5nIGJldHdlZW4gZGlyZWN0b3JpZXMuCiAgICAgICAgICAgICAgICAgICAgYWRkX2ZpbGUob3V0ZmlsZSArIG9zLnNlcCArIGZpbGUgKyAnPScgKyBmaWxlbmFtZSArIG9zLnNlcCArIGZpbGUpCiAgICAgICAgICAgIGVsc2U6CiAgICAgICAgICAgICAgICB0cnk6CiAgICAgICAgICAgICAgICAgICAgd2l0aCBvcGVuKGZpbGVuYW1lLCAncmInKSBhcyBmaWxlOgogICAgICAgICAgICAgICAgICAgICAgICBhcmNoaXZlLmFkZChvdXRmaWxlLCBmaWxlLnJlYWQoKSkKICAgICAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgICAgICAgICAgICAgICAgICBwcmludCgnQ291bGQgbm90IGFkZCBmaWxlIHswfSB0byBhcmNoaXZlOiB7MX0nLmZvcm1hdChmaWxlbmFtZSwgZSksIGZpbGU9c3lzLnN0ZGVycikKCiAgICAgICAgIyBJdGVyYXRlIG92ZXIgdGhlIGdpdmVuIGZpbGVzIHRvIGFkZCB0byBhcmNoaXZlLgogICAgICAgIGZvciBmaWxlbmFtZSBpbiBhcmd1bWVudHMuZmlsZXM6CiAgICAgICAgICAgIGFkZF9maWxlKF91bmljb2RlKGZpbGVuYW1lKSkKCiAgICAgICAgIyBTZXQgdmVyc2lvbiBmb3Igc2F2aW5nLCBhbmQgc2F2ZS4KICAgICAgICBhcmNoaXZlLnZlcnNpb24gPSB2ZXJzaW9uCiAgICAgICAgdHJ5OgogICAgICAgICAgICBhcmNoaXZlLnNhdmUob3V0cHV0KQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgICAgICAgICAgcHJpbnQoJ0NvdWxkIG5vdCBzYXZlIGFyY2hpdmUgZmlsZTogezB9Jy5mb3JtYXQoZSksIGZpbGU9c3lzLnN0ZGVycikKICAgIGVsaWYgYXJndW1lbnRzLmRlbGV0ZToKICAgICAgICAjIEl0ZXJhdGUgb3ZlciB0aGUgZ2l2ZW4gZmlsZXMgdG8gZGVsZXRlIGZyb20gdGhlIGFyY2hpdmUuCiAgICAgICAgZm9yIGZpbGVuYW1lIGluIGFyZ3VtZW50cy5maWxlczoKICAgICAgICAgICAgdHJ5OgogICAgICAgICAgICAgICAgYXJjaGl2ZS5yZW1vdmUoZmlsZW5hbWUpCiAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgICAgICAgICAgICAgIHByaW50KCdDb3VsZCBub3QgZGVsZXRlIGZpbGUgezB9IGZyb20gYXJjaGl2ZTogezF9
+set RPATOOL-NEW12=Jy5mb3JtYXQoZmlsZW5hbWUsIGUpLCBmaWxlPXN5cy5zdGRlcnIpCgogICAgICAgICMgU2V0IHZlcnNpb24gZm9yIHNhdmluZywgYW5kIHNhdmUuCiAgICAgICAgYXJjaGl2ZS52ZXJzaW9uID0gdmVyc2lvbgogICAgICAgIHRyeToKICAgICAgICAgICAgYXJjaGl2ZS5zYXZlKG91dHB1dCkKICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGU6CiAgICAgICAgICAgIHByaW50KCdDb3VsZCBub3Qgc2F2ZSBhcmNoaXZlIGZpbGU6IHswfScuZm9ybWF0KGUpLCBmaWxlPXN5cy5zdGRlcnIpCiAgICBlbGlmIGFyZ3VtZW50cy5leHRyYWN0OgogICAgICAgICMgRWl0aGVyIGV4dHJhY3QgdGhlIGdpdmVuIGZpbGVzLCBvciBhbGwgZmlsZXMgaWYgbm8gZmlsZXMgYXJlIGdpdmVuLgogICAgICAgIGlmIGxlbihhcmd1bWVudHMuZmlsZXMpID4gMDoKICAgICAgICAgICAgZmlsZXMgPSBhcmd1bWVudHMuZmlsZXMKICAgICAgICBlbHNlOgogICAgICAgICAgICBmaWxlcyA9IGFyY2hpdmUubGlzdCgpCgogICAgICAgICMgQ3JlYXRlIG91dHB1dCBkaXJlY3RvcnkgaWYgbm90IHByZXNlbnQuCiAgICAgICAgaWYgbm90IG9zLnBhdGguZXhpc3RzKG91dHB1dCk6CiAgICAgICAgICAgIG9zLm1ha2VkaXJzKG91dHB1dCkKCiAgICAgICAgIyBJdGVyYXRlIG92ZXIgZmlsZXMgdG8gZXh0cmFjdC4KICAgICAgICBmb3IgZmlsZW5hbWUgaW4gZmlsZXM6CiAgICAgICAgICAgIGlmIGZpbGVuYW1lLmZpbmQoJz0nKSAhPSAtMToKICAgICAgICAgICAgICAgIChvdXRmaWxlLCBmaWxlbmFtZSkgPSBmaWxlbmFtZS5zcGxpdCgnPScsIDIpCiAgICAgICAgICAgIGVsc2U6CiAgICAgICAgICAgICAgICBvdXRmaWxlID0gZmlsZW5hbWUKCiAgICAgICAgICAgIHRyeToKICAgICAgICAgICAgICAgIGNvbnRlbnRzID0gYXJjaGl2ZS5yZWFkKGZpbGVuYW1lKQoKICAgICAgICAgICAgICAgICMgQ3JlYXRlIG91dHB1dCBkaXJlY3RvcnkgZm9yIGZpbGUgaWYgbm90IHByZXNlbnQuCiAgICAgICAgICAgICAgICBpZiBub3Qgb3MucGF0aC5leGlzdHMob3MucGF0aC5kaXJuYW1lKG9zLnBhdGguam9pbihvdXRwdXQsIG91dGZpbGUpKSk6CiAgICAgICAgICAgICAgICAgICAgb3MubWFrZWRpcnMob3MucGF0aC5kaXJuYW1lKG9zLnBhdGguam9pbihvdXRwdXQsIG91dGZpbGUpKSkKCiAgICAgICAgICAgICAgICB3aXRoIG9wZW4ob3MucGF0aC5qb2luKG91dHB1dCwgb3V0ZmlsZSksICd3YicpIGFzIGZpbGU6CiAgICAgICAgICAgICAgICAgICAgZmlsZS53cml0ZShjb250ZW50cykKICAgICAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOgogICAgICAgICAgICAgICAgcHJpbnQoJ0NvdWxkIG5vdCBleHRyYWN0IGZpbGUgezB9IGZyb20gYXJjaGl2ZTogezF9Jy5mb3JtYXQoZmlsZW5hbWUsIGUpLCBmaWxlPXN5cy5zdGRlcnIpCiAgICBlbGlmIGFyZ3VtZW50cy5saXN0OgogICAgICAgICMgUHJpbnQgdGhlIHNvcnRlZCBmaWxlIGxpc3QuCiAgICAgICAgbGlzdCA9IGFyY2hpdmUubGlzdCgpCiAgICAgICAgbGlzdC5zb3J0KCkKICAgICAgICBm
+set RPATOOL-NEW13=b3IgZmlsZSBpbiBsaXN0OgogICAgICAgICAgICBwcmludChmaWxlKQogICAgZWxzZToKICAgICAgICBwcmludCgnTm8gb3BlcmF0aW9uIGdpdmVuIDooJykKICAgICAgICBwcmludCgnVXNlIHswfSAtLWhlbHAgZm9yIHVzYWdlIGRldGFpbHMuJy5mb3JtYXQoc3lzLmFyZ3ZbMF0pKQoK
 
 
-:: !! DO NOT EDIT BELOW THIS LINE !!
-:: UnRen-current.bat - UnRen Launcher Script for Ren'Py >= 8
-set "name=current"
-set "version=%name% (v9.6.57) (250816)"
-title UnRen-%name%.bat - %version%
-
-
-:init
-REM --------------------------------------------------------------------------------
-REM Splash screen
-REM --------------------------------------------------------------------------------
-cls
+set "initialized=0"
+set "nocls=0"
+:menu
+:: Splash screen
+if "%nocls%" == "0" cls
 echo.
-echo            [93m  ------------------------------------------------------------------------------[0m
-echo            [93m     __  __      ____                  __          __[0m
-echo            [93m    / / / /___  / __ \___  ____       / /_  ____ _/ /_[0m
-echo            [93m   / / / / __ \/ /_/ / _ \/ __ \     / __ \/ __ ^`/ __/[0m
-echo            [93m  / /_/ / / / / _   /  __/ / / / _  / /_/ / /_/ / /_[0m
-echo            [93m  \____/_/ /_/_/ \_\\___/_/ /_/ (_) \_.__/\__^,_/\__/ - %version%[0m
+echo           %YEL%  ---------------------------------------------------------------------------------%RES%
+echo           %YEL%     __  __      ____                  __          __%RES%
+echo           %YEL%    / / / /___  / __ \___  ____       / /_  ____ _/ /_%RES%
+echo           %YEL%   / / / / __ \/ /_/ / _ \/ __ \     / __ \/ __ ^`/ __/%RES%
+echo           %YEL%  / /_/ / / / / _   /  __/ / / / _  / /_/ / /_/ / /_%RES%
+echo           %YEL%  \____/_/ /_/_/ \_\\___/_/ /_/ (_) \_.__/\__^,_/\__/ - %NAME% %VERSION%%RES%
 echo.
-echo            [33m       Sam @ www.f95zone.to ^& Gideon[0m
-echo            [33m       Modified by joelurmel @ f95zone.to[0m
+echo           %YEL%       Sam @ www.f95zone.to ^& Gideon%RES%
+echo           %YEL%       Modified by joelurmel @ f95zone.to%RES%
 echo.
-echo            [93m  ------------------------------------------------------------------------------[0m
+echo           %YEL%  !INCASEOF.%LNG%!%RES%
+echo           %MAG%  %URL_REF%%RES%
+echo.
+set /a rand=%random% %%17
+if %rand% == 0 echo           %GRY%  "Hack the planet!" – Dade Murphy%RES%
+if %rand% == 1 echo           %GRY%  "Resistance is futile." – Borg%RES%
+if %rand% == 2 echo           %GRY%  "There is no spoon." – Neo%RES%
+if %rand% == 3 echo           %GRY%  "I'm in." – Mr. Robot%RES%
+if %rand% == 4 echo           %GRY%  "All your base are belong to us." – CATS%RES%
+if %rand% == 5 echo           %GRY%  "Would you like to know more?" – Various%RES%
+if %rand% == 6 echo           %GRY%  "This message will self-destruct in 5... 4... 3..."%RES%
+if %rand% == 7 echo           %GRY%  "If you're reading this, you're already better than 90%% of users..."%RES%
+if %rand% == 8 echo           %GRY%  "I'm not a hacker. I'm a code poet."%RES%
+if %rand% == 9 echo           %GRY%  "Welcome to the command line. Abandon all GUIs, ye who enter here."%RES%
+if %rand% == 10 echo          %GRY%  "rm -rf / — because chaos is an art form."%RES%
+if %rand% == 11 echo          %GRY%  "This script runs faster than your Wi-Fi on a Monday."%RES%
+if %rand% == 12 echo          %GRY%  "The cake is a lie." – Portal%RES%
+if %rand% == 13 echo          %GRY%  "I am Groot." – Groot%RES%
+if %rand% == 14 echo          %GRY%  "Do or do not. There is no try." – Yoda%RES%
+if %rand% == 15 echo          %GRY%  "I know kung fu." – Neo%RES%
+if %rand% == 16 echo          %GRY%  "You have been recruited by the Star League to defend the frontier." – The Last Starfighter%RES%
+echo           %YEL%  ---------------------------------------------------------------------------------%RES%
 echo.
 
-REM --------------------------------------------------------------------------------
-REM We need powershell for later, make sure it exists
-REM --------------------------------------------------------------------------------
+if "%initialized%" == "1" goto skipInit
+
+:: Initializing debug mode
+set "debugredir=>nul 2>&1"
+set "debuglevel=0"
+set "nocls=0"
+
+:: We need PowerShell for later, make sure it exists
+set "pshell.en=Checking for availability of PowerShell... "
+set "pshell.fr=Vérification de la disponibilité de PowerShell... "
+set "pshell.es=Comprobando la disponibilidad de PowerShell... "
+set "pshell.it=Verifica della disponibilità di PowerShell... "
+set "pshell.de=Überprüfung der Verfügbarkeit von PowerShell... "
+set "pshell.ru=Проверка доступности PowerShell... "
+
+set "pshell1.en=[Error] Powershell is required. !UNACONT.%LNG%!"
+set "pshell1.fr=[Erreur] Powershell est requis. !UNACONT.%LNG%!"
+set "pshell1.es=[Error] Se requiere Powershell. !UNACONT.%LNG%!"
+set "pshell1.it=[Errore] Powershell è richiesto. !UNACONT.%LNG%!"
+set "pshell1.de=[Fehler] Powershell ist erforderlich. !UNACONT.%LNG%!"
+set "pshell1.ru=[Ошибка] требуется PowerShell. !UNACONT.%LNG%!"
+
+set "pshell2.en=This is included in Windows 7, 8 and 10. XP/Vista users can"
+set "pshell2.fr=Ce programme est inclus dans Windows 7, 8 et 10. Les utilisateurs de XP/Vista peuvent"
+set "pshell2.es=Esto está incluido en Windows 7, 8 y 10. Los usuarios de XP/Vista pueden"
+set "pshell2.it=Questo programma è incluso in Windows 7, 8 e 10. Gli utenti di XP/Vista possono"
+set "pshell2.de=Dieses Programm ist in Windows 7, 8 und 10 enthalten. XP/Vista-Benutzer können"
+set "pshell2.ru=Это включено в Windows 7, 8 и 10. Пользователи XP/Vista могут"
+
+set "pshell3.en=download it here: %MAG%https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+set "pshell3.fr=le télécharger ici : %MAG%https://learn.microsoft.com/fr-fr/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+set "pshell3.es=descargarlo aquí: %MAG%https://learn.microsoft.com/es-es/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+set "pshell3.it=scaricarlo qui: %MAG%https://learn.microsoft.com/it-it/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+set "pshell3.de=es hier herunterladen: %MAG%https://learn.microsoft.com/de-de/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+set "pshell3.ru=скачать его здесь: %MAG%https://learn.microsoft.com/ru-ru/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+
+echo !pshell.%LNG%! >> "%UNRENLOG%"
+<nul set /p=!pshell.%LNG%!
 if not exist "%SystemRoot%\system32\WindowsPowerShell\v1.0\powershell.exe" (
-	echo [31m	! Error: Powershell is required, unable to continue.[0m
-	echo		This is included in Windows 7, 8, 10. XP/Vista users can
-	echo		download it here: http://support.microsoft.com/kb/968929
-	echo.
-	pause>nul|set/p=.			Press any key to exit...
-	exit
-)
+    call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog .
+    call :elog "    !pshell1.%LNG%!"
+    call :elog "    !pshell2.%LNG%!"
+    call :elog "    !pshell3.%LNG%!"
+    call :elog .
+    pause>nul|set/p=.      !ANYKEY.%LNG%!
 
-REM --------------------------------------------------------------------------------
-REM Define the script directory
-REM --------------------------------------------------------------------------------
-set "scriptdir=%~dp0"
-
-REM --------------------------------------------------------------------------------
-REM Set our paths, and make sure we can find python exe
-REM --------------------------------------------------------------------------------
-if "%~1"=="" (
-	echo Enter the path to the game, drag'n'drop it here, or press Enter if this tool is already in the desired folder.
-	set /p "workdir=If drag'n'drop does not work, please copy/paste the path instead: "
+    goto exitn
 ) else (
-	set "workdir=%~1"
-)
-if not defined workdir (
-	set "workdir=%cd%"
+    call :elog "%GRE%!PASS.%LNG%!%RES%"
 )
 
-rem Remove surrounding quotes if any
-set "workdir=%workdir:"=%"
-
-if not exist "%workdir%\" (
-	echo [31m	! Error: The specified directory does not exist.[0m
-	echo			 Are you sure we're in the game's root directory?
-	echo.
-	pause>nul|set/p=.			Press any key to exit...
-	exit
+:: Analysis of debug arguments
+if /i "%~3" == "-d" (
+    set "debugredir="
+    set "debuglevel=1"
+    set "nocls=1"
+    powershell.exe -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(%NEW_COLS%,3000)"
 )
-cd /d "%workdir%"
-
-REM --------------------------------------------------------------------------------
-REM Set unrenlog for debugging purpose
-REM --------------------------------------------------------------------------------
-set "unrenlog=%workdir%\UnRen-forall.log"
-set "unrenlog=%unrenlog:"=%"
-if exist "%unrenlog%" (
-	del "%unrenlog%" >nul 2>&1
+if /i "%~3" == "-dd" (
+    echo on
+    set "debugredir="
+    set "debuglevel=2"
+    set "nocls=1"
+    powershell.exe -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(%NEW_COLS%,5000)"
 )
 
-REM --------------------------------------------------------------------------------
-REM Define a function to log messages
-REM --------------------------------------------------------------------------------
-call :elog .
-call :elog "Checking if Python is available"
 
-if exist "lib\windows-x86_64\python.exe" (
-	if not "%PROCESSOR_ARCHITECTURE%"=="x86" (
-		set "pythondir=%workdir%\lib\windows-x86_64\"
-	) else if exist "lib\windows-i686\python.exe" (
-		set "pythondir=%workdir%\lib\windows-i686\"
-	)
-) else if exist "lib\windows-i686\python.exe" (
-	set "pythondir=%workdir%\lib\windows-i686\"
+:: Set the working directory
+set "setpath1.en=Enter the path to the game, drag'n'drop it here,"
+set "setpath1.fr=Entrez le chemin vers le jeu, faites-le glisser ici,"
+set "setpath1.es=Introduzca la ruta al juego, arrástrelo aquí,"
+set "setpath1.it=Inserisci il percorso del gioco, trascinalo qui,"
+set "setpath1.de=Geben Sie den Pfad zum Spiel ein, ziehen Sie es hierher,"
+set "setpath1.ru=Введите путь к игре, перетащите его сюда,"
+
+set "setpath2.en=or press Enter if this tool is already in the desired folder."
+set "setpath2.fr=ou appuyez sur Entrée si cet outil se trouve déjà dans le dossier souhaité."
+set "setpath2.es=o presione Entrar si esta herramienta ya se encuentra en la carpeta deseada."
+set "setpath2.it=oppure premi Invio se questo strumento si trova già nella cartella desiderata."
+set "setpath2.de=oder drücken Sie die Eingabetaste, wenn sich dieses Tool bereits im gewünschten Ordner befindet."
+set "setpath2.ru=или нажмите Enter, если этот инструмент уже находится в нужной папке."
+
+set "setpath3.en=If drag'n'drop does not work, please copy/paste the path instead: "
+set "setpath3.fr=Si le glisser-déposer ne fonctionne pas, veuillez copier/coller le chemin à la place : "
+set "setpath3.es=Si arrastrar y soltar no funciona, copie/pegue la ruta en su lugar: "
+set "setpath3.it=Se il trascinamento della selezione non funziona, copia/incolla il percorso invece: "
+set "setpath3.de=Wenn das Ziehen und Ablegen nicht funktioniert, kopieren Sie den Pfad bitte stattdessen hierher: "
+set "setpath3.ru=Если перетаскивание не работает, пожалуйста, скопируйте/вставьте путь вместо этого: "
+
+:: Check if game path is provided and set it
+if "%~1" == "" (
+    call :elog .
+    call :elog "!setpath1.%LNG%!"
+    call :elog "!setpath2.%LNG%!"
+    call :elog .
+    set /p "WORKDIR=!setpath3.%LNG%!"
+) else (
+    set "WORKDIR=%~1"
+)
+
+if not defined WORKDIR (
+    set "WORKDIR=%cd%"
+)
+
+if "%WORKDIR%" == "." (
+    set "WORKDIR=%cd%"
+)
+
+:: Check if an update is available
+call :check_update
+
+:: Check for required files
+call :check_all_files
+
+
+set "wdir1.en=[Error] The specified directory does not exist."
+set "wdir1.fr=[Erreur] Le répertoire spécifié n'existe pas."
+set "wdir1.es=[Error] El directorio especificado no existe."
+set "wdir1.it=[Errore] la directory specificata non esiste."
+set "wdir1.de=[Fehler] Das angegebene Verzeichnis existiert nicht."
+set "wdir1.ru=[Ошибка] Указанный каталог не существует."
+
+set "wdir2.en=Are you sure we're in the game's root directory?"
+set "wdir2.fr=Êtes-vous sûr que nous sommes dans le répertoire racine du jeu ?"
+set "wdir2.es=¿Está seguro de que estamos en el directorio raíz del juego?"
+set "wdir2.it=Sei sicuro che siamo nella directory principale del gioco?"
+set "wdir2.de=Sind Sie sicher, dass wir uns im Stammverzeichnis des Spiels befinden?"
+set "wdir2.ru=Вы уверены, что находимся в корневом каталоге игры?"
+
+set "wdir3.en=Testing write access to game directory"
+set "wdir3.fr=Test de l'accès en écriture au répertoire du jeu"
+set "wdir3.es=Prueba de acceso de escritura al directorio del juego"
+set "wdir3.it=Verifica l'accesso in scrittura alla directory di gioco"
+set "wdir3.de=Testen des Schreibzugriffs auf das Spieledirectory"
+set "wdir3.ru=Проверка доступа на запись в каталог игры"
+
+set "wdir4.en=You can't write in game directory."
+set "wdir4.fr=Vous ne pouvez pas écrire dans le répertoire du jeu."
+set "wdir4.es=No puedes escribir en el directorio del juego."
+set "wdir4.it=Non puoi scrivere nella directory di gioco."
+set "wdir4.de=Sie können nicht im Spieledirectory schreiben."
+set "wdir4.ru=Вы не можете писать в каталоге игры."
+
+:: Remove surrounding quotes if any
+set "WORKDIR=%WORKDIR:"=%"
+if not exist "%WORKDIR%\" (
+    call :elog .
+    call :elog "    %RED%!wdir1.%LNG%!%RES%"
+    call :elog "    !wdir2.%LNG%!"
+    call :elog .
+    pause>nul|set/p=.      !ANYKEY.%LNG%!
+
+    goto exitn
+)
+
+
+set "reqdir1.en=Checking if game, lib, renpy directories exist... "
+set "reqdir1.fr=Vérification de l'existence des répertoires game, lib et renpy... "
+set "reqdir1.es=Comprobando si existen los directorios game, lib, renpy... "
+set "reqdir1.it=Controllo dell'esistenza delle directory game, lib, renpy... "
+set "reqdir1.de=Überprüfung der Existenz der Verzeichnisse game, lib, renpy... "
+set "reqdir1.ru=Проверка наличия каталогов game, lib, renpy... "
+
+set "reqdir2.en=[Error] Cannot locate game, lib or renpy directories. !UNACONT.%LNG%!"
+set "reqdir2.fr=[Erreur] Impossible de localiser les répertoires game, lib ou renpy. !UNACONT.%LNG%!"
+set "reqdir2.es=[Error] No se pueden localizar los directorios game, lib o renpy. !UNACONT.%LNG%!"
+set "reqdir2.it=[Errore] Impossibile localizzare le directory game, lib o renpy. !UNACONT.%LNG%!"
+set "reqdir2.de=[Fehler] Unmöglich, die Verzeichnisse game, lib oder renpy zu finden. !UNACONT.%LNG%!"
+set "reqdir2.ru=[Ошибка] Не удалось найти каталоги game, lib или renpy. !UNACONT.%LNG%!"
+
+:: Check that you are in the root directory of the game.
+cd /d "%WORKDIR%"
+echo !reqdir1.%LNG%! >> "%UNRENLOG%"
+<nul set /p=!reqdir1.%LNG%!
+set missing=0
+if not exist "game\" (
+    set missing=1
+) else (
+	set "GAMEDIR=%WORKDIR%\game\"
+)
+if not exist "lib\" (
+    set missing=1
+)
+if not exist "renpy\" (
+    set missing=1
+) else (
+	set "RENPYDIR=%WORKDIR%\renpy\"
+)
+if %missing% EQU 1 (
+    call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog "    !reqdir2.%LNG%!"
+    call :elog "    !wdir2.%LNG%!"
+    call :elog .
+    pause>nul|set/p=.      !ANYKEY.%LNG%!
+
+    goto exitn
+) else (
+    call :elog "%GRE%!PASS.%LNG%!%RES%"
+)
+
+:: Check if %WORKDIR%\game is writable
+echo !wdir3.%LNG%!... >> "%UNRENLOG%"
+<nul set /p="!wdir3.%LNG%!... "
+copy nul "%WORKDIR%\game\test.txt" %debugredir%
+if %errorlevel% NEQ 0 (
+    call :elog "%RED%!FAIL.%LNG%! !wdir4.%LNG%!%RES%"
+    call :elog .
+    call :elog "    !wdir2.%LNG%!"
+    call :elog .
+    pause>nul|set/p=.      !ANYKEY.%LNG%!
+
+    goto exitn
+) else (
+    del /f /q "%WORKDIR%\game\test.txt"
+    call :elog "%GRE%!PASS.%LNG%!%RES%"
+)
+
+
+:: Set UNRENLOG for debugging purpose
+If exist "%TEMP%\UnRen-forall.log" (
+    :: Move the temporary log file to the working directory
+    move /y "%TEMP%\UnRen-forall.log" "%WORKDIR%\UnRen-forall.log" %debugredir%
+)
+set "UNRENLOG=%WORKDIR%\UnRen-forall.log"
+set "UNRENLOG=%UNRENLOG:"=%"
+
+:: Check for Python
+set "python1.en=Checking if Python is available..."
+set "python1.fr=Vérification de la disponibilité de Python..."
+set "python1.es=Comprobando si Python está disponible..."
+set "python1.it=Controllo della disponibilità di Python..."
+set "python1.de=Überprüfung der Verfügbarkeit von Python..."
+set "python1.ru=Проверка наличия Python..."
+
+set "python2.en=[Error] Cannot locate python directory. !UNACONT.%LNG%!"
+set "python2.fr=[Erreur] Impossible de localiser le répertoire python. !UNACONT.%LNG%!"
+set "python2.es=[Error] No se puede localizar el directorio de Python. !UNACONT.%LNG%!"
+set "python2.it=[Errore] Impossibile localizzare la directory di Python. !UNACONT.%LNG%!"
+set "python2.de=[Fehler] Python-Verzeichnis kann nicht gefunden werden. !UNACONT.%LNG%!"
+set "python2.ru=[Ошибка] Не удалось найти каталог Python. !UNACONT.%LNG%!"
+
+set "python3.en=You have lauched %SCRIPTNAME% but Python %PYVERS% is found. Please use UnRen-legacy.bat instead."
+set "python3.fr=Vous avez lancé %SCRIPTNAME% mais Python %PYVERS% a été trouvé. Veuillez utiliser UnRen-legacy.bat à la place."
+set "python3.es=Ha iniciado %SCRIPTNAME% pero se ha encontrado Python %PYVERS%. Utilice UnRen-legacy.bat en su lugar."
+set "python3.it=Hai avviato %SCRIPTNAME% ma è stato trovato Python %PYVERS%. Usa invece UnRen-legacy.bat."
+set "python3.de=Sie haben %SCRIPTNAME% gestartet, aber Python %PYVERS% wurde gefunden. Bitte verwenden Sie stattdessen UnRen-legacy.bat."
+set "python3.ru=Вы запустили %SCRIPTNAME%, но найден Python %PYVERS%. Пожалуйста, используйте UnRen-legacy.bat вместо этого."
+
+echo !python1.%LNG%! >> "%UNRENLOG%"
+<nul set /p=!python1.%LNG%!
+
+:: Doublecheck to avoid issues with Milfania games
+if exist "lib\py3-windows-x86_64\pythonw.exe" if exist "lib\py3-windows-x86_64\python.exe" (
+    if not "%PROCESSOR_ARCHITECTURE%" == "x86" (
+        <nul set /p=.
+        set "pythondir=%WORKDIR%\lib\py3-windows-x86_64\"
+    ) else if exist "lib\py3-windows-i686\python.exe" (
+        <nul set /p=.
+        set "pythondir=%WORKDIR%\lib\py3-windows-i686\"
+    )
+) else if exist "lib\py3-windows-i686\python.exe" (
+    <nul set /p=.
+    set "pythondir=%WORKDIR%\lib\py3-windows-i686\"
 )
 if exist "lib\py2-windows-x86_64\python.exe" (
-	if not "%PROCESSOR_ARCHITECTURE%"=="x86" (
-		set "pythondir=%workdir%\lib\py2-windows-x86_64\"
+    if not "%PROCESSOR_ARCHITECTURE%" == "x86" (
+        <nul set /p=.
+        set "pythondir=%WORKDIR%\lib\py2-windows-x86_64\"
     ) else if exist "lib\py2-windows-i686\python.exe" (
-		set "pythondir=%workdir%\lib\py2-windows-i686\"
-	)
+        <nul set /p=.
+        set "pythondir=%WORKDIR%\lib\py2-windows-i686\"
+    )
 ) else if exist "lib\py2-windows-i686\python.exe" (
-	set "pythondir=%workdir%\lib\py2-windows-i686\"
+    <nul set /p=.
+    set "pythondir=%WORKDIR%\lib\py2-windows-i686\"
 )
-REM Doublecheck to avoid issues with Milfania games
-if exist "lib\py3-windows-x86_64\pythonw.exe" if exist "lib\py3-windows-x86_64\python.exe" (
-	if not "%PROCESSOR_ARCHITECTURE%"=="x86" (
-		set "pythondir=%workdir%\lib\py3-windows-x86_64\"
-    ) else if exist "lib\py3-windows-i686\python.exe" (
-		set "pythondir=%workdir%\lib\py3-windows-i686\"
-	)
-) else if exist "lib\py3-windows-i686\python.exe" (
-	set "pythondir=%workdir%\lib\py3-windows-i686\"
-)
-
-if not exist "%pythondir%" (
-	echo [31m	! Error: Cannot locate python directory, unable to continue.[0m
-	echo			 Are you sure we're in the game's root directory?
-	call :elog .
-	pause>nul|set/p=.			Press any key to exit...
-	exit
+if exist "lib\windows-x86_64\python.exe" (
+    if not "%PROCESSOR_ARCHITECTURE%" == "x86" (
+        <nul set /p=.
+        set "pythondir=%WORKDIR%\lib\windows-x86_64\"
+    ) else if exist "lib\windows-i686\python.exe" (
+        <nul set /p=.
+        set "pythondir=%WORKDIR%\lib\windows-i686\"
+    )
+) else if exist "lib\windows-i686\python.exe" (
+    <nul set /p=.
+    set "pythondir=%WORKDIR%\lib\windows-i686\"
 )
 
-if exist "game" if exist "renpy" (
-	set "renpydir=%workdir%\renpy\"
-	set "gamedir=%workdir%\game\"
+:: Set the PYNOASSERT according to “%pythondir%Lib”.
+if exist "%pythondir%Lib" (
+    set "PYNOASSERT=-O"
 ) else (
-	echo [31m	! Error: Cannot locate game directory, unable to continue.[0m
-	echo			 Are you sure we're in the game's root directory?
-	call :elog .
-	pause>nul|set/p=.			Press any key to exit...
-	exit
+    set "PYNOASSERT="
 )
 
 set "PYTHONHOME=%pythondir%"
@@ -275,17 +679,29 @@ set "PYTHONPATH="
 set "latest="
 set "latestver="
 
-REM Priority to Python 2.7 if present
-if exist "%workdir%\lib\pythonlib2.7" (
-    set "PYTHONPATH=%workdir%\lib\pythonlib2.7"
-    goto :end
-) else if exist "%workdir%\lib\python2.7" (
-    set "PYTHONPATH=%workdir%\lib\python2.7"
-    goto :end
+:: Priority to Python 2.7 if present
+if exist "%WORKDIR%\lib\pythonlib2.7" (
+    <nul set /p=.
+    set "PYTHONPATH=%WORKDIR%\lib\pythonlib2.7"
+    set "PYVERS=2.7"
+    goto pyend
+) else if exist "%WORKDIR%\lib\python2.7" (
+    <nul set /p=.
+    set "PYTHONPATH=%WORKDIR%\lib\python2.7"
+    set "PYVERS=2.7"
+    goto pyend
 )
 
-REM Searching for the latest version of Python 3.x
-for /D %%D in ("%workdir%\lib\python3.*") do (
+if "%PYVERS%" == "2.7" (
+    call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog "!python3.%LNG%!"
+    call :elog .
+    goto exitn
+)
+
+:: Searching for the latest version of Python 3.x
+for /D %%D in ("%WORKDIR%\lib\python3.*") do (
+    <nul set /p=.
     set "ver=%%~nxD"
     set "found="
     for %%M in (os importlib encodings) do (
@@ -295,13 +711,16 @@ for /D %%D in ("%workdir%\lib\python3.*") do (
     )
     if defined found (
         for /f "tokens=2 delims=." %%V in ("!ver!") do (
+            <nul set /p=.
             if not defined latest (
                 set "latest=%%D"
                 set "latestver=%%V"
+                set "PYVERS=3.%%V"
             ) else (
                 if %%V GTR !latestver! (
                     set "latest=%%D"
                     set "latestver=%%V"
+                    set "PYVERS=3.%%V"
                 )
             )
         )
@@ -309,241 +728,638 @@ for /D %%D in ("%workdir%\lib\python3.*") do (
 )
 
 if defined latest (
+    <nul set /p=.
     set "PYTHONPATH=!latest!"
-	call :elog "Python found at %pythondir%"
-) else (
-    call :elog "[31m No valid version of Python found. Using default Python 2.7 if available."
 )
 
-:end
+:pyend
 
+if not exist "%pythondir%\python.exe" (
+    call :elog "%RED% !FAIL.%LNG%!%RES%"
+    call :elog .
+    call :elog "    %RED%!python2.%LNG%!%RES%"
+    call :elog "    !wdir2.%LNG%!"
+    call :elog .
+    pause>nul|set/p=.      !ANYKEY.%LNG%!
 
-REM Set the pynoassert according to “%pythondir%Lib”.
-if exist "%pythondir%Lib" (
-    set "pynoassert=-O"
+    goto exitn
 ) else (
-    set "pynoassert="
+    call :elog "%YEL% Python %PYVERS% %GRE%!PASS.%LNG%!%RES%"
 )
 
-call :elog "Check Python Version"
+echo Check Python Version... >> "%UNRENLOG%"
 for /f "tokens=2 delims= " %%a in ('"%pythondir%\python" -V 2^>^&1') do set PYTHONVERS=%%a
-REM Extraction of major and minor versions
+:: Extraction of major and minor versions
 for /f "tokens=1,2 delims=." %%b in ("%PYTHONVERS%") do (
     set PYTHONMAJOR=%%b
     set PYTHONMINOR=%%c
 )
 
-REM Check if Python ^>= 3.8
+:: Check if Python ^>= 3.8
 if %PYTHONMAJOR% GEQ 3 (
 	if %PYTHONMINOR% GEQ 8 (
-		call :elog "Python version is %PYTHONVERS%, which is upper or equal to 3.8"
-    	set "rpatool-new=y"
+		echo Python version is %PYTHONVERS%, which is upper or equal to 3.8 >> "%UNRENLOG%"
+    	set "RPATOOL-NEW=y"
 	) else (
-		call :elog "Python version is %PYTHONVERS%, which is lower than 3.8"
-		set "rpatool-new=n"
+		echo Python version is %PYTHONVERS%, which is lower than 3.8 >> "%UNRENLOG%"
+		set "RPATOOL-NEW=n"
 	)
 ) else (
-	call :elog "Python version is %PYTHONVERS%, which is lower than 3.8"
-    set "rpatool-new=n"
+	echo Python version is %PYTHONVERS%, which is lower than 3.8 >> "%UNRENLOG%"
+    set "RPATOOL-NEW=n"
 )
+
+:: Check for Ren'Py version
+set "renpyvers1.en=Ren'Py version found: "
+set "renpyvers1.fr=Version Ren'Py trouvée : "
+set "renpyvers1.es=Versión de Ren'Py encontrada: "
+set "renpyvers1.it=Versione Ren'Py rilevata: "
+set "renpyvers1.de=Ren'Py-Version gefunden: "
+set "renpyvers1.ru=Найдена версия Ren'Py: "
+
+set "renpyvers2.en=[Error] Failed to create detect_renpy_version.py. !UNACONT.%LNG%!"
+set "renpyvers2.fr=[Erreur] Impossible de créer detect_renpy_version.py. !UNACONT.%LNG%!"
+set "renpyvers2.es=[Error] No se pudo crear detect_renpy_version.py. !UNACONT.%LNG%!"
+set "renpyvers2.it=[Errore] Impossibile creare detect_renpy_version.py. !UNACONT.%LNG%!"
+set "renpyvers2.de=[Fehler] Die Erstellung von detect_renpy_version.py ist fehlgeschlagen. !UNACONT.%LNG%!"
+set "renpyvers2.ru=[Ошибка] Не удалось создать detect_renpy_version.py. !UNACONT.%LNG%!"
+
+set "renpyvers3.en=[Error] Unable to detect Ren'Py version,"
+set "renpyvers3.fr=[Erreur] Impossible de détecter la version de Ren'Py,"
+set "renpyvers3.es=[Error] No se puede detectar la versión de Ren'Py,"
+set "renpyvers3.it=[Errore] Impossibile rilevare la versione di Ren'Py,"
+set "renpyvers3.de=[Fehler] Unmöglich, die Ren'Py-Version zu erkennen, bitte sicherstellen,"
+set "renpyvers3.ru=[Ошибка] Не удалось обнаружить версию Ren'Py, пожалуйста,"
+
+set "renpyvers4.en=        please ensure the game is compatible with UnRen."
+set "renpyvers4.fr=         es-tu sûr que le jeu est compatible avec UnRen ?"
+set "renpyvers4.es=        asegúrese de que el juego sea compatible con UnRen."
+set "renpyvers4.it=         assicurati che il gioco sia compatibile con UnRen."
+set "renpyvers4.de=         dass das Spiel mit UnRen kompatibel ist."
+set "renpyvers4.ru=         убедитесь, что игра совместима с UnRen."
+
+echo !renpyvers1.%LNG%! >> "%UNRENLOG%"
+<nul set /p=!renpyvers1.%LNG%!
+
+cd /d "%WORKDIR%"
+set "detect_renpy_versionb64=IiIiDQogICAgVGhpcyBzY3JpcHQgZGV0ZWN0cyB0aGUgUmVuJ1B5IHZlcnNpb24NCiIiIg0KdHJ5Og0KICAgIGltcG9ydCByZW5weQ0KICAgIHZlcnNpb24gPSByZW5weS52ZXJzaW9uX3R1cGxlWzBdDQogICAgcHJpbnQodmVyc2lvbikNCmV4Y2VwdCBFeGNlcHRpb246DQogICAgcHJpbnQoIkVSUk9SIikNCg=="
+set "detect_renpy_version_tmp=detect_renpy_version.py.tmp"
+set "detect_renpy_version_py=detect_renpy_version.py"
+
+del /f /q "%detect_renpy_version_py%" %debugredir%
+
+powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllText('%detect_renpy_version_tmp%', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%detect_renpy_versionb64%')))" %debugredir%
+if exist "%detect_renpy_version_tmp%" (
+    move /y "%detect_renpy_version_tmp%" "%detect_renpy_version_py%" %debugredir%
+) else (
+    call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog .
+    call :elog "%RED%!renpyvers2.%LNG%!%RES%"
+    call :elog .
+    pause>nul|set/p=.      !ANYKEY.%LNG%!
+
+    goto exitn
+)
+
+if not exist "%detect_renpy_version_py%" (
+    call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog .
+    call :elog "!renpyvers2.%LNG%!"
+    call :elog .
+    pause>nul|set/p=.      !ANYKEY.%LNG%!
+
+    goto exitn
+) else (
+    for /f "delims=" %%A in ('"%PYTHONHOME%\python.exe" %PYNOASSERT% %detect_renpy_version_py%') do (
+        echo %%A | findstr /r "[0-9]" >nul
+        if !errorlevel! EQU 0 (
+            set "RENPYVERSION=%%A"
+        )
+    )
+    if not defined RENPYVERSION (
+        call :elog "%RED%!FAIL.%LNG%!%RES%"
+        call :elog .
+        call :elog "    %RED%!renpyvers3.%LNG%!%RES%"
+        call :elog "    %RED%!renpyvers4.%LNG%!%RES%"
+    ) else (
+        call :elog "%YEL%!RENPYVERSION!%RES%"
+    )
+)
+del /f /q "%detect_renpy_version_py%" %debugredir%
 
 call :DisplayVars "Init phase"
 
-:menu
-REM --------------------------------------------------------------------------------
-REM Menu selection
-REM --------------------------------------------------------------------------------
-set exitoption=
-echo.
-echo	Available Options:
-echo.
-echo 	1) [92m Extract RPA packages[0m
-echo 	2) [92m Decompile RPYC files[0m
-echo 	3) [96m Enable Console and Developer Menu[0m
-echo 	4) [96m Enable Quick Save and Quick Load[0m
-echo 	5) [96m Force enable skipping of unseen content[0m
-echo 	6) [96m Force enable rollback (scroll wheel)[0m
-echo 	7) [92m Deobfuscate when decompile RPYC files [33m(Use basic code)[0m
-echo 	8) [92m Extract and decompile[0m
-echo 	9) [92m All of the above [33m(Can break your game)[0m
-echo.
-echo 	[33mOptional actions[0m
-echo 	d) [96m Download and add 0x52_URM to the game directory[0m
-echo 	e) [96m Extract text for translation purpose[0m
-echo.
-echo 	[33mThe following choices require administrative privileges[0m
-echo 	+) [96m Add a right-click menu entry for folders to run the script[0m
-echo 	-) [96m Remove the right-click menu entry from the registry[0m
-echo.
-echo 	x) Exit
-echo.
-set /p "option=.  Enter your choice: "
-echo.
-echo  ----------------------------------------------------
-echo.
-if "%option%"=="1" call :extract
-if "%option%"=="2" call :decompile
-if "%option%"=="3" call :console
-if "%option%"=="4" call :quick
-if "%option%"=="5" call :skip
-if "%option%"=="6" call :rollback
-if "%option%"=="7" call :decompile
-if "%option%"=="8" call :extract
-if "%option%"=="9" call :extract
-if "%option%"=="d" call :download_urm
-if "%option%"=="e" call :extract_text
-if "%option%"=="+" call :add_reg
-if "%option%"=="-" call :remove_reg
-if "%option%"=="x" exit 0
-call :init
+set "def=5"
+set initialized=1
 
-:extract_text
-REM --------------------------------------------------------------------------------
-REM Extract text for translation purpose
-REM --------------------------------------------------------------------------------
-cd /d "%workdir%"
-REM find the current game name by checking the presence of same name with .exe, .py and .sh extension
-call :elog " 	Searching for game files..."
+:SkipInit
+set "mtitle.en=Working directory: "
+set "mtitle.fr=Répertoire de travail : "
+set "mtitle.es=Directorio de trabajo: "
+set "mtitle.it=Directory di lavoro: "
+set "mtitle.de=Aktuelles Verzeichnis: "
+set "mtitle.ru=Рабочий каталог: "
+
+set "choice1.en=Extract RPA packages."
+set "choice1.fr=Extraire les paquets RPA."
+set "choice1.es=Extraer paquetes RPA."
+set "choice1.it=Estrai pacchetti RPA."
+set "choice1.de=RPA-Pakete extrahieren."
+set "choice1.ru=Извлечь пакеты RPA."
+
+set "choice2.en=Decompile RPYC files."
+set "choice2.fr=Décompiler les fichiers RPYC."
+set "choice2.es=Descompilar archivos RPYC."
+set "choice2.it=Decompilare i file RPYC."
+set "choice2.de=RPYC-Dateien dekompilieren."
+set "choice2.ru=Декомпилировать файлы RPYC."
+
+set "choice3.en=Deobfuscate when extract RPA files %YEL%(Use basic code)"
+set "choice3.fr=Déobfusquer lors de l'extraction des fichiers RPA %YEL%(Utiliser le code de base)"
+set "choice3.es=Desofuscar al extraer archivos RPA %YEL%(Usar código básico)"
+set "choice3.it=Deoffuscare durante l'estrazione dei file RPA %YEL%(Utilizzare codice di base)"
+set "choice3.de=Deobfuscate beim Extrahieren von RPA-Dateien %YEL%(Basiscode verwenden)"
+set "choice3.ru=Деобфусцировать при извлечении файлов RPA %YEL%(Использовать базовый код)"
+
+set "choice4.en=Deobfuscate when decompile RPYC files %YEL%(Use basic code)"
+set "choice4.fr=Déobfusquer lors de la décompilation des fichiers RPYC %YEL%(Utiliser le code de base)"
+set "choice4.es=Desofuscar al descompilar archivos RPYC %YEL%(Usar código básico)"
+set "choice4.it=Deoffuscare durante la decompilazione dei file RPYC %YEL%(Utilizzare codice di base)"
+set "choice4.de=Deobfuscate beim Dekompilieren von RPYC-Dateien %YEL%(Basiscode verwenden)"
+set "choice4.ru=Деобфусцировать при декомпиляции файлов RPYC %YEL%(Использовать базовый код)"
+
+set "choice5.en=Extract and decompile (RPA and RPYC)"
+set "choice5.fr=Extraire et décompiler (RPA et RPYC)"
+set "choice5.es=Extraer y descompilar (RPA y RPYC)"
+set "choice5.it=Estrai e decompila (RPA e RPYC)"
+set "choice5.de=Extrahieren und dekompilieren (RPA und RPYC)"
+set "choice5.ru=Извлечь и декомпилировать (RPA и RPYC)"
+
+
+set "choice6.en=Deobfuscate, extract and decompile for both RPA and RPYC files %YEL%(Use basic code)"
+set "choice6.fr=Déobfusquer, extraire et décompiler pour les fichiers RPA et RPYC %YEL%(Utilise le code de base)"
+set "choice6.es=Desofuscar, extraer y descompilar archivos RPA y RPYC. %YEL%(Usar código básico)"
+set "choice6.it=Deoffuscare, estrarre e decompilare sia i file RPA che RPYC %YEL%(Utilizzare codice di base)"
+set "choice6.de=Entschlüsseln, extrahieren und dekompilieren Sie sowohl RPA- als auch RPYC-Dateien. %YEL%(Basiscode verwenden)"
+set "choice6.ru=Деобфускация, извлечение и декомпиляция файлов RPA и RPYC %YEL%(Использовать базовый код)"
+
+set "minfo1.en=The following options are independent of the Ren'Py version."
+set "minfo1.fr=Les options suivantes sont indépendantes de la version de Ren'Py."
+set "minfo1.es=Las siguientes opciones son independientes de la versión de Ren'Py."
+set "minfo1.it=Le seguenti opzioni sono indipendenti dalla versione di Ren'Py."
+set "minfo1.de=Die folgenden Optionen sind unabhängig von der Ren'Py-Version."
+set "minfo1.ru=Следующие параметры независимы от версии Ren'Py."
+
+set "choicea.en=Enable Console (Shift+O) and Developer menu (Shift+D)"
+set "choicea.fr=Activer la Console (Maj+O) et le menu Développeur (Maj+D)"
+set "choicea.es=Activar la Consola (Mayús+O) y el menú de desarrollador (Mayús+D)"
+set "choicea.it=Attiva la Console (Maiusc+O) e il menu sviluppatore (Maiusc+D)"
+set "choicea.de=Aktiviert die Konsole (Umschalt+O) und das Entwicklermenü (Umschalt+D)."
+set "choicea.ru=Активируйте консоль (Shift+O) и меню «Разработчик» (Shift+D)."
+
+set "choiceb.en=Enable debug mode %YEL%(Can break your game)"
+set "choiceb.fr=Activer le mode debug %YEL%(peut casser le jeu)"
+set "choiceb.es=Activar el modo debug %YEL%(puede romper el juego)"
+set "choiceb.it=Attiva la modalità debug %YEL%(può rompere il gioco)"
+set "choiceb.de=Aktiviert Sie den Debug-Modus %YEL%(kann Ihr Spiel beschädigen)"
+set "choiceb.ru=Включить режим отладки %YEL%(может сломать игру)"
+
+set "choicec.en=Force Skip (Unseen Text, After Choices)"
+set "choicec.fr=Forcer Skip (Unseen Text, After Choices)"
+set "choicec.es=Forzar Skip (Unseen Text, After Choices)"
+set "choicec.it=Forza Skip (Unseen Text, After Choices)"
+set "choicec.de=Zwangsweise überspringen (Unseen Text, After Choices)"
+set "choicec.ru=Принудить Skip (Unseen Text, After Choices)"
+
+set "choiced.en=Force all Skip (Unseen Text, After Choices, Transitions)"
+set "choiced.fr=Forcer tous les Skip (Unseen Text, After Choices, Transitions)"
+set "choiced.es=Forzar todos los Skip (Unseen Text, After Choices, Transitions)"
+set "choiced.it=Forza tutti gli Skip (Unseen Text, After Choices, Transitions)"
+set "choiced.de=Zwangsweise überspringen (Unseen Text, After Choices, Transitions)"
+set "choiced.ru=Принудить все пропуски (Unseen Text, After Choices, Transitions)"
+
+set "choicee.en=Force enable rollback (scroll wheel)"
+set "choicee.fr=Activer le "Rollback" (molette de défilement)"
+set "choicee.es=Forzar la activación del "Rollback" (rueda de desplazamiento)"
+set "choicee.it=Forza l'attivazione del "Rollback" (rotella di scorrimento)"
+set "choicee.de=Aktivieren Sie "Rollback" (Scrollrad)"
+set "choicee.ru=Принудить активацию "Rollback" (колесо прокрутки)"
+
+set "choicef.en=Enable Quick Save and Quick Load (Shift+S F5, Shift+L F9)"
+set "choicef.fr=Activer "Quick Save" et "Quick Load" (Maj+S F5, Maj+L F9)"
+set "choicef.es=Activar "Quick Save" y "Quick Load" (Mayús+S F5, Mayús+L F9)"
+set "choicef.it=Attiva "Quick Save" e "Quick Load" (Maiusc+S F5, Maiusc+L F9)"
+set "choicef.de=Aktivieren Sie "Quick Save" und "Quick Load" (Umschalt+S F5, Umschalt+L F9)"
+set "choicef.ru=Включить "Quick Save" и "Quick Load" (Shift+S F5, Shift+L F9)"
+
+set "choiceg.en=Try forcing the Quick Menu to display."
+set "choiceg.fr=Essayer de forcer l'affichage du "Quick Menu""
+set "choiceg.es=Intenta forzar la visualización del "Quick Menu""
+set "choiceg.it=Prova a forzare la visualizzazione del "Quick Menu""
+set "choiceg.de=Versuche, die Anzeige des "Quick Menu" zu erzwingen"
+set "choiceg.ru=Попробуй заставить отобразиться "Quick Menu""
+
+set "choiceh.en=Download and add Universal Gallery Unlocker ZLZK"
+set "choiceh.fr=Télécharger et ajouter le "Universal Gallery Unlocker ZLZK""
+set "choiceh.es=Descargar y agregar el "Universal Gallery Unlocker ZLZK""
+set "choiceh.it=Scarica e aggiungi il "Universal Gallery Unlocker ZLZK""
+set "choiceh.de="Universal Gallery Unlocker ZLZK" herunterladen und hinzufügen"
+set "choiceh.ru=Скачать и добавить "Universal Gallery Unlocker ZLZK""
+
+set "choicei.en=Download and add Universal Choice Descriptor ZLZK"
+set "choicei.fr=Télécharger et ajouter le "Universal Choice Descriptor ZLZK""
+set "choicei.es=Descargar y agregar el "Universal Choice Descriptor ZLZK""
+set "choicei.it=Scarica e aggiungi il "Universal Choice Descriptor ZLZK""
+set "choicei.de="Universal Choice Descriptor ZLZK" herunterladen und hinzufügen"
+set "choicei.ru=Скачать и добавить "Universal Choice Descriptor" ZLZK"
+
+set "choicej.en=Download and add Universal Transparent Text Box Mod by Penfold Mole"
+set "choicej.fr=Télécharger et ajouter le "Universal Transparent Text Box Mod" par Penfold Mole"
+set "choicej.es=Descargar y agregar el "Universal Transparent Text Box Mod" de Penfold Mole"
+set "choicej.it=Scarica e aggiungi il "Universal Transparent Text Box Mod" di Penfold Mole"
+set "choicej.de="Universal Transparent Text Box Mod" von Penfold Mole herunterladen und hinzufügen"
+set "choicej.ru=Скачать и добавить "Universal Transparent Text Box Mod" от Penfold Mole"
+
+set "choicek.en=Download and add 0x52 URM by 0x52"
+set "choicek.fr=Télécharger et ajouter "0x52 URM by 0x52""
+set "choicek.es=Descargar y agregar "0x52 URM by 0x52""
+set "choicek.it=Scarica e aggiungi "0x52 URM by 0x52""
+set "choicek.de="0x52 URM by 0x52" herunterladen und hinzufügen"
+set "choicek.ru=Скачать и добавить "0x52 URM by 0x52""
+
+set "choicel.en=Rename MC name if it's named mcname"
+set "choicel.fr=Renommer le MC name si il est nommé mcname"
+set "choicel.es=Renombrar el nombre de MC si se llama mcname"
+set "choicel.it=Rinomina il nome di MC se si chiama mcname"
+set "choicel.de=Den MC-Namen umbenennen, wenn er mcname heißt"
+set "choicel.ru=Переименовать имя MC, если оно называется mcname"
+
+set "choicet.en=Extract text for translation purposes"
+set "choicet.fr=Extraire le texte à des fins de traduction"
+set "choicet.es=Extraer texto con fines de traducción"
+set "choicet.it=Estrai il testo a scopo di traduzione"
+set "choicet.de=Text zum Übersetzen extrahieren"
+set "choicet.ru=Извлечь текст для перевода"
+
+set "minfo2.en=The following choices require administrative privileges."
+set "minfo2.fr=Les choix suivants nécessitent des privilèges administrateurs."
+set "minfo2.es=Las siguientes opciones requieren privilegios administrativos."
+set "minfo2.it=Le seguenti opzioni richiedono privilegi amministrativi."
+set "minfo2.de=Die folgenden Optionen erfordern administrative Berechtigungen."
+set "minfo2.ru=Следующие варианты требуют административных прав."
+
+set "choice+.en=Add a right-click menu entry for folders to run the script."
+set "choice+.fr=Ajouter une entrée de menu contextuel pour les dossiers afin d'exécuter le script."
+set "choice+.es=Agregar una entrada de menú contextual para las carpetas para ejecutar el script."
+set "choice+.it=Aggiungere una voce al menu contestuale delle cartelle per eseguire lo script."
+set "choice+.de=Einträge im Kontextmenü für Ordner hinzufügen, um das Skript auszuführen."
+set "choice+.ru=Добавить элемент контекстного меню для папок для запуска скрипта."
+
+set "choice-.en=Remove the right-click menu entry from the registry."
+set "choice-.fr=Supprimer l'entrée de menu contextuel du registre."
+set "choice-.es=Eliminar la entrada de menú contextual del registro."
+set "choice-.it=Rimuovi la voce del menu contestuale dal registro."
+set "choice-.de=Einträge im Kontextmenü aus der Registrierung entfernen."
+set "choice-.ru=Удалить элемент контекстного меню из реестра."
+
+set "mquest.en=Your choice (1-6,a-l,t,+,- by default [%MDEFS2%]): "
+set "mquest.fr=Votre choix (1-6,a-l,t,+,- par défaut [%MDEFS2%]) : "
+set "mquest.es=Su elección (1-6,a-l,t,+,- por defecto [%MDEFS2%]): "
+set "mquest.it=La tua scelta (1-6,a-l,t,+,- predefinito [%MDEFS2%]): "
+set "mquest.de=Ihre Wahl (1-6,a-l,t,+,- für Standard [%MDEFS2%]): "
+set "mquest.ru=Ваш выбор (1-6,a-l,t,+,- по умолчанию [%MDEFS2%]): "
+
+set "choicex.en=Exit"
+set "choicex.fr=Quitter"
+set "choicex.es=Salir"
+set "choicex.it=Esci"
+set "choicex.de=Beenden"
+set "choicex.ru=Выход"
+
+set "uchoice.en=Unknown choice:"
+set "uchoice.fr=Choix inconnu :"
+set "uchoice.es=Opción desconocida:"
+set "uchoice.it=Scelta sconosciuta:"
+set "uchoice.de=Unbekannte Wahl:"
+set "uchoice.ru=Неизвестный выбор:"
+
+:: Menu display
 call :elog .
-for %%e in (exe py sh) do (
-    for %%f in (*%%e) do (
-        set "fname=%%~nf"
-        call :elog "[32m 	+ Game name found: !fname![0m"
-        goto :found_name
+call :elog .
+call :elog "!mtitle.%LNG%!%YEL%%WORKDIR% %RES%"
+call :elog .
+echo        1) %GRE%!choice1.%LNG%!%RES%
+echo        2) %GRE%!choice2.%LNG%!%RES%
+echo        3) %GRY%!choice3.%LNG%!%RES%
+echo        4) %GRE%!choice4.%LNG%!%RES%
+echo        5) %GRE%!choice5.%LNG%!%RES%
+echo        6) %GRY%!choice6.%LNG%!%RES%
+call :elog .
+echo        %YEL%!minfo1.%LNG%!%RES%
+echo        a) %CYA%!choicea.%LNG%!%RES%
+echo        b) %CYA%!choiceb.%LNG%!%RES%
+echo        c) %CYA%!choicec.%LNG%!%RES%
+echo        d) %CYA%!choiced.%LNG%!%RES%
+echo        e) %CYA%!choicee.%LNG%!%RES%
+echo        f) %CYA%!choicef.%LNG%!%RES%
+echo        g) %CYA%!choiceg.%LNG%!%RES%
+echo        h) %CYA%!choiceh.%LNG%!%RES%
+echo        i) %CYA%!choicei.%LNG%!%RES%
+echo        j) %CYA%!choicej.%LNG%!%RES%
+echo        k) %CYA%!choicek.%LNG%!%RES%
+echo        l) %CYA%!choicel.%LNG%!%RES%
+echo        t) %CYA%!choicet.%LNG%!%RES%
+call :elog .
+echo        %YEL%!minfo2.%LNG%!%RES%
+echo        +) %CYA%!choice+.%LNG%!%RES%
+echo        -) %CYA%!choice-.%LNG%!%RES%
+call :elog .
+echo        x) %YEL%!choicex.%LNG%!%RES%
+
+:: Reading the selection
+echo.
+echo.
+set "OPTIONS="
+set /p "OPTIONS=!mquest.%LNG%!"
+if not defined OPTIONS set "OPTIONS=%MDEFS2%"
+set "OPTIONS=%OPTIONS: =%"
+
+:: Loop through each character in the input
+:: First, check for invalid characters
+set "VALID=123456abctdefghijklt+-x"
+for /L %%I in (0,1,15) do (
+    set "CHAR=!OPTIONS:~%%I,1!"
+    if "!CHAR!"=="" goto end_check
+    echo "!VALID!" | findstr /C:"!CHAR!" >nul || (
+        echo.
+        echo.
+        echo %RED%!uchoice.%LNG%! %YEL%!CHAR!%RES%
+        timeout /t 2 >nul
+        echo.
     )
 )
-call :elog "[31m	! No game files found with .exe, .py or .sh[0m"
+:end_check
 
-:found_name
-call :elog .
-set /p "translation_lang=Enter the target translation language (french by default): "
-if not defined translation_lang (
-	set "translation_lang=french"
+:: Now process each valid character
+for %%C in (1 2 3 4 5 6 a b c d e f g h i j k l t + - x) do (
+    echo !OPTIONS! | find /i "%%C" >nul
+    if !errorlevel! EQU 0 (
+        set "OPTION=%%C"
+        if "!OPTION!" == "1" call :extract
+        if "!OPTION!" == "2" call :decompile
+        if "!OPTION!" == "3" call :unavailable REM :extract_wkey
+        if "!OPTION!" == "4" call :decompile
+        if "!OPTION!" == "5" call :extract
+        if "!OPTION!" == "6" call :unavailable REM :extract_wkey
+
+        if /i "!OPTION!" == "a" call :console
+        if /i "!OPTION!" == "b" call :debug
+        if /i "!OPTION!" == "c" call :skip
+        if /i "!OPTION!" == "d" call :skipall
+        if /i "!OPTION!" == "e" call :rollback
+        if /i "!OPTION!" == "f" call :quick
+        if /i "!OPTION!" == "g" call :qmenu
+        if /i "!OPTION!" == "h" call :add_ugu
+        if /i "!OPTION!" == "i" call :add_ucd
+        if /i "!OPTION!" == "j" call :add_utbox
+        if /i "!OPTION!" == "k" call :add_urm
+        if /i "!OPTION!" == "l" call :replace_mcname
+        if /i "!OPTION!" == "t" call :extract_text
+
+        if "!OPTION!" == "+" call :add_reg
+        if "!OPTION!" == "-" call :remove_reg
+
+        if /i "!OPTION!" == "x" goto exitn
+    )
 )
 
-if not exist %gamedir%/tl (
-	mkdir %gamedir%/tl
-)
+set "MDEFS2=x"
+echo.
+echo.
+pause
 
-if not exist %gamedir%\tl\%translation_lang% (
-	call :elog "[33m	+ Translation folder will be created: %gamedir%\tl\%translation_lang%[0m"
-) else (
-	call :elog "[33m	+ Translation folder already exists, it will be updated.[0m"
-)
-
-call :elog .
-call :elog " 	Extracting text for translation using: "
-call :elog " 	+ %pythondir%python.exe %fname%.py game translate %translation_lang%"
-"%pythondir%python.exe" %fname%.py game translate %translation_lang% >>%unrenlog% 2>&1
-if errorlevel 1 (
-	call :elog "[31m	! Error: Failed to extract text for translation, unable to continue.[0m"
-	call :elog .
-	pause>nul|set/p=.			Press any key to exit...
-	exit
-)
-
-call :finish
-
-exit /b
-
-
-REM --------------------------------------------------------------------------------
-REM Download 0x52_URM and add to the game
-REM --------------------------------------------------------------------------------
-set URL="https://api.0x52.dev/modversions/1223/download"
-set OUTZIP="%gamedir%0x52_URM.zip"
-call :elog "	Downloading 0x52_URM.zip to %OUTZIP%"
-powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%URL%','%OUTZIP%')"
-if not exist "%OUTZIP%" (
-	call :elog "[31m	! Error: Failed to download 0x52_URM.zip, unable to continue.[0m"
-	call :elog .
-	pause>nul|set/p=.			Press any key to exit...
-	exit
-) else (
-	call :elog "[32m	+ 0x52_URM.zip downloaded successfully[0m"
-	call :elog .
-	powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%OUTZIP%' '%gamedir%'"
-	if errorlevel 1 (
-		call :elog "[31m	! Error: Failed to add 0x52_URM to the game directory[0m"
-	) else (
-		call :elog "[32m	+ 0x52_URM added to the game directory[0m"
-	)
-	call :elog .
-
-	del "%OUTZIP%"
-)
-
-call :finish
-
-exit /b
+goto menu
 
 
 :extract
-REM --------------------------------------------------------------------------------
-REM Write rpatool.py from our base64 strings
-REM --------------------------------------------------------------------------------
+set "extm1.en=Remove RPA archives after extraction? Enter [y/n] (default n): "
+set "extm1.fr=Supprimer les archives RPA après extraction ? Entrer [o/n] (par défaut n) : "
+set "extm1.es=¿Eliminar los archivos RPA después de la extracción? Ingrese [s/n] (predeterminado n): "
+set "extm1.it=Rimuovere gli archivi RPA dopo l'estrazione? Inserisci [s/n] (predefinito n): "
+set "extm1.de=RPA-Archive nach der Extraktion entfernen? Geben Sie [y/n] ein (Standard n): "
+set "extm1.ru=Удалить архивы RPA после извлечения? Введите [y/n] (по умолчанию n): "
+
+set "extm2.en=RPA archives will be moved to %WORKDIR%\rpa."
+set "extm2.fr=Les archives RPA seront déplacées vers %WORKDIR%\rpa."
+set "extm2.es=Los archivos RPA se moverán a %WORKDIR%\rpa."
+set "extm2.it=Gli archivi RPA verranno spostati in %WORKDIR%\rpa."
+set "extm2.de=RPA-Archive werden nach %WORKDIR%\rpa verschoben."
+set "extm2.ru=Архивы RPA будут перемещены в %WORKDIR%\rpa."
+
+set "extm3.en=RPA archives will be deleted after extraction."
+set "extm3.fr=Les archives RPA seront supprimées après extraction."
+set "extm3.es=Los archivos RPA se eliminarán después de la extracción."
+set "extm3.it=Gli archivi RPA verranno eliminati dopo l'estrazione."
+set "extm3.de=RPA-Archive werden nach der Extraktion gelöscht."
+set "extm3.ru=Архивы RPA будут удалены после извлечения."
+
+set "extm4.en=Extract all or select RPA archives? Enter [a/s] (default a): "
+set "extm4.fr=Extraire toutes les archives RPA ou sélectionner ? Entrer [t/s] (par défaut t) : "
+set "extm4.es=¿Extraer todos o seleccionar archivos RPA? Ingrese [t/s] (predeterminado t): "
+set "extm4.it=Estrarre tutti o selezionare gli archivi RPA? Inserisci [t/s] (predefinito t): "
+set "extm4.de=Alle oder ausgewählte RPA-Archive extrahieren? Geben Sie [a/s] ein (Standard a): "
+set "extm4.ru=Извлечь все или выбрать архивы RPA? Введите [a/s] (по умолчанию a): "
+
+set "extm5.en=You will select the RPA archives to extract."
+set "extm5.fr=Vous allez sélectionner les archives RPA à extraire."
+set "extm5.es=Seleccionará los archivos RPA para extraer."
+set "extm5.it=Selezionerai gli archivi RPA da estrarre."
+set "extm5.de=Sie werden die RPA-Archive zum Extrahieren auswählen."
+set "extm5.ru=Вы выберете архивы RPA для извлечения."
+
+set "extm6.en=All RPA archives will be extracted."
+set "extm6.fr=Toutes les archives RPA seront extraites."
+set "extm6.es=Se extraerán todos los archivos RPA."
+set "extm6.it=Verranno estratti tutti gli archivi RPA."
+set "extm6.de=Alle RPA-Archive werden extrahiert."
+set "extm6.ru=Все архивы RPA будут извлечены."
+
+set "extm7.en=[Error] Failed to create rpatool.py. !UNACONT.%LNG%!"
+set "extm7.fr=[Erreur] Échec de la création de rpatool.py. !UNACONT.%LNG%!"
+set "extm7.es=[Error] No se pudo crear rpatool.py. !UNACONT.%LNG%!"
+set "extm7.it=[Errore] Impossibile creare rpatool.py. !UNACONT.%LNG%!"
+set "extm7.de=[Fehler] Die Erstellung von rpatool.py ist fehlgeschlagen. !UNACONT.%LNG%!"
+set "extm7.ru=[Ошибка] Не удалось создать rpatool.py. !UNACONT.%LNG%!"
+
+set "extm8.en=Searching for RPA files in the game directory..."
+set "extm8.fr=Recherche de fichiers RPA dans le répertoire du jeu..."
+set "extm8.es=Buscando archivos RPA en el directorio del juego..."
+set "extm8.it=Cercando file RPA nella directory di gioco..."
+set "extm8.de=Suche nach RPA-Dateien im Spieledirectory..."
+set "extm8.ru=Поиск файлов RPA в каталоге игры..."
+
+set "extm9.en=Creating rpatool..."
+set "extm9.fr=Création de rpatool..."
+set "extm9.es=Creando rpatool..."
+set "extm9.it=Creazione di rpatool..."
+set "extm9.de=Erstellen von rpatool..."
+set "extm9.ru=Создание rpatool..."
+
+set "extm10.en=RPA extension renamed to:"
+set "extm10.fr=Extension RPA renommée en :"
+set "extm10.es=Extensión RPA renombrada a:"
+set "extm10.it=Estensione RPA rinominata in:"
+set "extm10.de=RPA-Erweiterung umbenannt in:"
+set "extm10.ru=Расширение RPA переименовано в:"
+
+set "extm11.en=[Error] No RPA archive detected."
+set "extm11.fr=[Erreur] Aucune archive RPA détectée."
+set "extm11.es=[Error] No se detectó ningún archivo RPA."
+set "extm11.it=[Errore] Nessun archivio RPA rilevato."
+set "extm11.de=[Fehler] Kein RPA-Archiv erkannt."
+set "extm11.ru=[Ошибка] Архив RPA не обнаружен."
+
+set "extm12.en=[Error] processing RPA files in"
+set "extm12.fr=[Erreur] lors du traitement des fichiers RPA dans"
+set "extm12.es=[Error] al procesar archivos RPA en"
+set "extm12.it=[Errore] durante l'elaborazione dei file RPA in"
+set "extm12.de=[Fehler] beim Verarbeiten von RPA-Dateien in"
+set "extm12.ru=[Ошибка] при обработке файлов RPA в"
+
+:: set extm13 to extm15 are set later in the code because of the dynamic variables.
+
+set "extm16.en=Extracting files from:"
+set "extm16.fr=Extraction des fichiers à partir de :"
+set "extm16.es=Extrayendo archivos de :"
+set "extm16.it=Estrazione dei file da :"
+set "extm16.de=Extrahieren von Dateien aus :"
+set "extm16.ru=Извлечение файлов из :"
+
+set "extm17.en=Do you want to extract the RPA archive:"
+set "extm17.fr=Voulez-vous extraire l'archive RPA :"
+set "extm17.es=¿Quieres extraer el archivo RPA:"
+set "extm17.it=Vuoi estrarre l'archivio RPA:"
+set "extm17.de=Möchten Sie das RPA-Archiv extrahieren:"
+set "extm17.ru=Вы хотите извлечь архив RPA:"
+
+:: set extm18 to extm24 are set later in the code because of the dynamic variables.
+
+set "extm25.en=extension found:"
+set "extm25.fr=extension trouvée :"
+set "extm25.es=extensión encontrada:"
+set "extm25.it=estensione trovata:"
+set "extm25.de=erweiterung gefunden:"
+set "extm25.ru=найдено расширение:"
+
+:: Write rpatool.py from our base64 strings
 call :DisplayVars "RPA extract phase"
 
-echo.
-echo Remove RPA archives after extraction?
-<nul set /p="Enter [Y/N] (default N): "
-choice /C YN /N /D N /T 5
-if errorlevel 2 (
+call :elog .
+<nul set /p "extans=!extm1.%LNG%!"
+choice /c OSJДYN /N /D N /T 5
+if errorlevel 6 (
+    set "extans=n"
+)
+set "extans=%extans: =%"
+set "delrpa="
+if /i "%extans%" == "n" (
 	set "delrpa=n"
-	call :elog "[33m	+ RPA archives will be moved[0m"
-	call :elog .
-) else if errorlevel 1 (
-	set "delrpa=y"
-	call :elog "[33m	+ RPA archives will be deleted[0m"
-	call :elog .
-)
-
-REM Not possible with the old rpatool
-if "%rpatool-new%" == "y" (
-	echo.
-	echo Extract all or select RPA archives?
-	<nul set /p="Enter [A/S] (default A): "
-	choice /C AS /N /D A /T 5
-	if errorlevel 2 (
-		set "extract_all_rpa=n"
-		call :elog "[33m	+ You will select the RPA archives to extract.[0m"
-		call :elog .
-	) else if errorlevel 1 (
-		set "extract_all_rpa=y"
-		call :elog "[33m	+ All RPA archives will be extracted.[0m"
-		call :elog .
-	)
+	call :elog "%YEL%	+ !extm2.%LNG%!%RES%"
 ) else (
-	call :elog "[33m	- Unable to select RPA archives.[0m"
+	set "delrpa=y"
+	call :elog "%YEL%	+ !extm3.%LNG%!%RES%"
+)
+call :elog .
+
+:: Ask if we want to extract all RPA or select
+:: Not possible with the old rpatool
+if "%RPATOOL-NEW%" == "y" (
 	call :elog .
+	set "extans="
+	<nul set /p "extans=!extm4.%LNG%!"
+    choice /c AДТS /N /D A /T 5
+    if errorlevel 4 (
+        set "extans=s"
+    ) else (
+        set "extans=a"
+    )
+	set "extans=%extans: =%"
+	if /i "%extans%" == "s" (
+		set "extract_all_rpa=n"
+		call :elog "    %YEL%+ !extm5.%LNG%!%RES%"
+	) else (
+		set "extract_all_rpa=y"
+		call :elog "    %YEL%+ !extm6.%LNG%!%RES%"
+	)
+)
+call :elog .
+
+:: List of extensions to ignore
+set "skipExt=jpg png jpeg gif bmp webp webm mp4 avi mkv avif txt json xml ini rpy rpyc rpyb rpatool py pyc pyo pyd dll so lib exe bin dat mp3 ogg wav flac ttf otf woff woff2 eot sfnt fon icns cur ani ico"
+set "rpaExt="
+
+echo !extm8.%LNG%! >> "%UNRENLOG%"
+<nul set /p="!extm8.%LNG%!"
+cd /d "%GAMEDIR%"
+for /R . %%f in (*) do (
+    set "ext=%%~xf"
+    set "ext=!ext:~1!"
+
+    <nul set /p="."
+    set "skip=0"
+    for %%e in (%skipExt%) do (
+        if /I "!ext!" == "%%e" set "skip=1"
+    )
+
+    if !skip! == 0 (
+		powershell.exe -nologo -noprofile -noninteractive -command "$fs = [System.IO.File]::OpenRead('%%f'); $bytes = New-Object byte[] 3; $fs.Read($bytes, 0, 3) | Out-Null; $fs.Close(); if ($bytes[0] -eq 82 -and $bytes[1] -eq 80 -and $bytes[2] -eq 65) { exit 0 } else { exit 1 }" %debugredir%
+        if !errorlevel! EQU 0 (
+            set "rpaExt=%%~xf"
+            set "rpaExt=!rpaExt:~1!"
+            call :elog " !extm25.%LNG%! !rpaExt! %GRE%!PASS.%LNG%!%RES%"
+            goto found_ext
+        )
+    )
 )
 
-set "rpatool=%workdir%\rpatool.py"
-call :elog "Creating rpatool..."
+if defined rpaExt (
+    if /I not "!rpaExt!" == "rpa" (
+        call :elog "%YEL% !extm10.%LNG%! !rpaExt!%RES%"
+    )
+) else (
+    call :elog "%RED% !extm11.%LNG%!%RES%"
+    goto rpa_cleanup
+)
+call :elog .
+
+:found_ext
+call :elog .
+echo !extm9.%LNG%! >> "%UNRENLOG%"
+<nul set /p="!extm9.%LNG%!"
+set "rpatool=%WORKDIR%\rpatool.py"
 if exist "%rpatool%.tmp" (
-	del "%rpatool%.tmp"
+    del /f /q "%rpatool%.tmp" >nul 2>&1
 )
 if exist "%rpatool%" (
-	del "%rpatool%"
+    del /f /q "%rpatool%" >nul 2>&1
 )
 
-REM echo %rpatool%>> "%rpatool%.tmp"
-if "%rpatool-new%" == "y" (
-	echo %rpatool-new01%>> "%rpatool%.tmp"
-	echo %rpatool-new02%>> "%rpatool%.tmp"
-	echo %rpatool-new03%>> "%rpatool%.tmp"
-	echo %rpatool-new04%>> "%rpatool%.tmp"
-	echo %rpatool-new05%>> "%rpatool%.tmp"
-	echo %rpatool-new06%>> "%rpatool%.tmp"
-	echo %rpatool-new07%>> "%rpatool%.tmp"
-	echo %rpatool-new08%>> "%rpatool%.tmp"
-	echo %rpatool-new09%>> "%rpatool%.tmp"
-	echo %rpatool-new10%>> "%rpatool%.tmp"
-	echo %rpatool-new11%>> "%rpatool%.tmp"
-	echo %rpatool-new12%>> "%rpatool%.tmp"
-	echo %rpatool-new13%>> "%rpatool%.tmp"
+if "%RPATOOL-NEW%" == "y" (
+    echo %RPATOOL-NEW01%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW02%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW03%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW04%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW05%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW06%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW07%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW08%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW09%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW10%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW11%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW12%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW13%>> "%rpatool%.tmp"
 ) else (
-	echo %rpatool01%>> "%rpatool%.tmp"
+    echo %rpatool01%>> "%rpatool%.tmp"
 )
 
 set "rpatoolps=%rpatool:[=`[%"
@@ -552,197 +1368,703 @@ set "rpatoolps=%rpatoolps:^=^^%"
 set "rpatoolps=%rpatoolps:&=^&%"
 powershell.exe -nologo -noprofile -noninteractive -command "& { [IO.File]::WriteAllBytes(\"%rpatoolps%\", [Convert]::FromBase64String([IO.File]::ReadAllText(\"%rpatoolps%.tmp\"))) }"
 if not exist "%rpatool%" (
-	call :elog "[31m	! Error: Failed to create rpatool.py, unable to continue.[0m"
-	call :elog .
-	pause>nul|set/p=".			Press any key to exit..."
-	exit
+    call :elog " %RED%!FAIL.%LNG%! %YEL%!extm7.%LNG%!%RES%"
+    goto :eof
 ) else (
-	call :elog "[32m	+ RPA tool created successfully[0m"
+    call :elog " %GRE%!PASS.%LNG%!%RES%"
+)
+call :elog .
+
+:: Unpack RPA
+cd /d "%GAMEDIR%"
+if "%RPATOOL-NEW%" == "n" (
+	if "%delrpa%" == "y" (
+		echo "%pythondir%"python.exe %PYNOASSERT% "%rpatool%" -r . >> "%UNRENLOG%" 2>&1
+		"%pythondir%"python.exe %PYNOASSERT% "%rpatool%" -r .
+		if !errorlevel! NEQ 0 (
+			call :elog "    %RED% !extm12.%LNG%! "%GAMEDIR%".%RES%"
+		)
+	) else (
+		echo "%pythondir%"python.exe %PYNOASSERT% "%rpatool%" . >> "%UNRENLOG%" 2>&1
+		"%pythondir%"python.exe %PYNOASSERT% "%rpatool%" .
+		if !errorlevel! NEQ 0 (
+			call :elog "    %RED% !extm12.%LNG%! "%GAMEDIR%".%RES%"
+		)
+		cd /d "%WORKDIR%"
+		for /R "game" %%f in (*.%rpaExt%) do (
+			set "rpafile=%%~dpnf.%rpaExt%"
+
+            set "extm13.en=Moving RPA '!rpafile!' to '!WORKDIR!\rpa'"
+            set "extm13.fr=Déplacement de RPA '!rpafile!' vers '!WORKDIR!\rpa'"
+            set "extm13.es=Moviendo RPA '!rpafile!' a '!WORKDIR!\rpa'"
+            set "extm13.it=Spostamento di RPA '!rpafile!' in '!WORKDIR!\rpa'"
+            set "extm13.de=Verschieben von RPA '!rpafile!' nach '!WORKDIR!\rpa'"
+            set "extm13.ru=Перемещение RPA '!rpafile!' в '!WORKDIR!\rpa'"
+			call :elog "    + !extm13.%LNG%!"
+			if not exist "!WORKDIR!\rpa\" (
+				mkdir "!WORKDIR!\rpa" %debugredir%
+			)
+
+            set "extm14.en=[Error] moving RPA '!rpafile!' to '!WORKDIR!\rpa'."
+            set "extm14.fr=[Erreur] lors du déplacement de RPA '!rpafile!' vers '!WORKDIR!\rpa'."
+            set "extm14.es=[Error] al mover RPA '!rpafile!' a '!WORKDIR!\rpa'."
+            set "extm14.it=[Errore] durante lo spostamento di RPA '!rpafile!' in '!WORKDIR!\rpa'."
+            set "extm14.de=[Fehler] beim Verschieben von RPA '!rpafile!' nach '!WORKDIR!\rpa'."
+            set "extm14.ru=[Ошибка] при перемещении RPA '!rpafile!' в '!WORKDIR!\rpa'."
+
+            set "extm15.en=RPA '!rpafile!' moved to '!WORKDIR!\rpa'."
+            set "extm15.fr=RPA '!rpafile!' déplacé vers '!WORKDIR!\rpa'."
+            set "extm15.es=RPA '!rpafile!' movido a '!WORKDIR!\rpa'."
+            set "extm15.it=RPA '!rpafile!' spostato in '!WORKDIR!\rpa'."
+            set "extm15.de=RPA '!rpafile!' nach '!WORKDIR!\rpa' verschoben."
+            set "extm15.ru=RPA '!rpafile!' перемещен в '!WORKDIR!\rpa'."
+			move "!rpafile!" "!WORKDIR!\rpa" %debugredir%
+			if !errorlevel! NEQ 0 (
+				call :elog "    %RED% !extm14.%LNG%!%RES%"
+			) else (
+				call :elog "    %GRE% + !extm15.%LNG%!%RES%"
+			)
+		)
+	)
 )
 
-REM --------------------------------------------------------------------------------
-REM Unpack RPA
-REM --------------------------------------------------------------------------------
-REM List of extensions to ignore
-set "skipExt=jpg png jpeg gif bmp webp webm mp4 avi mkv avif txt json xml ini"
-set "rpaExt="
+cd /d "%WORKDIR%"
+if "%RPATOOL-NEW%" == "y" (
+	for /R "game" %%f in (*.%rpaExt%) do (
+		set "rpafile=%%~dpnf.%rpaExt%"
+		set "relativePath=%%f"
+		set "relativePath=!relativePath:%WORKDIR%\game\=!"
+
+
+        set "extm18.en=RPA file '!rpafile!' ignored."
+        set "extm18.fr=fichier RPA '!rpafile!' ignoré."
+        set "extm18.es=RPA archivo '!rpafile!' ignorado."
+        set "extm18.it=RPA file '!rpafile!' ignorato."
+        set "extm18.de=RPA Datei '!rpafile!' ignoriert."
+        set "extm18.ru=RPA файл '!rpafile!' проигнорирован."
+
+        set "extm19.en=[Error] processing RPA !rpafile!. Please check the !UNRENLOG! for details."
+        set "extm19.fr=[Erreur] lors du traitement du fichier RPA !rpafile!. Veuillez vérifier le !UNRENLOG! pour plus de détails."
+        set "extm19.es=[Error] al procesar el archivo RPA !rpafile!. Consulte el !UNRENLOG! para más detalles."
+        set "extm19.it=[Errore] durante l'elaborazione del file RPA !rpafile!. Controlla il !UNRENLOG! per i dettagli."
+        set "extm19.de=[Fehler] beim Verarbeiten der RPA !rpafile!. Bitte überprüfen Sie das !UNRENLOG! für Details."
+        set "extm19.ru=[Ошибка] при обработке файла RPA !rpafile!. Пожалуйста, проверьте !UNRENLOG! для получения подробной информации."
+
+        set "extm20.en=RPA file extracted: !relativePath!"
+        set "extm20.fr=fichier RPA extrait : !relativePath!"
+        set "extm20.es=archivo RPA extraído: !relativePath!"
+        set "extm20.it=RPA file estratto: !relativePath!"
+        set "extm20.de=RPA-Datei extrahiert: !relativePath!"
+        set "extm20.ru=Файл RPA извлечен: !relativePath!"
+
+        set "extm21.en=Deleting RPA file '!rpafile!'"
+        set "extm21.fr=Suppression de RPA fichier '!rpafile!'"
+        set "extm21.es=Eliminando RPA archivo '!rpafile!'"
+        set "extm21.it=Eliminazione di RPA file '!rpafile!'"
+        set "extm21.de=Löschen von RPA Datei '!rpafile!'"
+        set "extm21.ru=Удаление RPA файл '!rpafile!'"
+
+        set "extm22.en=Moving RPA file '!rpafile!' to '!WORKDIR!\rpa'"
+        set "extm22.fr=Déplacement de RPA fichier '!rpafile!' vers '!WORKDIR!\rpa'"
+        set "extm22.es=Moviendo RPA archivo '!rpafile!' a '!WORKDIR!\rpa'"
+        set "extm22.it=Spostamento di RPA file '!rpafile!' in '!WORKDIR!\rpa'"
+        set "extm22.de=Verschieben von RPA Datei '!rpafile!' nach '!WORKDIR!\rpa'"
+        set "extm22.ru=Перемещение RPA файл '!rpafile!' в '!WORKDIR!\rpa'"
+
+        set "extm23.en=[Error] moving RPA file '!rpafile!' to '!WORKDIR!\rpa'. Please check the !UNRENLOG! for details."
+        set "extm23.fr=[Erreur] lors du déplacement de RPA fichier '!rpafile!' vers '!WORKDIR!\rpa'. Veuillez vérifier le !UNRENLOG! pour plus de détails."
+        set "extm23.es=[Error] al mover RPA archivo '!rpafile!' a '!WORKDIR!\rpa'. Consulte el !UNRENLOG! para más detalles."
+        set "extm23.it=[Errore] durante lo spostamento di RPA file '!rpafile!' in '!WORKDIR!\rpa'. Controlla il !UNRENLOG! per i dettagli."
+        set "extm23.de=[Fehler] beim Verschieben von RPA Datei '!rpafile!' nach '!WORKDIR!\rpa'. Bitte überprüfen Sie das !UNRENLOG! für Details."
+        set "extm23.ru=[Ошибка] при перемещении RPA файл '!rpafile!' в '!WORKDIR!\rpa'. Пожалуйста, проверьте !UNRENLOG! для получения подробной информации."
+
+        set "extm24.en=RPA file '!rpafile!' moved to '!WORKDIR!\rpa'."
+        set "extm24.fr=RPA fichier '!rpafile!' déplacé vers '!WORKDIR!\rpa'."
+        set "extm24.es=RPA archivo '!rpafile!' movido a '!WORKDIR!\rpa'."
+        set "extm24.it=RPA file '!rpafile!' spostato in '!WORKDIR!\rpa'."
+        set "extm24.de=RPA Datei '!rpafile!' nach '!WORKDIR!\rpa' verschoben."
+        set "extm24.ru=RPA файл '!rpafile!' перемещен в '!WORKDIR!\rpa'."
+
+		if exist "!rpafile!" if not "!relativePath!" == "saves\persistent" (
+            if "extract_all_rpa" == "n" (
+                call :elog .
+                call :elog "    !extm16.%LNG%! !relativePath!?"
+                <nul set /p="   !ENTERYN.%LNG%! "
+                choice /C OSJДYN /N /D N /T 5
+                if errorlevel 6 (
+                    call :elog "    %GRE%! - extm18.%LNG%!%RES%"
+                ) else (
+                    "!pythondir!"python.exe !PYNOASSERT! "!rpatool!" -o game -x "!rpafile!" >>!UNRENLOG! 2>&1
+                    if !errorlevel! NEQ 0 (
+                        call :elog "    %RED% !extm19.%LNG%!%RES%"
+                    ) else (
+                        call :elog "    %GRE% + !extm20.%LNG%!%RES%"
+                        if "!delrpa!" == "y" (
+                            call :elog "    !extm21.%LNG%!%RES%"
+                            del /f /q "!rpafile!" %debugredir%
+                        ) else (
+                            call :elog .
+                            call :elog "    !extm22.%LNG%!"
+                            if not exist "!WORKDIR!\rpa" (
+                                mkdir "!WORKDIR!\rpa"
+                            )
+                            move "!rpafile!" "!WORKDIR!\rpa" %debugredir%
+                            if !errorlevel! NEQ 0 (
+                                call :elog "    %RED% !extm23.%LNG%!%RES%"
+                            ) else (
+                                call :elog "    %GRE% + !extm24.%LNG%!%RES%"
+                            )
+                        )
+                    )
+                )
+            ) else (
+                call :elog "    + !extm16.%LNG%! !relativePath!"
+				"!pythondir!"python.exe !PYNOASSERT! "!rpatool!" -o game -x "!rpafile!" >>!UNRENLOG! 2>&1
+				if !errorlevel! NEQ 0 (
+					call :elog "    %RED% !extm19.%LNG%!%RES%"
+				) else (
+					call :elog "    %GRE% + !extm20.%LNG%!%RES%"
+					if "!delrpa!" == "y" (
+						call :elog "    !extm21.%LNG%!%RES%"
+						del /f /q "!rpafile!" %debugredir%
+					) else (
+                        call :elog .
+						call :elog "    !extm22.%LNG%!"
+						if not exist "!WORKDIR!\rpa" (
+							mkdir "!WORKDIR!\rpa"
+						)
+						move "!rpafile!" "!WORKDIR!\rpa" %debugredir%
+						if !errorlevel! NEQ 0 (
+							call :elog "    %RED% !extm23.%LNG%!%RES%"
+						) else (
+							call :elog "    %GRE% + !extm24.%LNG%!%RES%"
+						)
+					)
+                )
+    		)
+	    )
+    )
+)
+call :elog .
+
+:rpa_cleanup
+:: Clean up
+call :elog "!CLEANUP.%LNG%!"
+if exist "%rpatool%.tmp" del /f /q "%rpatool%.tmp"
+if exist "%rpatool%" del /f /q "%rpatool%"
+if exist "%WORKDIR%\__pycache__" rmdir /Q /S "%WORKDIR%\__pycache__"
+cd /d "%WORKDIR%"
+call :elog .
+if "%OPTION%" == "5" call :decompile
+if "%OPTION%" == "6" call :decompile
+
+goto :eof
+
+:: Use unrpa instead of rpatool which offer the ability to extract RPA archives with a key
+:extract_wkey
+set "extm1.en=Remove RPA archives after extraction? Enter [y/n] (default n): "
+set "extm1.fr=Supprimer les archives RPA après extraction ? Entrer [o/n] (par défaut n) : "
+set "extm1.es=¿Eliminar los archivos RPA después de la extracción? Ingrese [s/n] (predeterminado n): "
+set "extm1.it=Rimuovere gli archivi RPA dopo l'estrazione? Inserisci [s/n] (predefinito n): "
+set "extm1.de=RPA-Archive nach der Extraktion entfernen? Geben Sie [y/n] ein (Standard n): "
+set "extm1.ru=Удалить архивы RPA после извлечения? Введите [y/n] (по умолчанию n): "
+
+set "extm2.en=RPA archives will be moved to %WORKDIR%\rpa."
+set "extm2.fr=Les archives RPA seront déplacées vers %WORKDIR%\rpa."
+set "extm2.es=Los archivos RPA se moverán a %WORKDIR%\rpa."
+set "extm2.it=Gli archivi RPA verranno spostati in %WORKDIR%\rpa."
+set "extm2.de=RPA-Archive werden nach %WORKDIR%\rpa verschoben."
+set "extm2.ru=Архивы RPA будут перемещены в %WORKDIR%\rpa."
+
+set "extm3.en=RPA archives will be deleted after extraction."
+set "extm3.fr=Les archives RPA seront supprimées après extraction."
+set "extm3.es=Los archivos RPA se eliminarán después de la extracción."
+set "extm3.it=Gli archivi RPA verranno eliminati dopo l'estrazione."
+set "extm3.de=RPA-Archive werden nach der Extraktion gelöscht."
+set "extm3.ru=Архивы RPA будут удалены после извлечения."
+
+set "extm4.en=Extract all or select RPA archives? Enter [a/s] (default a): "
+set "extm4.fr=Extraire toutes les archives RPA ou sélectionner ? Entrer [t/s] (par défaut t) : "
+set "extm4.es=¿Extraer todos o seleccionar archivos RPA? Ingrese [t/s] (predeterminado t): "
+set "extm4.it=Estrarre tutti o selezionare gli archivi RPA? Inserisci [t/s] (predefinito t): "
+set "extm4.de=Alle oder ausgewählte RPA-Archive extrahieren? Geben Sie [a/s] ein (Standard a): "
+set "extm4.ru=Извлечь все или выбрать архивы RPA? Введите [a/s] (по умолчанию a): "
+
+set "extm5.en=You will select the RPA archives to extract."
+set "extm5.fr=Vous allez sélectionner les archives RPA à extraire."
+set "extm5.es=Seleccionará los archivos RPA para extraer."
+set "extm5.it=Selezionerai gli archivi RPA da estrarre."
+set "extm5.de=Sie werden die RPA-Archive zum Extrahieren auswählen."
+set "extm5.ru=Вы выберете архивы RPA для извлечения."
+
+set "extm6.en=All RPA archives will be extracted."
+set "extm6.fr=Toutes les archives RPA seront extraites."
+set "extm6.es=Se extraerán todos los archivos RPA."
+set "extm6.it=Verranno estratti tutti gli archivi RPA."
+set "extm6.de=Alle RPA-Archive werden extrahiert."
+set "extm6.ru=Все архивы RPA будут извлечены."
+
+set "extm7.en=[Error] Failed to create rpatool.py. !UNACONT.%LNG%!"
+set "extm7.fr=[Erreur] Échec de la création de rpatool.py. !UNACONT.%LNG%!"
+set "extm7.es=[Error] No se pudo crear rpatool.py. !UNACONT.%LNG%!"
+set "extm7.it=[Errore] Impossibile creare rpatool.py. !UNACONT.%LNG%!"
+set "extm7.de=[Fehler] Die Erstellung von rpatool.py ist fehlgeschlagen. !UNACONT.%LNG%!"
+set "extm7.ru=[Ошибка] Не удалось создать rpatool.py. !UNACONT.%LNG%!"
+
+set "extm8.en=Searching for RPA files in the game directory..."
+set "extm8.fr=Recherche de fichiers RPA dans le répertoire du jeu..."
+set "extm8.es=Buscando archivos RPA en el directorio del juego..."
+set "extm8.it=Cercando file RPA nella directory di gioco..."
+set "extm8.de=Suche nach RPA-Dateien im Spieledirectory..."
+set "extm8.ru=Поиск файлов RPA в каталоге игры..."
+
+set "extm9.en=Creating rpatool..."
+set "extm9.fr=Création de rpatool..."
+set "extm9.es=Creando rpatool..."
+set "extm9.it=Creazione di rpatool..."
+set "extm9.de=Erstellen von rpatool..."
+set "extm9.ru=Создание rpatool..."
+
+set "extm10.en=RPA extension renamed to:"
+set "extm10.fr=Extension RPA renommée en :"
+set "extm10.es=Extensión RPA renombrada a:"
+set "extm10.it=Estensione RPA rinominata in:"
+set "extm10.de=RPA-Erweiterung umbenannt in:"
+set "extm10.ru=Расширение RPA переименовано в:"
+
+set "extm11.en=[Error] No RPA archive detected."
+set "extm11.fr=[Erreur] Aucune archive RPA détectée."
+set "extm11.es=[Error] No se detectó ningún archivo RPA."
+set "extm11.it=[Errore] Nessun archivio RPA rilevato."
+set "extm11.de=[Fehler] Kein RPA-Archiv erkannt."
+set "extm11.ru=[Ошибка] Архив RPA не обнаружен."
+
+set "extm12.en=[Error] processing RPA files in"
+set "extm12.fr=[Erreur] lors du traitement des fichiers RPA dans"
+set "extm12.es=[Error] al procesar archivos RPA en"
+set "extm12.it=[Errore] durante l'elaborazione dei file RPA in"
+set "extm12.de=[Fehler] beim Verarbeiten von RPA-Dateien in"
+set "extm12.ru=[Ошибка] при обработке файлов RPA в"
+
+:: set extm13 to extm15 are set later in the code because of the dynamic variables.
+
+set "extm16.en=Extracting files from:"
+set "extm16.fr=Extraction des fichiers à partir de :"
+set "extm16.es=Extrayendo archivos de :"
+set "extm16.it=Estrazione dei file da :"
+set "extm16.de=Extrahieren von Dateien aus :"
+set "extm16.ru=Извлечение файлов из :"
+
+set "extm17.en=Do you want to extract the RPA archive:"
+set "extm17.fr=Voulez-vous extraire l'archive RPA :"
+set "extm17.es=¿Quieres extraer el archivo RPA:"
+set "extm17.it=Vuoi estrarre l'archivio RPA:"
+set "extm17.de=Möchten Sie das RPA-Archiv extrahieren:"
+set "extm17.ru=Вы хотите извлечь архив RPA:"
+
+:: set extm18 to extm24 are set later in the code because of the dynamic variables.
+
+set "extm25.en=extension found:"
+set "extm25.fr=extension trouvée :"
+set "extm25.es=extensión encontrada:"
+set "extm25.it=estensione trovata:"
+set "extm25.de=erweiterung gefunden:"
+set "extm25.ru=найдено расширение:"
+
+:: Write rpatool.py from our base64 strings
+call :DisplayVars "RPA extract phase"
 
 call :elog .
-call :elog "Searching for RPA files in the game directory..."
-cd /d "%gamedir%"
+<nul set /p "extans=!extm1.%LNG%!"
+choice /c OSJДYN /N /D N /T 5
+if errorlevel 6 (
+    set "extans=n"
+)
+set "extans=%extans: =%"
+set "delrpa="
+if /i "%extans%" == "n" (
+	set "delrpa=n"
+	call :elog "%YEL%	+ !extm2.%LNG%!%RES%"
+) else (
+	set "delrpa=y"
+	call :elog "%YEL%	+ !extm3.%LNG%!%RES%"
+)
+call :elog .
 
+:: Ask if we want to extract all RPA or select
+:: Not possible with the old rpatool
+if "%RPATOOL-NEW%" == "y" (
+	call :elog .
+	set "extans="
+	<nul set /p "extans=!extm4.%LNG%!"
+    choice /c AДТS /N /D A /T 5
+    if errorlevel 4 (
+        set "extans=s"
+    ) else (
+        set "extans=a"
+    )
+	set "extans=%extans: =%"
+	if /i "%extans%" == "s" (
+		set "extract_all_rpa=n"
+		call :elog "    %YEL%+ !extm5.%LNG%!%RES%"
+	) else (
+		set "extract_all_rpa=y"
+		call :elog "    %YEL%+ !extm6.%LNG%!%RES%"
+	)
+)
+call :elog .
 
-for /R "%gamedir%" %%f in (*) do (
+:: List of extensions to ignore
+set "skipExt=jpg png jpeg gif bmp webp webm mp4 avi mkv avif txt json xml ini rpy rpyc rpyb rpatool py pyc pyo pyd dll so lib exe bin dat mp3 ogg wav flac ttf otf woff woff2 eot sfnt fon icns cur ani ico"
+set "rpaExt="
+
+echo !extm8.%LNG%! >> "%UNRENLOG%"
+<nul set /p="!extm8.%LNG%!"
+cd /d "%GAMEDIR%"
+for /R . %%f in (*) do (
     set "ext=%%~xf"
     set "ext=!ext:~1!"
 
+    <nul set /p="."
     set "skip=0"
     for %%e in (%skipExt%) do (
-        if /I "!ext!"=="%%e" set "skip=1"
+        if /I "!ext!" == "%%e" set "skip=1"
     )
 
     if !skip! == 0 (
-		powershell.exe -nologo -noprofile -noninteractive -command "$fs = [System.IO.File]::OpenRead('%%f'); $bytes = New-Object byte[] 3; $fs.Read($bytes, 0, 3) | Out-Null; $fs.Close(); if ($bytes[0] -eq 82 -and $bytes[1] -eq 80 -and $bytes[2] -eq 65) { exit 0 } else { exit 1 }"
-        if !errorlevel! == 0 (
+		powershell.exe -nologo -noprofile -noninteractive -command "$fs = [System.IO.File]::OpenRead('%%f'); $bytes = New-Object byte[] 3; $fs.Read($bytes, 0, 3) | Out-Null; $fs.Close(); if ($bytes[0] -eq 82 -and $bytes[1] -eq 80 -and $bytes[2] -eq 65) { exit 0 } else { exit 1 }" %debugredir%
+        if !errorlevel! EQU 0 (
             set "rpaExt=%%~xf"
             set "rpaExt=!rpaExt:~1!"
-            goto :found_ext
+            call :elog " !extm25.%LNG%! !rpaExt! %GRE%!PASS.%LNG%!%RES%"
+            goto found_ext
         )
     )
 )
 
-:found_ext
 if defined rpaExt (
     if /I not "!rpaExt!" == "rpa" (
-        call :elog "[33m   + RPA extension renamed: !rpaExt![0m"
+        call :elog "%YEL% !extm10.%LNG%! !rpaExt!%RES%"
     )
 ) else (
-    call :elog "[31m   ! No RPA archive detected.[0m"
+    call :elog "%RED% !extm11.%LNG%!%RES%"
+    goto rpa_cleanup
 )
-
 call :elog .
 
-cd /d "%gamedir%"
-if "%rpatool-new%" == "n" (
+:found_ext
+call :elog .
+echo !extm9.%LNG%! >> "%UNRENLOG%"
+<nul set /p="!extm9.%LNG%!"
+set "rpatool=%WORKDIR%\rpatool.py"
+if exist "%rpatool%.tmp" (
+    del /f /q "%rpatool%.tmp" >nul 2>&1
+)
+if exist "%rpatool%" (
+    del /f /q "%rpatool%" >nul 2>&1
+)
+
+if "%RPATOOL-NEW%" == "y" (
+    echo %RPATOOL-NEW01%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW02%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW03%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW04%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW05%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW06%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW07%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW08%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW09%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW10%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW11%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW12%>> "%rpatool%.tmp"
+    echo %RPATOOL-NEW13%>> "%rpatool%.tmp"
+) else (
+    echo %rpatool01%>> "%rpatool%.tmp"
+)
+
+set "rpatoolps=%rpatool:[=`[%"
+set "rpatoolps=%rpatoolps:]=`]%"
+set "rpatoolps=%rpatoolps:^=^^%"
+set "rpatoolps=%rpatoolps:&=^&%"
+powershell.exe -nologo -noprofile -noninteractive -command "& { [IO.File]::WriteAllBytes(\"%rpatoolps%\", [Convert]::FromBase64String([IO.File]::ReadAllText(\"%rpatoolps%.tmp\"))) }"
+if not exist "%rpatool%" (
+    call :elog " %RED%!FAIL.%LNG%! %YEL%!extm7.%LNG%!%RES%"
+    goto :eof
+) else (
+    call :elog " %GRE%!PASS.%LNG%!%RES%"
+)
+call :elog .
+
+:: Unpack RPA
+cd /d "%GAMEDIR%"
+if "%RPATOOL-NEW%" == "n" (
 	if "%delrpa%" == "y" (
-		echo "%pythondir%"python.exe %pynoassert% "%rpatool%" -r . >>"%unrenlog%" 2>&1
-		"%pythondir%"python.exe %pynoassert% "%rpatool%" -r .
-		if !errorlevel! neq 0 (
-			call :elog "[31m	! Error processing RPA files in "%gamedir%"".[0m"
+		echo "%pythondir%"python.exe %PYNOASSERT% "%rpatool%" -r . >> "%UNRENLOG%" 2>&1
+		"%pythondir%"python.exe %PYNOASSERT% "%rpatool%" -r .
+		if !errorlevel! NEQ 0 (
+			call :elog "    %RED% !extm12.%LNG%! "%GAMEDIR%".%RES%"
 		)
 	) else (
-		echo "%pythondir%"python.exe %pynoassert% "%rpatool%" . >>"%unrenlog%" 2>&1
-		"%pythondir%"python.exe %pynoassert% "%rpatool%" .
-		if !errorlevel! neq 0 (
-			call :elog "[31m	! Error processing RPA files in "%gamedir%"".[0m"
+		echo "%pythondir%"python.exe %PYNOASSERT% "%rpatool%" . >> "%UNRENLOG%" 2>&1
+		"%pythondir%"python.exe %PYNOASSERT% "%rpatool%" .
+		if !errorlevel! NEQ 0 (
+			call :elog "    %RED% !extm12.%LNG%! "%GAMEDIR%".%RES%"
 		)
-		cd "%workdir%"
+		cd /d "%WORKDIR%"
 		for /R "game" %%f in (*.%rpaExt%) do (
 			set "rpafile=%%~dpnf.%rpaExt%"
 
-			call :elog "	Moving RPA '!rpafile!' to '!workdir!\rpa'"
-			if not exist "!workdir!\rpa\" (
-				mkdir "!workdir!\rpa" >nul 2>&1
+            set "extm13.en=Moving RPA '!rpafile!' to '!WORKDIR!\rpa'"
+            set "extm13.fr=Déplacement de RPA '!rpafile!' vers '!WORKDIR!\rpa'"
+            set "extm13.es=Moviendo RPA '!rpafile!' a '!WORKDIR!\rpa'"
+            set "extm13.it=Spostamento di RPA '!rpafile!' in '!WORKDIR!\rpa'"
+            set "extm13.de=Verschieben von RPA '!rpafile!' nach '!WORKDIR!\rpa'"
+            set "extm13.ru=Перемещение RPA '!rpafile!' в '!WORKDIR!\rpa'"
+			call :elog "    + !extm13.%LNG%!"
+			if not exist "!WORKDIR!\rpa\" (
+				mkdir "!WORKDIR!\rpa" %debugredir%
 			)
-			move "!rpafile!" "!workdir!\rpa" >nul 2>&1
-			if !errorlevel! neq 0 (
-				call :elog "[31m	Error moving RPA '!rpafile!' to '!workdir!\rpa'.[0m"
+
+            set "extm14.en=[Error] moving RPA '!rpafile!' to '!WORKDIR!\rpa'."
+            set "extm14.fr=[Erreur] lors du déplacement de RPA '!rpafile!' vers '!WORKDIR!\rpa'."
+            set "extm14.es=[Error] al mover RPA '!rpafile!' a '!WORKDIR!\rpa'."
+            set "extm14.it=[Errore] durante lo spostamento di RPA '!rpafile!' in '!WORKDIR!\rpa'."
+            set "extm14.de=[Fehler] beim Verschieben von RPA '!rpafile!' nach '!WORKDIR!\rpa'."
+            set "extm14.ru=[Ошибка] при перемещении RPA '!rpafile!' в '!WORKDIR!\rpa'."
+
+            set "extm15.en=RPA '!rpafile!' moved to '!WORKDIR!\rpa'."
+            set "extm15.fr=RPA '!rpafile!' déplacé vers '!WORKDIR!\rpa'."
+            set "extm15.es=RPA '!rpafile!' movido a '!WORKDIR!\rpa'."
+            set "extm15.it=RPA '!rpafile!' spostato in '!WORKDIR!\rpa'."
+            set "extm15.de=RPA '!rpafile!' nach '!WORKDIR!\rpa' verschoben."
+            set "extm15.ru=RPA '!rpafile!' перемещен в '!WORKDIR!\rpa'."
+			move "!rpafile!" "!WORKDIR!\rpa" %debugredir%
+			if !errorlevel! NEQ 0 (
+				call :elog "    %RED% !extm14.%LNG%!%RES%"
 			) else (
-				call :elog "[32m	RPA '!rpafile!' moved to '!workdir!\rpa'.[0m"
+				call :elog "    %GRE% + !extm15.%LNG%!%RES%"
 			)
 		)
 	)
 )
 
-cd /d "%workdir%"
-if "%rpatool-new%" == "y" (
+cd /d "%WORKDIR%"
+if "%RPATOOL-NEW%" == "y" (
 	for /R "game" %%f in (*.%rpaExt%) do (
 		set "rpafile=%%~dpnf.%rpaExt%"
 		set "relativePath=%%f"
-		set "relativePath=!relativePath:%workdir%\game\=!"
+		set "relativePath=!relativePath:%WORKDIR%\game\=!"
 
-		call :elog "     + Processing !relativePath!"
+        set "extm18.en=RPA file '!rpafile!' ignored."
+        set "extm18.fr=RPA fichier '!rpafile!' ignoré."
+        set "extm18.es=RPA archivo '!rpafile!' ignorado."
+        set "extm18.it=RPA file '!rpafile!' ignorato."
+        set "extm18.de=RPA Datei '!rpafile!' ignoriert."
+        set "extm18.ru=RPA файл '!rpafile!' проигнорирован."
 
-		if exist "!rpafile!" (
-			echo.
-			echo Do you want to extract the RPA package: !relativePath!?
-			<nul set /p="Enter [Y/N] (default Y): "
-			choice /C YN /N /D Y /T 5
-			if errorlevel 2 (
-				call :elog "[32m	RPA !rpafile! ignored.[0m"
-			) else (
-				echo "!pythondir!"python.exe !pynoassert! "!rpatool!" -o "!gamedir!" -x "!rpafile!" >>!unrenlog!
-				"!pythondir!"python.exe !pynoassert! "!rpatool!" -o game -x "!rpafile!"
-				if !errorlevel! neq 0 (
-					call :elog "[31m	Error processing RPA !rpafile!. Please check the !unrenlog! for details.[0m"
+        set "extm19.en=[Error] processing RPA !rpafile!. Please check the !UNRENLOG! for details."
+        set "extm19.fr=[Erreur] lors du traitement du fichier RPA !rpafile!. Veuillez vérifier le !UNRENLOG! pour plus de détails."
+        set "extm19.es=[Error] al procesar el archivo RPA !rpafile!. Consulte el !UNRENLOG! para más detalles."
+        set "extm19.it=[Errore] durante l'elaborazione del file RPA !rpafile!. Controlla il !UNRENLOG! per i dettagli."
+        set "extm19.de=[Fehler] beim Verarbeiten der RPA !rpafile!. Bitte überprüfen Sie das !UNRENLOG! für Details."
+        set "extm19.ru=[Ошибка] при обработке файла RPA !rpafile!. Пожалуйста, проверьте !UNRENLOG! для получения подробной информации."
+
+        set "extm20.en=RPA file extracted: !relativePath!"
+        set "extm20.fr=fichier RPA extrait : !relativePath!"
+        set "extm20.es=archivo RPA extraído: !relativePath!"
+        set "extm20.it=RPA file estratto: !relativePath!"
+        set "extm20.de=RPA-Datei extrahiert: !relativePath!"
+        set "extm20.ru=Файл RPA извлечен: !relativePath!"
+
+        set "extm21.en=Deleting RPA file '!rpafile!'"
+        set "extm21.fr=Suppression de RPA fichier '!rpafile!'"
+        set "extm21.es=Eliminando RPA archivo '!rpafile!'"
+        set "extm21.it=Eliminazione di RPA file '!rpafile!'"
+        set "extm21.de=Löschen von RPA Datei '!rpafile!'"
+        set "extm21.ru=Удаление RPA файл '!rpafile!'"
+
+        set "extm22.en=Moving RPA file '!rpafile!' to '!WORKDIR!\rpa'"
+        set "extm22.fr=Déplacement de RPA fichier '!rpafile!' vers '!WORKDIR!\rpa'"
+        set "extm22.es=Moviendo RPA archivo '!rpafile!' a '!WORKDIR!\rpa'"
+        set "extm22.it=Spostamento di RPA file '!rpafile!' in '!WORKDIR!\rpa'"
+        set "extm22.de=Verschieben von RPA Datei '!rpafile!' nach '!WORKDIR!\rpa'"
+        set "extm22.ru=Перемещение RPA файл '!rpafile!' в '!WORKDIR!\rpa'"
+
+        set "extm23.en=[Error] moving RPA file '!rpafile!' to '!WORKDIR!\rpa'. Please check the !UNRENLOG! for details."
+        set "extm23.fr=[Erreur] lors du déplacement de RPA fichier '!rpafile!' vers '!WORKDIR!\rpa'. Veuillez vérifier le !UNRENLOG! pour plus de détails."
+        set "extm23.es=[Error] al mover RPA archivo '!rpafile!' a '!WORKDIR!\rpa'. Consulte el !UNRENLOG! para más detalles."
+        set "extm23.it=[Errore] durante lo spostamento di RPA file '!rpafile!' in '!WORKDIR!\rpa'. Controlla il !UNRENLOG! per i dettagli."
+        set "extm23.de=[Fehler] beim Verschieben von RPA Datei '!rpafile!' nach '!WORKDIR!\rpa'. Bitte überprüfen Sie das !UNRENLOG! für Details."
+        set "extm23.ru=[Ошибка] при перемещении RPA файл '!rpafile!' в '!WORKDIR!\rpa'. Пожалуйста, проверьте !UNRENLOG! для получения подробной информации."
+
+        set "extm24.en=RPA file '!rpafile!' moved to '!WORKDIR!\rpa'."
+        set "extm24.fr=RPA fichier '!rpafile!' déplacé vers '!WORKDIR!\rpa'."
+        set "extm24.es=RPA archivo '!rpafile!' movido a '!WORKDIR!\rpa'."
+        set "extm24.it=RPA file '!rpafile!' spostato in '!WORKDIR!\rpa'."
+        set "extm24.de=RPA Datei '!rpafile!' nach '!WORKDIR!\rpa' verschoben."
+        set "extm24.ru=RPA файл '!rpafile!' перемещен в '!WORKDIR!\rpa'."
+		if exist "!rpafile!" if not "!relativePath!" == "saves\persistent" (
+            if "extract_all_rpa" == "n" (
+                call :elog .
+                call :elog "    !extm16.%LNG%! !relativePath!?"
+                <nul set /p="   !ENTERYN.%LNG%! "
+                choice /C OSJДYN /N /D N /T 5
+                if errorlevel 6 (
+                    call :elog "    %GRE%! - extm18.%LNG%!%RES%"
+                ) else (
+                    "!pythondir!"python.exe !PYNOASSERT! "!rpatool!" -o game -x "!rpafile!" >>!UNRENLOG! 2>&1
+                    if !errorlevel! NEQ 0 (
+                        call :elog "    %RED% !extm19.%LNG%!%RES%"
+                    ) else (
+                        call :elog "    %GRE% + !extm20.%LNG%!%RES%"
+                        if "!delrpa!" == "y" (
+                            call :elog "    !extm21.%LNG%!%RES%"
+                            del /f /q "!rpafile!" %debugredir%
+                        ) else (
+                            call :elog .
+                            call :elog "    !extm22.%LNG%!"
+                            if not exist "!WORKDIR!\rpa" (
+                                mkdir "!WORKDIR!\rpa"
+                            )
+                            move "!rpafile!" "!WORKDIR!\rpa" %debugredir%
+                            if !errorlevel! NEQ 0 (
+                                call :elog "    %RED% !extm23.%LNG%!%RES%"
+                            ) else (
+                                call :elog "    %GRE% + !extm24.%LNG%!%RES%"
+                            )
+                        )
+                    )
+                )
+            ) else (
+                call :elog "    + !extm16.%LNG%! !relativePath!"
+				"!pythondir!"python.exe !PYNOASSERT! "!rpatool!" -o game -x "!rpafile!" >>!UNRENLOG! 2>&1
+				if !errorlevel! NEQ 0 (
+					call :elog "    %RED% !extm19.%LNG%!%RES%"
 				) else (
-					call :elog "[32m	+ RPA package extracted: !relativePath![0m"
+					call :elog "    %GRE% + !extm20.%LNG%!%RES%"
 					if "!delrpa!" == "y" (
-						call :elog "	Deleting RPA !rpafile!"
-						del "!rpafile!" >nul 2>&1
+						call :elog "    !extm21.%LNG%!%RES%"
+						del /f /q "!rpafile!" %debugredir%
 					) else (
-						call :elog "	Moving RPA !rpafile! to '!workdir!\rpa'"
-						if not exist "!workdir!\rpa" (
-							mkdir "!workdir!\rpa"
+                        call :elog .
+						call :elog "    !extm22.%LNG%!"
+						if not exist "!WORKDIR!\rpa" (
+							mkdir "!WORKDIR!\rpa"
 						)
-						move "!rpafile!" "!workdir!\rpa" >nul 2>&1
-						if !errorlevel! neq 0 (
-							call :elog "[31m	Error moving RPA !rpafile! to '!workdir!\rpa'. Please check the !unrenlog! for details.[0m"
+						move "!rpafile!" "!WORKDIR!\rpa" %debugredir%
+						if !errorlevel! NEQ 0 (
+							call :elog "    %RED% !extm23.%LNG%!%RES%"
 						) else (
-							call :elog "[32m	RPA !rpafile! moved to '!workdir!\rpa'[0m"
+							call :elog "    %GRE% + !extm24.%LNG%!%RES%"
 						)
 					)
-				)
-			)
-		) else (
-			call :elog "[31m	+ RPA package not found: !relativePath![0m"
-		)
-	)
+                )
+    		)
+	    )
+    )
 )
 call :elog .
 
-
-REM --------------------------------------------------------------------------------
-REM Clean up
-REM --------------------------------------------------------------------------------
-call :elog "Cleaning up temporary files..."
-if exist "%rpatool%.tmp" del "%rpatool%.tmp"
-if exist "%rpatool%" del "%rpatool%"
-if exist "%workdir%\__pycache__" rmdir /Q /S "%workdir%\__pycache__"
-cd "%workdir%"
+:rpa_cleanup
+:: Clean up
+call :elog "!CLEANUP.%LNG%!"
+if exist "%rpatool%.tmp" del /f /q "%rpatool%.tmp"
+if exist "%rpatool%" del /f /q "%rpatool%"
+if exist "%WORKDIR%\__pycache__" rmdir /Q /S "%WORKDIR%\__pycache__"
+cd /d "%WORKDIR%"
 call :elog .
-if "%option%" == "9" call :decompile
-if "%option%" == "8" call :decompile
+if "%OPTION%" == "5" call :decompile
+if "%OPTION%" == "6" call :decompile
 
-call :finish
-
-exit /b
+goto :eof
 
 
 :decompile
-REM --------------------------------------------------------------------------------
-REM Write to temporary file first, then convert. Needed due to binary file
-REM --------------------------------------------------------------------------------
-set "decompcab=%workdir%\decomp.cab"
-set "decompilerdir=%workdir%\decompiler"
-set "unrpycpy=%workdir%\unrpyc.py"
-set "deobfuscate=%workdir%\deobfuscate.py"
+set "decm1.en=[Error] Failed to create decomp.cab. !UNACONT.%LNG%!"
+set "decm1.fr=[Erreur] Échec de la création de decomp.cab. !UNACONT.%LNG%!"
+set "decm1.es=[Error] Error al crear decomp.cab. !UNACONT.%LNG%!"
+set "decm1.it=[Errore] Impossibile creare decomp.cab. !UNACONT.%LNG%!"
+set "decm1.de=[Fehler] Dekompilierung.cab konnte nicht erstellt werden. !UNACONT.%LNG%!"
+set "decm1.ru=[Ошибка] Не удалось создать decomp.cab. !UNACONT.%LNG%!"
+
+set "decm2.en=Decompilation tool created successfully."
+set "decm2.fr=Outil de décompilation créé avec succès."
+set "decm2.es=Herramienta de descompilación creada con éxito."
+set "decm2.it=Strumento di decompilazione creato con successo."
+set "decm2.de=Dekompilierungswerkzeug erfolgreich erstellt."
+set "decm2.ru=Инструмент декомпиляции успешно создан."
+
+set "decm3.en=Overwrite RPY files after decompilation?"
+set "decm3.fr=Écraser les fichiers RPY après la décompilation ?"
+set "decm3.es=¿Sobrescribir archivos RPY después de la descompilación?"
+set "decm3.it=Sovrascrivere i file RPY dopo la decompilazione?"
+set "decm3.de=RPY-Dateien nach der Dekompilierung überschreiben?"
+set "decm3.ru=Перезаписать файлы RPY после декомпиляции?"
+
+set "decm4.en=Existing RPY files won't be overwritten."
+set "decm4.fr=Les fichiers RPY existants ne seront pas écrasés."
+set "decm4.es=Los archivos RPY existentes no se sobrescribirán."
+set "decm4.it=I file RPY esistenti non verranno sovrascritti."
+set "decm4.de=Vorhandene RPY-Dateien werden nicht überschrieben."
+set "decm4.ru=Существующие файлы RPY не будут перезаписаны."
+
+set "decm5.en=Existing RPY files will be overwritten after decompilation."
+set "decm5.fr=Les fichiers RPY existants seront écrasés après la décompilation."
+set "decm5.es=Los archivos RPY existentes se sobrescribirán después de la descompilación."
+set "decm5.it=I file RPY esistenti verranno sovrascritti dopo la decompilazione."
+set "decm5.de=Vorhandene RPY-Dateien werden nach der Dekompilierung überschrieben."
+set "decm5.ru=Существующие файлы RPY будут перезаписаны после декомпиляции."
+
+set "decm6.en=Extracting decomp.cab..."
+set "decm6.fr=Extraction de decomp.cab..."
+set "decm6.es=Extrayendo decomp.cab..."
+set "decm6.it=Estrazione di decomp.cab..."
+set "decm6.de=Extrahieren von decomp.cab..."
+set "decm6.ru=Извлечение decomp.cab..."
+
+set "decm7.en=Unable to find:"
+set "decm7.fr=Impossible de trouver :"
+set "decm7.es=No se puede encontrar:"
+set "decm7.it=Impossibile trovare:"
+set "decm7.de=Nicht gefunden:"
+set "decm7.ru=Не удалось найти:"
+
+set "decm8.en=Searching for RPYC files in the game directory..."
+set "decm8.fr=Recherche de fichiers RPYC dans le répertoire du jeu..."
+set "decm8.es=Buscando archivos RPYC en el directorio del juego..."
+set "decm8.it=Cercando file RPYC nella directory di gioco..."
+set "decm8.de=Suche nach RPYC-Dateien im Spieledirectory..."
+set "decm8.ru=Поиск файлов RPYC в каталоге игры..."
+
+: set decm9 to decm13 are set later in the code because of the dynamic variables.
+
+:: Write to temporary file first, then convert. Needed due to binary file and avoid antivirus false positive.
+set "decompcab=%WORKDIR%\decomp.cab"
+set "decompilerdir=%WORKDIR%\decompiler"
+set "unrpycpy=%WORKDIR%\unrpyc.py"
+set "deobfuscate=%WORKDIR%\deobfuscate.py"
+
+cd /d "%WORKDIR%"
 if exist "%decompcab%.tmp" (
-	del "%decompcab%.tmp"
+	del /f /q "%decompcab%.tmp"
 )
 if exist "%decompcab%" (
-	del "%decompcab%"
+	del /f /q "%decompcab%"
 )
 if exist "%decompilerdir%" (
 	rmdir /Q /S "%decompilerdir%"
 )
 
 if exist "%unrpyc%.tmp" (
-	del "%unrpyc%.tmp"
+	del /f /q "%unrpyc%.tmp"
 )
 if exist "%unrpyc%" (
-	del "%unrpyc%"
-)
-
-call :elog "Check the Ren'Py version to adjust the `offset` variable."
-if exist "%gamedir%script_version.txt" (
-	for /f "usebackq tokens=1,2,3 delims=(), " %%a in ("%gamedir%script_version.txt") do (
- 		set major_version=%%a
-	)
-) else if exist "%gamedir%renpy_version.txt" (
-	for /f "usebackq tokens=1,2,3 delims=(), " %%a in ("%gamedir%renpy_version.txt") do (
- 		set major_version=%%a
-	)
-) else (
-	call :elog "[31m	! Error: Cannot find script_version.txt or renpy_version.txt.[0m"
-	call :elog .
-	pause>nul|set/p=.			Press any key to exit...
-	exit
+	del /f /q "%unrpyc%"
 )
 
 
-REM And use the correct unrpyc version.
-if %major_version% LSS 8 (
+:: And use the correct unrpyc version.
+if %RENPYVERSION% LSS 8 (
 	echo %unrpyc-legacy01%>> "%decompcab%.tmp"
 	echo %unrpyc-legacy02%>> "%decompcab%.tmp"
 	echo %unrpyc-legacy03%>> "%decompcab%.tmp"
@@ -812,36 +2134,35 @@ if %major_version% LSS 8 (
 	echo %unrpyc-master27%>> "%decompcab%.tmp"
 	echo %unrpyc-master28%>> "%decompcab%.tmp"
 
-
     set "offset=--no-init-offset"
 )
-
 set "decompcabps=%decompcab:[=`[%"
 set "decompcabps=%decompcabps:]=`]%"
 set "decompcabps=%decompcabps:^=^^%"
 set "decompcabps=%decompcabps:&=^&%"
-powershell.exe -nologo -noprofile -noninteractive -command "& { [IO.File]::WriteAllBytes(\"%decompcabps%\", [Convert]::FromBase64String([IO.File]::ReadAllText(\"%decompcabps%.tmp\"))) }"
+powershell.exe -nologo -noprofile -noninteractive -command "& { [IO.File]::WriteAllBytes(\"%decompcabps%\", [Convert]::FromBase64String([IO.File]::ReadAllText(\"%decompcabps%.tmp\")))}"
+call :elog .
 if not exist "%decompcab%" (
-	call :elog "[31m	Error: Failed to create decomp.cab, unable to continue.[0m"
+	call :elog "%RED%!decm1.%LNG%!%RES%"
 	call :elog .
-	pause>nul|set/p=.			Press any key to exit...
+	pause>nul|set/p=.			!ANYKEY.%LNG%!
 	exit
 ) else (
-	call :elog "[32m	+ Decompilation tool created successfully[0m"
+	call :elog "%GRE%!decm2.%LNG%!%RES%"
 	call :elog .
 )
 
-echo.
-echo Overwrite RPY files after decompilation?
-<nul set /p="Enter [Y/N] (default N): "
-choice /C YN /N /D N /T 5
-if errorlevel 2 (
+call :elog .
+call :elog "!decm3.%LNG%!"
+<nul set /p="!ENTERYN.%LNG%! "
+choice /C OSJДYN /N /D N /T 5
+if errorlevel 6 (
 	set "owrpy=n"
-	call :elog "[33m	RPY files won't be overwritten[0m"
+	call :elog "    %YEL%!decm4.%LNG%!%RES%"
 	call :elog .
 ) else if errorlevel 1 (
 	set "owrpy=y"
-	call :elog "[33m	RPY files will be overwritten[0m"
+	call :elog "    %YEL%!decm5.%LNG%!%RES%"
 	call :elog .
 )
 
@@ -849,345 +2170,1299 @@ call :DisplayVars "RPYC extract phase"
 
 call :elog .
 
-REM --------------------------------------------------------------------------------
-REM Once converted, extract the cab file. Needs to be a cab file due to expand.exe
-REM --------------------------------------------------------------------------------
-call :elog "Extracting decomp.cab..."
-mkdir "%decompilerdir%"
-expand -F:* "%decompcab%" "%decompilerdir%" >>"%unrenlog%" 2>&1
-move "%decompilerdir%\unrpyc.py" "%unrpycpy%" >>"%unrenlog%" 2>&1
-move "%decompilerdir%\deobfuscate.py" "%deobfuscate%" >>"%unrenlog%" 2>&1
+:: Once converted, extract the cab file. Needs to be a cab file due to expand.exe
+set "found=0"
+echo !decm6.%LNG%! >> "%UNRENLOG%"
+<nul set /p=!decm6.%LNG%!
+mkdir "%decompilerdir%"  >> "%UNRENLOG%" 2>&1
+expand -F:* "%decompcab%" "%decompilerdir%" >> "%UNRENLOG%" 2>&1
+move /y "%decompilerdir%\unrpyc.py" "%unrpycpy%" >> "%UNRENLOG%" 2>&1
+move /y "%decompilerdir%\deobfuscate.py" "%deobfuscate%" >> "%UNRENLOG%" 2>&1
+if not exist "%unrpycpy%" (
+    call :elog "    %RED%!decm7.%LNG%! %unrpycpy%. !UNACONT.%LNG%!%RES%"
+    call :elog .
+    pause>nul|set/p=.			!ANYKEY.%LNG%!
+    exit
+) else (
+    set "found=1"
+)
+if not exist "%deobfuscate%" (
+    call :elog "    %RED%!decm7.%LNG%! %deobfuscate%. !UNACONT.%LNG%!%RES%"
+    call :elog .
+    pause>nul|set/p=.			!ANYKEY.%LNG%!
+    exit
+) else (
+    if defined found (
+        call :elog "%GRE% !PASS.%LNG%!%RES%"
+        call :elog .
+    )
+)
 
-REM --------------------------------------------------------------------------------
-REM Decompile rpyc files
-REM --------------------------------------------------------------------------------
-call :elog "Searching for RPYC files in the game directory..."
-cd /d "%workdir%"
-
+:: Decompile rpyc files
 call :elog .
+call :elog "!decm8.%LNG%!"
 
 for /R "game" %%f in (*.rpyc) do (
     set "error=0"
-	REM Remove "c" from "rpyc" to generate the corresponding .rpy file name
 	set "rpyfile=%%~dpnf.rpy"
-	set "relativerpy=!rpyfile:%workdir%\game\=!"
+	set "relativerpy=!rpyfile:%WORKDIR%\game\=!"
 	set "relativePath=%%f"
-	set "relativePath=!relativePath:%workdir%\game\=!"
+	set "relativePath=!relativePath:%WORKDIR%\game\=!"
+
+    set "decm9.en=Decompiling file: !relativePath!"
+    set "decm9.fr=Décompilation du fichier : !relativePath!"
+    set "decm9.es=Descompilando archivo: !relativePath!"
+    set "decm9.it=Decompilazione del file: !relativePath!"
+    set "decm9.de=Dekompilierung der Datei: !relativePath!"
+    set "decm9.ru=Декомпиляция файла: !relativePath!"
+
+    set "decm10.en=Creating backup of '!relativePath!' as '!relativePath!.org'."
+    set "decm10.fr=Création d'une copie de '!relativePath!' sous '!relativePath!.org'."
+    set "decm10.es=Creando una copia de '!relativePath!' como '!relativePath!.org'."
+    set "decm10.it=Creazione di un backup di '!relativePath!' come '!relativePath!.org'."
+    set "decm10.de=Erstelle eine Sicherungskopie von '!relativePath!' als '!relativePath!.org'."
+    set "decm10.ru=Создание резервной копии '!relativePath!' как '!relativePath!.org'."
+
+    set "decm11.en=Overwriting existing RPY file for '!relativePath!'."
+    set "decm11.fr=Écrasement du fichier RPY existant pour '!relativePath!'."
+    set "decm11.es=Sobrescribiendo el archivo RPY existente para '!relativePath!'."
+    set "decm11.it=Sovrascrittura del file RPY esistente per '!relativePath!'."
+    set "decm11.de=Überschreiben der vorhandenen RPY-Datei für '!relativePath!'."
+    set "decm11.ru=Перезапись существующего файла RPY для '!relativePath!'."
+
+    set "decm12.en=Skipping: '!relativePath!', decompiled file already exists."
+    set "decm12.fr=Ignore : '!relativePath!', le fichier décompilé existe déjà."
+    set "decm12.es=Saltando: '!relativePath!', el archivo descompilado ya existe."
+    set "decm12.it=Ignorando: '!relativePath!', il file decompilato esiste già."
+    set "decm12.de=Überspringen: '!relativePath!', die dekompilierte Datei existiert bereits."
+    set "decm12.ru=Пропуск: '!relativePath!', декомпилированный файл уже существует."
+
+    set "decm13.en=%RED% Error processing '%%f'. Please check the !UNRENLOG! for details."
+    set "decm13.fr=%RED% Erreur lors du traitement de '%%f'. Veuillez consulter le !UNRENLOG! pour plus de détails."
+    set "decm13.es=%RED% Error al procesar '%%f'. Por favor, consulte el !UNRENLOG! para más detalles."
+    set "decm13.it=%RED% Errore durante l'elaborazione di '%%f'. Controlla il !UNRENLOG! per ulteriori dettagli."
+    set "decm13.de=%RED% Fehler bei der Verarbeitung von '%%f'. Bitte überprüfen Sie das !UNRENLOG! auf Einzelheiten."
+    set "decm13.ru=%RED% Ошибка при обработке '%%f'. Пожалуйста, проверьте !UNRENLOG! для получения дополнительных сведений."
 
 	if not exist !rpyfile! (
-		call :elog "     + Processing '!relativePath!'"
-		if "!option!" == "7" (
-			echo "!pythondir!python.exe" !pynoassert! "!unrpycpy!" !offset! --try-harder "%%f" >>!unrenlog!
-			"!pythondir!python.exe" !pynoassert! "!unrpycpy!" !offset! --try-harder "%%f" >>!unrenlog! 2>&1
+		call :elog "    + !decm9.%LNG%!"
+		if "!OPTION!" == "7" (
+			echo "!pythondir!python.exe" !PYNOASSERT! "!unrpycpy!" !offset! --try-harder "%%f" >>!UNRENLOG!
+			"!pythondir!python.exe" !PYNOASSERT! "!unrpycpy!" !offset! --try-harder "%%f" >>!UNRENLOG! 2>&1
 			set "error=!errorlevel!"
 		) else (
-			echo "!pythondir!python.exe" !pynoassert! "!unrpycpy!" !offset! "%%f" >>!unrenlog!
-			"!pythondir!python.exe" !pynoassert! "!unrpycpy!" !offset! "%%f" >>!unrenlog! 2>&1
+			echo "!pythondir!python.exe" !PYNOASSERT! "!unrpycpy!" !offset! "%%f" >>!UNRENLOG!
+			"!pythondir!python.exe" !PYNOASSERT! "!unrpycpy!" !offset! "%%f" >>!UNRENLOG! 2>&1
 			set "error=!errorlevel!"
 		)
 	) else if exist !rpyfile! if "!owrpy!" == "y" (
 		if not exist "!rpyfile!.org" (
-			call :elog "[33m     + Creating backup of '!relativePath!' as '!relativePath!.org'.[0m"
-			copy "!rpyfile!" "!rpyfile!.org" >nul 2>&1
+			call :elog "    %YEL%+ !decm10.%LNG%!%RES%"
+			copy "!rpyfile!" "!rpyfile!.org" %debugredir%
 		)
 
-		call :elog "[33m     + Overwriting '!relativePath!' with decompiled file.[0m"
-		REM call :elog "     + Processing '!relativePath!'"
-		if "!option!" == "7" (
-			echo "!pythondir!python.exe" !pynoassert! "!unrpycpy!" --clobber !offset! --try-harder "%%f" >>!unrenlog!
-			"!pythondir!python.exe" !pynoassert! "!unrpycpy!" --clobber !offset! --try-harder "%%f" >>!unrenlog! 2>&1
+		call :elog "    %YEL%+ !decm11.%LNG%!%RES%"
+		if "!OPTION!" == "4" (
+			echo "!pythondir!python.exe" !PYNOASSERT! "!unrpycpy!" --clobber !offset! --try-harder "%%f" >>!UNRENLOG!
+			"!pythondir!python.exe" !PYNOASSERT! "!unrpycpy!" --clobber !offset! --try-harder "%%f" >>!UNRENLOG! 2>&1
 			set "error=!errorlevel!"
 		) else (
-			echo "!pythondir!python.exe" !pynoassert! "!unrpycpy!" --clobber !offset! "%%f" >>!unrenlog!
-			"!pythondir!python.exe" !pynoassert! "!unrpycpy!" --clobber !offset! "%%f" >>!unrenlog! 2>&1
+			echo "!pythondir!python.exe" !PYNOASSERT! "!unrpycpy!" --clobber !offset! "%%f" >>!UNRENLOG!
+			"!pythondir!python.exe" !PYNOASSERT! "!unrpycpy!" --clobber !offset! "%%f" >>!UNRENLOG! 2>&1
 			set "error=!errorlevel!"
 		)
 	) else if exist !rpyfile! if "!owrpy!" == "n" (
-		call :elog "[33m     + Skipping '!relativePath!', decompiled file already exists.[0m"
+		call :elog "    %YEL%+ !decm12.%LNG%!%RES%"
 		set "error=0"
 	)
-	if !error! neq 0 (
-		call :elog "[31m Error processing '%%f'. Please check the !unrenlog! for details.[0m"
+	if !error! NEQ 0 (
+		call :elog "    %RED%!decm13.%LNG%!%RES%"
 	)
 )
 
 call :elog .
 
-REM --------------------------------------------------------------------------------
-REM Clean up
-REM --------------------------------------------------------------------------------
-call :elog "Cleaning up temporary files..."
-cd "%workdir%"
-if exist "%unrpycpy%o" del "%unrpycpy%o"
-if exist "%unrpyc%" del "%unrpyc%"
-if exist "%unrpycpy%" del "%unrpycpy%"
-if exist "%unrpycpy%.tmp" del "%decompcab%.tmp"
-if exist "%decompcab%" del "%decompcab%"
-if exist "%decompcab%.tmp" del "%decompcab%.tmp"
-if exist "%deobfuscate%" del "%deobfuscate%"
-if exist "%deobfuscate%o" del "%deobfuscate%o"
-if exist "__pycache__" rmdir /Q /S "__pycache__"
-if exist "%decompilerdir%" rmdir /Q /S "%decompilerdir%"
+:: Clean up
+call :elog "!CLEANUP.%LNG%!"
+cd /d "%WORKDIR%"
+if exist "%unrpycpy%o" del /f /q "%unrpycpy%o" %debugredir%
+if exist "%unrpyc%" del /f /q "%unrpyc%" %debugredir%
+if exist "%unrpycpy%" del /f /q "%unrpycpy%" %debugredir%
+if exist "%unrpycpy%.tmp" del /f /q "%decompcab%.tmp" %debugredir%
+if exist "%decompcab%" del /f /q "%decompcab%" %debugredir%
+if exist "%decompcab%.tmp" del /f /q "%decompcab%.tmp" %debugredir%
+if exist "%deobfuscate%" del /f /q "%deobfuscate%" %debugredir%
+if exist "%deobfuscate%o" del /f /q "%deobfuscate%o" %debugredir%
+if exist "__pycache__" rmdir /Q /S "__pycache__" %debugredir%
+if exist "%decompilerdir%" rmdir /Q /S "%decompilerdir%" %debugredir%
 
 call :elog .
 
-if "%option%" == "9" call :console
-call :finish
-exit /b
+goto :eof
 
 
+:: Drop our console/dev mode enabler into the game folder
 :console
-REM --------------------------------------------------------------------------------
-REM Drop our console/dev mode enabler into the game folder
-REM --------------------------------------------------------------------------------
-call :elog "Creating Developer/Console file..."
-set "unren-console=%workdir%\game\unren-console.rpy"
-set unren-console01=aW5pdCA5OTkgcHl0aG9uOg0KICAgIGNvbmZpZy5kZXZlbG9wZXIgPSBUcnVlDQogICAgY29uZmlnLmNvbnNvbGUgPSBUcnVl
-
-if exist "%unren-console%.tmp" (
-	del "%unren-console%.tmp"
-)
+set "unren-console=%WORKDIR%\game\unren-console.rpy"
+echo %YEL%!TWADD.%LNG%! %unren-console%.%RES%
+echo %YEL%!INCASEDEL.%LNG%!%RES%
+echo %YEL%%unren-console%%RES%
+echo %YEL%%unren-console%c%RES%
+call :elog .
+call :elog .
+echo !choicea.%LNG%!...  >> "%UNRENLOG%"
+<nul set /p="!choicea.%LNG%!... "
 if exist "%unren-console%" (
-	del "%unren-console%"
-)
-
-echo %unren-console01%>> "%unren-console%.tmp"
-set "unren-consoleps=%unren-console:[=`[%"
-set "unren-consoleps=%unren-consoleps:]=`]%"
-set "unren-consoleps=%unren-consoleps:^=^^%"
-set "unren-consoleps=%unren-consoleps:&=^&%"
-powershell.exe -nologo -noprofile -noninteractive -command "& { [IO.File]::WriteAllBytes(\"%unren-consoleps%\", [Convert]::FromBase64String([IO.File]::ReadAllText(\"%unren-consoleps%.tmp\"))) }"
-if not exist "%unren-console%" (
-	call :elog "[31m	! Error: Failed to create unren-console.rpy, unable to continue.[0m"
-	call :elog .
-	pause>nul|set/p=.			Press any key to exit...
-	exit
+    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
 ) else (
-	call :elog "[32m	+ Console/Dev Menu tool created successfully[0m"
+    >"%unren-console%.b64" (
+        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KZGVmaW5lIDk5OSBjb25maWcuY29uc29sZSA9IFRydWUNCmRlZmluZSA5OTkgY29uZmlnX2RlYnVnID0gVHJ1ZQ0K
+    )
+    powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllText('%unren-console%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-console%.b64'))))" %debugredir%
+    if not exist "%unren-console%.tmp" (
+        call :elog "%RED%!FAIL.%LNG%!%RES%"
+    ) else (
+        move /y "%unren-console%.tmp" "%unren-console%" %debugredir%
+        del /f /q "%unren-console%.b64" %debugredir%
+        call :elog "%GRE%!PASS.%LNG%!%RES%"
+    )
 )
 
-call :elog "	+ Console: SHIFT+O"
-call :elog "	+ Dev Menu: SHIFT+D"
+goto :eof
+
+
+:: Drop our debug mode enabler into the game folder
+:debug
+set "unren-debug=%WORKDIR%\game\unren-debug.rpy"
+echo %YEL%!TWADD.%LNG%! %unren-debug%.%RES%
+echo %YEL%!INCASEDEL.%LNG%!%RES%
+echo %YEL%%unren-debug%%RES%
+echo %YEL%%unren-debug%c%RES%
 call :elog .
-del "%unren-console%.tmp"
+call :elog .
+echo !choiceb.%LNG%!...  >> "%UNRENLOG%"
+<nul set /p="!choiceb.%LNG%!... "
 
-if "%option%" == "9" call :quick
-call :finish
-exit /b
-
-
-:quick
-REM --------------------------------------------------------------------------------
-REM Drop our Quick Save/Load file into the game folder
-REM --------------------------------------------------------------------------------
-call :elog "Creating Quick Save/Load tool..."
-set "unren-quick=%workdir%\game\unren-quick.rpy"
-set unren-quick01=aW5pdCA5OTkgcHl0aG9uOg0KICAgIHRyeToNCiAgICAgICAgY29uZmlnLnVuZGVybGF5WzBdLmtleW1hcFsncXVpY2tTYXZlJ10gPSBRdWlja1NhdmUoKQ0KICAgICAgICBjb25maWcua2V5bWFwWydxdWlja1NhdmUnXSA9ICdLX0Y1Jw0KICAgICAgICBjb25maWcudW5kZXJsYXlbMF0ua2V5bWFwWydxdWlja0xvYWQnXSA9IFF1aWNrTG9hZCgpDQogICAgICAgIGNvbmZpZy5rZXltYXBbJ3F1aWNrTG9hZCddID0gJ0tfRjknDQogICAgZXhjZXB0Og0KICAgICAgICBwYXNz
-
-if exist "%unren-quick%.tmp" (
-	del "%unren-quick%.tmp"
-)
-if exist "%unren-quick%" (
-	del "%unren-quick%"
-)
-
-echo %unren-quick01%>> "%unren-quick%.tmp"
-set "unren-quickps=%unren-quick:[=`[%"
-set "unren-quickps=%unren-quickps:]=`]%"
-set "unren-quickps=%unren-quickps:^=^^%"
-set "unren-quickps=%unren-quickps:&=^&%"
-powershell.exe -nologo -noprofile -noninteractive -command "& { [IO.File]::WriteAllBytes(\"%unren-quickps%\", [Convert]::FromBase64String([IO.File]::ReadAllText(\"%unren-quickps%.tmp\"))) }"
-if not exist "%unren-quick%" (
-	call :elog "[31m	! Error: Failed to create unren-quick.rpy, unable to continue.[0m"
-	call :elog .
-	pause>nul|set/p=.			Press any key to exit...
-	exit
+if exist "%unren-debug%" (
+    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
 ) else (
-	call :elog "[32m	+ Quick Save/Load tool created successfully[0m"
+    >"%unren-debug%.b64" (
+        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KZGVmaW5lIDk5OSBjb25maWcuZGVidWcgPSBUcnVlDQo=
+    )
+    powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllText('%unren-debug%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-debug%.b64'))))" %debugredir%
+    if not exist "%unren-debug%.tmp" (
+        call :elog "%RED%!FAIL.%LNG%!%RES%"
+    ) else (
+        move /y "%unren-debug%.tmp" "%unren-debug%" %debugredir%
+        del /f /q "%unren-debug%.b64" %debugredir%
+        call :elog "%GRE%!PASS.%LNG%!%RES%"
+    )
 )
 
-call :elog "	Default hotkeys:"
-call :elog "	+ Quick Save: F5"
-call :elog "	+ Quick Load: F9"
-call :elog .
-del "%unren-quick%.tmp"
-
-if "%option%" == "9" call :skip
-call :finish
-exit /b
+goto :eof
 
 
+:: Drop our skip file into the game folder
 :skip
-REM --------------------------------------------------------------------------------
-REM Drop our skip file into the game folder
-REM --------------------------------------------------------------------------------
-call :elog "Creating skip file..."
-set "unren-skip=%workdir%\game\unren-skip.rpy"
-set unren-skip01=aW5pdCA5OTkgcHl0aG9uOg0KICAgIF9wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCiAgICByZW5weS5nYW1lLnByZWZlcmVuY2VzLnNraXBfdW5zZWVuID0gVHJ1ZQ0KICAgIHJlbnB5LmNvbmZpZy5hbGxvd19za2lwcGluZyA9IFRydWUNCiAgICByZW5weS5jb25maWcuZmFzdF9za2lwcGluZyA9IFRydWUNCiAgICB0cnk6DQogICAgICAgIGNvbmZpZy5rZXltYXBbJ3NraXAnXSA9IFsgJ0tfTENUUkwnLCAnS19SQ1RSTCcgXQ0KICAgIGV4Y2VwdDoNCiAgICAgICAgcGFzcw0K
+set "unren-skip=%WORKDIR%\game\unren-skip.rpy"
+echo %YEL%!TWADD.%LNG%! %unren-skip%.%RES%
+echo %YEL%!INCASEDEL.%LNG%!%RES%
+echo %YEL%%unren-skip%%RES%
+echo %YEL%%unren-skip%c%RES%
+call :elog .
+call :elog .
+echo !choicec.%LNG%!... >> "%UNRENLOG%"
+<nul set /p="!choicec.%LNG%!... "
 
-if exist "%unren-skip%.tmp" (
-	del "%unren-skip%.tmp"
-)
 if exist "%unren-skip%" (
-	del "%unren-skip%"
-)
-
-echo %unren-skip01%>> "%unren-skip%.tmp"
-set "unren-skipps=%unren-skip:[=`[%"
-set "unren-skipps=%unren-skipps:]=`]%"
-set "unren-skipps=%unren-skipps:^=^^%"
-set "unren-skipps=%unren-skipps:&=^&%"
-powershell.exe -nologo -noprofile -noninteractive -command "& { [IO.File]::WriteAllBytes(\"%unren-skipps%\", [Convert]::FromBase64String([IO.File]::ReadAllText(\"%unren-skipps%.tmp\"))) }"
-if not exist "%unren-skip%" (
-	call :elog "[31m	! Error: Failed to create unren-skip.rpy, unable to continue.[0m"
-	call :elog .
-	pause>nul|set/p=.			Press any key to exit...
-	exit
+    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
 ) else (
-	call :elog "[32m	+ Skip tool created successfully[0m"
+    >"%unren-skip%.b64" (
+        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIF9wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCiAgICBjb25maWcuYWxsb3dfc2tpcHBpbmcgPSBUcnVlDQogICAgcmVucHkuZ2FtZS5wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCiAgICByZW5weS5nYW1lLnByZWZlcmVuY2VzLnNraXBfYWZ0ZXJfY2hvaWNlcyA9IFRydWUNCiAgICByZW5weS5jb25maWcuZmFzdF9za2lwcGluZyA9IFRydWUNCiAgICB0cnk6DQogICAgICAgIGNvbmZpZy5rZXltYXBbJ3NraXAnXSA9IFsgJ0tfTENUUkwnLCAnS19SQ1RSTCcgXQ0KICAgIGV4Y2VwdDoNCiAgICAgICAgcGFzcw0K
+    )
+    powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllText('%unren-skip%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-skip%.b64'))))" %debugredir%
+    if not exist "%unren-skip%.tmp" (
+        call :elog "%RED%!FAIL.%LNG%!%RES%"
+    ) else (
+        move /y "%unren-skip%.tmp" "%unren-skip%" %debugredir%
+        del /f /q "%unren-skip%.b64" %debugredir%
+        call :elog "%GRE%!PASS.%LNG%!%RES%"
+    )
 )
 
-call :elog "	+ You can now skip all text using TAB and CTRL keys"
+goto :eof
+
+
+:: Drop our skip file into the game folder
+:skipall
+set "unren-skipall=%WORKDIR%\game\unren-skipall.rpy"
+echo %YEL%!TWADD.%LNG%! %unren-skipall%.%RES%
+echo %YEL%!INCASEDEL.%LNG%!%RES%
+echo %YEL%%unren-skipall%%RES%
+echo %YEL%%unren-skipall%c%RES%
 call :elog .
-del "%unren-skip%.tmp"
+call :elog .
+echo !choiced.%LNG%!... >> "%UNRENLOG%"
+<nul set /p="!choiced.%LNG%!... "
 
-if "%option%" == "9" call :rollback
-call :finish
-exit /b
+if exist "%unren-skipall%" (
+    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
+) else (
+    >"%unren-skipall%.b64" (
+        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIF9wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCiAgICBjb25maWcuYWxsb3dfc2tpcHBpbmcgPSBUcnVlDQogICAgcmVucHkuZ2FtZS5wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCiAgICByZW5weS5nYW1lLnByZWZlcmVuY2VzLnNraXBfYWZ0ZXJfY2hvaWNlcyA9IFRydWUNCiAgICByZW5weS5jb25maWcuZmFzdF9za2lwcGluZyA9IFRydWUNCiAgICBwcmVmZXJlbmNlcy50cmFuc2l0aW9ucyA9IDANCiAgICB0cnk6DQogICAgICAgIGNvbmZpZy5rZXltYXBbJ3NraXAnXSA9IFsgJ0tfTENUUkwnLCAnS19SQ1RSTCcgXQ0KICAgIGV4Y2VwdDoNCiAgICAgICAgcGFzcw0K
+    )
+    powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllText('%unren-skipall%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-skipall%.b64'))))" %debugredir%
+    if not exist "%unren-skipall%.tmp" (
+        call :elog "%RED%!FAIL.%LNG%!%RES%"
+    ) else (
+        move /y "%unren-skipall%.tmp" "%unren-skipall%" %debugredir%
+        del /f /q "%unren-skipall%.b64" %debugredir%
+        call :elog "%GRE%!PASS.%LNG%!%RES%"
+    )
+)
+
+goto :eof
 
 
+:: Drop our rollback file into the game folder
 :rollback
-REM --------------------------------------------------------------------------------
-REM Drop our rollback file into the game folder
-REM --------------------------------------------------------------------------------
-call :elog "Creating rollback file..."
-set "unren-rollback=%workdir%\game\unren-rollback.rpy"
-set unren-rollback01=aW5pdCA5OTkgcHl0aG9uOg0KICAgIHJlbnB5LmNvbmZpZy5yb2xsYmFja19lbmFibGVkID0gVHJ1ZQ0KICAgIHJlbnB5LmNvbmZpZy5oYXJkX3JvbGxiYWNrX2xpbWl0ID0gMjU2DQogICAgcmVucHkuY29uZmlnLnJvbGxiYWNrX2xlbmd0aCA9IDI1Ng0KICAgIGRlZiB1bnJlbl9ub2Jsb2NrKCAqYXJncywgKiprd2FyZ3MgKToNCiAgICAgICAgcmV0dXJuDQogICAgcmVucHkuYmxvY2tfcm9sbGJhY2sgPSB1bnJlbl9ub2Jsb2NrDQogICAgdHJ5Og0KICAgICAgICBjb25maWcua2V5bWFwWydyb2xsYmFjayddID0gWyAnS19QQUdFVVAnLCAncmVwZWF0X0tfUEFHRVVQJywgJ0tfQUNfQkFDSycsICdtb3VzZWRvd25fNCcgXQ0KICAgIGV4Y2VwdDoNCiAgICAgICAgcGFzcw==
+set "unren-rollback=%WORKDIR%\game\unren-rollback.rpy"
+echo %YEL%!TWADD.%LNG%! %unren-rollback%.%RES%
+echo %YEL%!INCASEDEL.%LNG%!%RES%
+echo %YEL%%unren-rollback%%RES%
+echo %YEL%%unren-rollback%c%RES%
+call :elog .
+call :elog .
+echo !choicee.%LNG%!... >> "%UNRENLOG%"
+<nul set /p="!choicee.%LNG%!... "
 
-if exist "%unren-rollback%.tmp" (
-	del "%unren-rollback%.tmp"
-)
 if exist "%unren-rollback%" (
-	del "%unren-rollback%"
-)
-
-echo %unren-rollback01%>> "%unren-rollback%.tmp"
-set "unren-rollbackps=%unren-rollback:[=`[%"
-set "unren-rollbackps=%unren-rollbackps:]=`]%"
-set "unren-rollbackps=%unren-rollbackps:^=^^%"
-set "unren-rollbackps=%unren-rollbackps:&=^&%"
-powershell.exe -nologo -noprofile -noninteractive -command "& { [IO.File]::WriteAllBytes(\"%unren-rollbackps%\", [Convert]::FromBase64String([IO.File]::ReadAllText(\"%unren-rollbackps%.tmp\"))) }"
-if not exist "%unren-rollback%" (
-	call :elog "[31m	! Error: Failed to create unren-rollback.rpy, unable to continue.[0m"
-	call :elog .
-	pause>nul|set/p=.			Press any key to exit...
-	exit
+    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
 ) else (
-	call :elog "[32m	+ Rollback tool created successfully[0m"
+    > "%unren-rollback%.b64" (
+        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIHJlbnB5LmNvbmZpZy5yb2xsYmFja19lbmFibGVkID0gVHJ1ZQ0KICAgIHJlbnB5LmNvbmZpZy5oYXJkX3JvbGxiYWNrX2xpbWl0ID0gMjU2DQogICAgcmVucHkuY29uZmlnLnJvbGxiYWNrX2xlbmd0aCA9IDI1Ng0KICAgIGRlZiB1bnJlbl9ub2Jsb2NrKCphcmdzLCAqKmt3YXJncyk6DQogICAgICAgIHJldHVybg0KICAgIHJlbnB5LmJsb2NrX3JvbGxiYWNrID0gdW5yZW5fbm9ibG9jaw0KICAgIHRyeToNCiAgICAgICAgY29uZmlnLmtleW1hcFsncm9sbGJhY2snXSA9IFsgJ0tfUEFHRVVQJywgJ3JlcGVhdF9LX1BBR0VVUCcsICdLX0FDX0JBQ0snLCAnbW91c2Vkb3duXzQnIF0NCiAgICBleGNlcHQ6DQogICAgICAgIHBhc3MNCg ==
+    )
+    powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllText('%unren-rollback%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-rollback%.b64'))))" %debugredir%
+    if not exist "%unren-rollback%.tmp" (
+        call :elog "%RED%!FAIL.%LNG%!%RES%"
+    ) else (
+        move /y "%unren-rollback%.tmp" "%unren-rollback%" %debugredir%
+        del /f /q "%unren-rollback%.b64" %debugredir%
+        call :elog "%GRE%!PASS.%LNG%!%RES%"
+    )
 )
 
-call :elog "	+ You can now rollback using the scrollwheel"
+goto :eof
+
+
+:: Drop our Quick Save/Load file into the game folder
+:quick
+set "unren-quick=%WORKDIR%\game\unren-quick.rpy"
+echo %YEL%!TWADD.%LNG%! %unren-quick%.%RES%
+echo %YEL%!INCASEDEL.%LNG%!%RES%
+echo %YEL%%unren-quick%%RES%
+echo %YEL%%unren-quick%c%RES%
 call :elog .
-del "%unren-rollback%.tmp"
+call :elog .
+echo !choicef.%LNG%!... >> "%UNRENLOG%"
+<nul set /p="!choicef.%LNG%!... "
 
-call :finish
-exit /b
+if exist "%unren-quick%" (
+    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
+) else (
+    >"%unren-quick%.b64" (
+        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIHRyeToNCiAgICAgICAgY29uZmlnLnVuZGVybGF5WzBdLmtleW1hcFsncXVpY2tTYXZlJ10gPSBRdWlja1NhdmUoKQ0KICAgICAgICBjb25maWcua2V5bWFwWydxdWlja1NhdmUnXSA9ICdLX0Y1Jw0KICAgICAgICBjb25maWcudW5kZXJsYXlbMF0ua2V5bWFwWydxdWlja0xvYWQnXSA9IFF1aWNrTG9hZCgpDQogICAgICAgIGNvbmZpZy5rZXltYXBbJ3F1aWNrTG9hZCddID0gJ0tfRjknDQogICAgZXhjZXB0Og0KICAgICAgICBwYXNzDQo=
+    )
+    powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllText('%unren-quick%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-quick%.b64'))))" %debugredir%
+    if not exist "%unren-quick%.tmp" (
+        call :elog "%RED%!FAIL.%LNG%!%RES%"
+    ) else (
+        move /y "%unren-quick%.tmp" "%unren-quick%" %debugredir%
+        del /f /q "%unren-quick%.b64" %debugredir%
+        call :elog "%GRE%!PASS.%LNG%!%RES%"
+    )
+)
+
+goto :eof
 
 
+:: Drop our Quick Menu file into the game folder
+:qmenu
+set "unren-qmenu=%WORKDIR%\game\unren-qmenu.rpy"
+echo %YEL%!TWADD.%LNG%! %unren-qmenu%.%RES%
+echo %YEL%!INCASEDEL.%LNG%!%RES%
+echo %YEL%%unren-qmenu%%RES%
+echo %YEL%%unren-qmenu%c%RES%
+call :elog .
+call :elog .
+echo !choiceg.%LNG%!... >> "%UNRENLOG%"
+<nul set /p="!choiceg.%LNG%!... "
+
+if exist "%unren-qmenu%" (
+    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
+) else (
+    >"%unren-qmenu%.b64" (
+        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCBweXRob246DQogICAgZGVmIGFsd2F5c19lbmFibGVfcXVpY2tfbWVudSgpOg0KICAgICAgICBzdG9yZS5xdWlja19tZW51ID0gVHJ1ZQ0KICAgICAgICByZW5weS5zaG93X3NjcmVlbigicXVpY2tfbWVudSIpDQogICAgY29uZmlnLm92ZXJsYXlfZnVuY3Rpb25zLmFwcGVuZChhbHdheXNfZW5hYmxlX3F1aWNrX21lbnUpDQoNCiAgICBkZWYgZm9yY2VfcXVpY2tfbWVudV9vbl9pbnRlcmFjdCgpOg0KICAgICAgICBzdG9yZS5xdWlja19tZW51ID0gVHJ1ZQ0KICAgIGNvbmZpZy5pbnRlcmFjdF9jYWxsYmFja3MuYXBwZW5kKGZvcmNlX3F1aWNrX21lbnVfb25faW50ZXJhY3Qp
+    )
+    powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllText('%unren-qmenu%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-qmenu%.b64'))))" %debugredir%
+    if not exist "%unren-qmenu%.tmp" (
+        call :elog "%RED%!FAIL.%LNG%!%RES%"
+    ) else (
+        move /y "%unren-qmenu%.tmp" "%unren-qmenu%" %debugredir%
+        del /f /q "%unren-qmenu%.b64" %debugredir%
+        call :elog "%GRE%!PASS.%LNG%!%RES%"
+    )
+)
+
+goto :eof
+
+
+:: Add the Universal Gallery Unlocker to the game folder
+:add_ugu
+set "ugu_name=Universal_Gallery_Unlocker ZLZK"
+set "url=https://attachments.f95zone.to/2024/01/3314515_Universal_Gallery_Unlocker_2024-01-24_ZLZK.zip"
+set "uguzip=%TEMP%\Universal_Gallery_Unlocker.zip"
+set "uguhardzip=%TEMP%\hard.zip"
+set "ugusoftzip=%TEMP%\soft.zip"
+set "ugudir=%WORKDIR%\game\_mods\"
+del /f /q "%uguzip%" %debugredir%
+del /f /q "%uguhardzip%" %debugredir%
+del /f /q "%ugusoftzip%" %debugredir%
+
+echo %YEL%!TWADD.%LNG%! %ugudir%.%RES%
+echo %YEL%!INCASEOF.%LNG%! %RES%
+echo %MAG%https://f95zone.to/threads/universal-gallery-unlocker-2024-01-24-zlzk.136812/%RES%
+echo %YEL%!INCASEDEL.%LNG%!%RES%
+echo %YEL%%ugudir%\ZLZK_UGU_soft%RES%
+call :elog .
+call :elog .
+echo !choiceh.%LNG%!... >> "%UNRENLOG%"
+<nul set /p="!choiceh.%LNG%!... "
+
+if %debuglevel% geq 1 (
+    call :elog .
+    echo powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%url%','%uguzip%')"
+)
+powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%url%','%uguzip%')" %debugredir%
+if %errorlevel% NEQ 0 (
+    call :elog "%RED%!FAIL.%LNG%!%RES%"
+) else (
+    if %debuglevel% geq 1 (
+        call :elog .
+        echo powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%uguzip%' '%TEMP%'"
+    )
+    powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%uguzip%' '%TEMP%'" %debugredir%
+    if not exist "%uguhardzip%" (
+        echo %RED%!FAIL.%LNG%! !MISSING.%LNG%! %uguhardzip% %RES%
+        goto skip_ugu
+    )
+    if not exist "%ugusoftzip%" (
+        echo %RED%!FAIL.%LNG%! !MISSING.%LNG%! %ugusoftzip% %RES%
+        goto skip_ugu
+    )
+    if %debuglevel% geq 1 (
+        call :elog .
+        echo powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%ugusoftzip%' %WORKDIR%"
+    )
+    powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%ugusoftzip%' %WORKDIR%" %debugredir%
+    if %errorlevel% NEQ 0 (
+        call :elog "%RED%!FAIL.%LNG%! !UNEXTRACT.%LNG%! %ugusoftzip% %RES%"
+        goto skip_ucd
+    ) else (
+        call :elog "%GRE%!PASS.%LNG%!%RES%"
+    )
+    del /f /q "%ugusoftzip%" %debugredir%
+    del /f /q "%uguhardzip%" %debugredir%
+    del /f /q "%uguzip%" %debugredir%
+    del /f /q "%TEMP%\readme.txt" %debugredir%
+)
+
+goto :eof
+
+
+:: Add the Universal Choice Descriptor to the game folder
+:add_ucd
+set "ucd_name=Universal_Choice_Descriptor ZLZK"
+set "url=https://attachments.f95zone.to/2024/01/3314453_Universal_Choice_Descriptor.zip"
+set "ucdzip=%TEMP%\Universal_Choice_Descriptor.zip"
+set "ucdzip_part1=%TEMP%\Universal_Choice_Descriptor_[2024-01-24]_[ZLZK].zip"
+set "ucdzip_part2=%TEMP%\ZLZK_[2024-01-24]_[ZLZK].zip"
+
+set "ucddir=%WORKDIR%\game\_mods\"
+del /f /q "%ucdzip%" %debugredir%
+del /f /q "%ucdzip_part1%" %debugredir%
+del /f /q "%ucdzip_part2%" %debugredir%
+del /f /q "%TEMP%\Readme.txt" %debugredir%
+
+echo %YEL%!TWADD.%LNG%! %ucddir%.%RES%
+echo %YEL%!INCASEOF.%LNG%! %RES%
+echo %MAG%https://f95zone.to/threads/universal-gallery-unlocker-2024-01-24-zlzk.136812/%RES%
+echo %YEL%!INCASEDEL.%LNG%!%RES%
+echo %YEL%%ucddir%%RES%
+call :elog .
+call :elog .
+echo !choicei.%LNG%!... >> "%UNRENLOG%"
+<nul set /p="!choicei.%LNG%!... "
+if %debuglevel% geq 1 (
+    call :elog .
+    echo powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%url%','%ucdzip%')"
+)
+powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%url%','%ucdzip%')" %debugredir%
+if not exist "%ucdzip%" (
+	call :elog "%RED%!FAIL.%LNG%! !UNDWNLD.%LNG%! %url% %RES%"
+	goto skip_ucd
+) else (
+	if %debuglevel% geq 1 (
+        call :elog .
+        echo powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%ucdzip%' '%TEMP%'"
+    )
+	powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%ucdzip%' '%TEMP%'" %debugredir%
+    if not exist "%ucdzip_part1%" (
+        call :elog "%RED%!FAIL.%LNG%! !MISSING.%LNG%! %ucdzip_part1% %RES%"
+        goto skip_ucd
+    ) else (
+        move /y "%ucdzip_part1%" %TEMP%\part1.zip %debugredir%
+    )
+    if not exist "%ucdzip_part2%" (
+        call :elog "%RED%!FAIL.%LNG%! !MISSING.%LNG%! %ucdzip_part2% %RES%"
+        goto skip_ucd
+    ) else (
+        move /y "%ucdzip_part2%" %TEMP%\part2.zip %debugredir%
+    )
+    if %debuglevel% geq 1 (
+        call :elog .
+        echo powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%TEMP%\part1.zip' %WORKDIR%"
+    )
+    powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%TEMP%\part1.zip' %WORKDIR%" %debugredir%
+    if %errorlevel% NEQ 0 (
+        call :elog "%RED%!FAIL.%LNG%! !UNEXTRACT.%LNG%! %ucdzip_part1% %RES%"
+        goto skip_ucd
+    )
+    if %debuglevel% geq 1 (
+        call :elog .
+        echo powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%TEMP%\part2.zip' %WORKDIR%"
+    )
+    powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%TEMP%\part2.zip' %WORKDIR%" %debugredir%
+    if %errorlevel% NEQ 0 (
+        call :elog "%RED%!FAIL.%LNG%! !UNEXTRACT.%LNG%! %ucdzip_part2% %RES%"
+        goto skip_ucd
+    )
+    call :elog "%GRE%!PASS.%LNG%!%RES%"
+    :skip_ucd
+	del /f /q "%ucdzip%" %debugredir%
+    del /f /q "%ucdzip_part1%" %debugredir%
+    del /f /q "%TEMP%\part1.zip" %debugredir%
+    del /f /q "%ucdzip_part2%" %debugredir%
+    del /f /q "%TEMP%\part2.zip" %debugredir%
+    del /f /q "%TEMP%\readme.txt" %debugredir%
+)
+
+goto :eof
+
+
+:: Download and install Universal Transparent Text Box Mod by Penfold Mole
+:add_utbox
+set "utbox_name=Universal Transparent Text Box Mod"
+set "url=https://attachments.f95zone.to/2023/12/3214690_RenPy_universal_transparent_textbox_mod_v2.6.4_by_Penfold_Mole.7z"
+set "utboxzip=%TEMP%\RenPy_Transparent_Text_Box_Mod.7z"
+set "utbox_file=%WORKDIR%\game\y_outline.rpy"
+set "utbox_tdir=%TEMP%\utbox"
+
+:: Need 7z.exe for extraction
+if not exist "%ProgramFiles%\7-Zip\7z.exe" (
+    echo %RED%!FAIL.%LNG%! !MISSING.%LNG%! %YEL%%ProgramFiles%\7-Zip\7z.exe %RES%
+    goto skip_utbox
+)
+
+del /f /q "%utbox_file%" %debugredir%
+
+echo %YEL%!TWADD.%LNG%! %ucddir%.%RES%
+echo %YEL%!INCASEOF.%LNG%! %RES%
+echo %MAG%https://f95zone.to/threads/renpy-transparent-text-box-mod-v2-6-4.11925/%RES%
+echo %YEL%!INCASEDEL.%LNG%!%RES%
+echo %YEL%%ucddir%%RES%
+call :elog .
+call :elog .
+echo !choicej.%LNG%!... >> "%UNRENLOG%"
+<nul set /p="!choicej.%LNG%!..."
+if %debuglevel% geq 1 (
+    call :elog .
+    echo powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%url%','%utboxzip%')"
+)
+powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%url%','%utboxzip%')" %debugredir%
+if not exist "%utboxzip%" (
+    echo %RED% !FAIL.%LNG%! !UNDWNLD.%LNG%! %url% %RES%
+    goto skip_utbox
+) else (
+    if %debuglevel% geq 1 (
+        call :elog .
+        echo "%ProgramFiles%\7-Zip\7z.exe" x -y -o"%utbox_tdir%" "%utboxzip%"
+    )
+    "%ProgramFiles%\7-Zip\7z.exe" x -y -o"%utbox_tdir%" "%utboxzip%" %debugredir%
+    if %errorlevel% NEQ 0 (
+        echo %RED% !FAIL.%LNG%! !UNEXTRACT.%LNG%! %utboxzip% %RES%
+        goto skip_utbox
+    ) else (
+        move /y "%utbox_tdir%\game\y_outline.rpy" "%WORKDIR%\game" %debugredir%
+        if exist "%utbox_file%" (
+            echo %GRE% !PASS.%LNG%!%RES%
+        ) else (
+            echo %RED% !FAIL.%LNG%! !MISSING.%LNG%! %YEL%%utbox_file% %RES%
+        )
+    )
+    :skip_utbox
+    del /f /q "%utboxzip%" %debugredir%
+    rd /s /q "%utbox_tdir%" %debugredir%
+)
+
+goto :eof
+
+
+:: Download 0x52_URM and add to the game
+:add_urm
+set "urm_name=0x52 URM"
+set "url=https://api.0x52.dev/modversions/1223/download"
+set "urm_zip=%WORKDIR%\0x52_URM.zip"
+set "urm_rpa=%WORKDIR%\game\0x52_URM.rpa"
+del /f /q "%urm_zip%" %debugredir%
+
+echo %YEL%!TWADD.%LNG%! %urm_rpa%.%RES%
+echo %YEL%!INCASEOF.%LNG%! %RES%
+echo %MAG%https://f95zone.to/threads/universal-renpy-mod-urm-2-6-2-mod-any-renpy-game-yourself.48025/%RES%
+echo %YEL%!INCASEDEL.%LNG%!%RES%
+echo %YEL%%urm_rpa%%RES%
+
+call :elog .
+call :elog .
+echo !choicek.%LNG%!... >> "%UNRENLOG%"
+<nul set /p="!choicek.%LNG%!... "
+powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%url%','%urm_zip%')" %debugredir%
+if not exist "%urm_zip%" (
+	echo %RED%!FAIL.%LNG%! !UNDWNLD.%LNG%!%urm_name%.zip.%RES%
+) else (
+	powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%urm_zip%' '%WORKDIR%\game'" %debugredir%
+	if %errorlevel% NEQ 0 (
+		echo %RED%!FAIL.%LNG%! !UNINSTALL.%LNG%! %urm_name% %RES%
+	) else (
+		echo %GRE%!PASS.%LNG%!%RES%
+	)
+	del /f /q "%urm_zip%" %debugredir%
+)
+
+goto :eof
+
+
+:: Replace MCName in game files
+:replace_mcname
+set "unr-mcchange=%WORKDIR%\game\unren-mcchange.rpy"
+
+set "rmcname.en=Please input the new name (without quotes): "
+set "rmcname.fr=Veuillez saisir le nouveau nom (sans guillemets) : "
+set "rmcname.es=Por favor ingrese el nuevo nombre (sin comillas): "
+set "rmcname.it=Si prega di inserire il nuovo nome (senza virgolette): "
+set "rmcname.de=Bitte geben Sie den neuen Namen (ohne Anführungszeichen) ein: "
+set "rmcname.ru=Пожалуйста, введите новое имя (без кавычек): "
+
+set "rmcname2.en=No name provided."
+set "rmcname2.fr=Aucun nom fourni."
+set "rmcname2.es=No se proporcionó ningún nombre."
+set "rmcname2.it=Nome non fornito."
+set "rmcname2.de=Kein Name angegeben."
+set "rmcname2.ru=Имя не указано."
+
+set "rmcname3.en=Please input the old name (without quotes): "
+set "rmcname3.fr=Veuillez saisir l'ancien nom (sans guillemets) : "
+set "rmcname3.es=Por favor ingrese el nombre antiguo (sin comillas): "
+set "rmcname3.it=Si prega di inserire il vecchio nome (senza virgolette): "
+set "rmcname3.de=Bitte geben Sie den alten Namen (ohne Anführungszeichen) ein: "
+set "rmcname3.ru=Пожалуйста, введите старое имя (без кавычек): "
+
+echo %YEL%!TWADD.%LNG%! %unr-mcchange%.%RES%
+echo %YEL%!INCASEDEL.%LNG%!%RES%
+echo %YEL%%unr-mcchange%%RES%
+echo %YEL%%unr-mcchange%c%RES%
+
+call :elog .
+call :elog .
+set "oldmcname="
+echo oldmcname=!rmcname3.%LNG%! >> "%UNRENLOG%"
+set /p "oldmcname=!rmcname3.%LNG%!"
+if "%oldmcname%" == "" (
+    echo %RED%!FAIL.%LNG%! !rmcname2.%LNG%!.%RES%
+    goto mcend
+) else (
+    echo oldmcname=%oldmcname% >> "%UNRENLOG%"
+)
+
+call :elog .
+set "newmcname="
+echo newmcname=!rmcname.%LNG%! >> "%UNRENLOG%"
+set /p "newmcname=!rmcname.%LNG%!"
+if "%newmcname%" == "" (
+    echo %RED%!FAIL.%LNG%! !rmcname2.%LNG%!.%RES%
+    goto mcend
+) else (
+    echo newmcname=%newmcname% >> "%UNRENLOG%"
+)
+
+call :elog .
+echo !choicel.%LNG%!... >> "%UNRENLOG%"
+<nul set /p="!choicel.%LNG%!... "
+
+>"%unr-mcchange%.b64" (
+    echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KZGVmaW5lIDk5OSBtY25hbWUgPSAibmV3bWNuYW1lIg0KZGVmaW5lIDk5OSBNQyA9ICJuZXdtY25hbWUiIA0KZGVmaW5lIDk5OSBNQ19uYW1lID0gIm5ld21jbmFtZSINCmRlZmluZSA5OTkgbWNfbmFtZSA9ICJuZXdtY25hbWUiDQogDQppbml0IDk5OSBweXRob246IA0KICAgIGRlZiByZXBsYWNlX3RleHQodCk6IA0KICAgICAgICByZXR1cm4gdC5yZXBsYWNlKCJvbGRtY25hbWUiLCAibmV3bWNuYW1lIikgDQogDQogICAgY29uZmlnLnJlcGxhY2VfdGV4dCA9IHJlcGxhY2VfdGV4dCANCiANCiAgICBkZWwgcmVwbGFjZV90ZXh0IA0K
+)
+powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllBytes('%unr-mcchange%.tmp', [Convert]::FromBase64String((Get-Content '%unr-mcchange%.b64' -Raw)))" %debugredir%
+if not exist "%unr-mcchange%.tmp" (
+    echo %RED%!FAIL.%LNG%!%RES% !MISSING.%LNG%! %unr-mcchange%.tmp
+    goto mcend
+) else (
+    del /f /q "%unr-mcchange%.b64" %debugredir%
+    powershell.exe -nologo -noprofile -noninteractive -command "(Get-Content '%unr-mcchange%.tmp') -replace 'newmcname', '%newmcname%' | Set-Content '%unr-mcchange%'" %debugredir%
+    powershell.exe -nologo -noprofile -noninteractive -command "(Get-Content '%unr-mcchange%') -replace 'oldmcname', '%oldmcname%' | Set-Content '%unr-mcchange%'" %debugredir%
+    if not exist "%unr-mcchange%" (
+        echo %RED%!FAIL.%LNG%!%RES% !MISSING.%LNG%! %unr-mcchange%
+        goto mcend
+    )
+    del /f /q "%unr-mcchange%.tmp" %debugredir%
+    echo %GRE%!PASS.%LNG%!%RES%
+)
+
+:mcend
+
+goto :eof
+
+
+:: Extract text for translation purpose
+:extract_text
+cd /d "%WORKDIR%"
+
+set "etext1.en=Searching for game name"
+set "etext1.fr=Recherche du nom du jeu"
+set "etext1.es=Buscando el nombre del juego"
+set "etext1.it=Cercando il nome del gioco"
+set "etext1.de=Suche nach dem Spieletitel"
+set "etext1.ru=Поиск названия игры"
+
+set "etext2.en=No game files found with .exe, .py or .sh extensions."
+set "etext2.fr=Aucun fichier de jeu trouvé avec les extensions .exe, .py ou .sh."
+set "etext2.es=No se encontraron archivos de juego con las extensiones .exe, .py o .sh."
+set "etext2.it=Nessun file di gioco trovato con le estensioni .exe, .py o .sh."
+set "etext2.de=Keine Spieldateien mit den Erweiterungen .exe, .py oder .sh gefunden."
+set "etext2.ru=Не найдено игровых файлов с расширениями .exe, .py или .sh."
+
+set "etext3.en=Enter the target translation language (french by default): "
+set "etext3.fr=Entrez la langue de traduction cible (french par défaut) : "
+set "etext3.es=Ingrese el idioma de traducción objetivo (french por defecto): "
+set "etext3.it=Inserisci la lingua di traduzione di destinazione (french per impostazione predefinita): "
+set "etext3.de=Geben Sie die Zielsprache für die Übersetzung ein (french standardmäßig): "
+set "etext3.ru=Введите целевой язык перевода (french по умолчанию): "
+
+set "etext4.en=Unable to extract text for translation."
+set "etext4.fr=Impossible d'extraire le texte pour la traduction."
+set "etext4.es=No se pudo extraer el texto para la traducción."
+set "etext4.it=Impossibile estrarre il testo per la traduzione."
+set "etext4.de=Fehler beim Extrahieren des Textes für die Übersetzung."
+set "etext4.ru=Не удалось извлечь текст для перевода."
+
+:: find the current game name by checking the presence of same name with .exe, .py and .sh extension
+call :elog .
+call :elog .
+echo !etext1.%LNG%!...  >> "%UNRENLOG%"
+<nul set /p="!etext1.%LNG%!... "
+
+set "processed="
+
+for %%e in (exe py sh) do (
+    for %%f in (*%%e) do (
+        set "fname=%%~nf"
+
+        :: Check if this name has already been processed
+        echo !processed! | findstr /i "\<!fname\>" >nul
+        if errorlevel 1 (
+            :: Count how many files with this name exist
+            set /a count=0
+            for %%x in (exe py sh) do (
+                if exist "%%~dpf!fname!.%%x" (
+                    set /a count+=1
+                )
+            )
+            if !count! EQU 3 (
+                echo %YEL%!fname! %GRE%!PASS.%LNG%!%YEL%%RES%
+                set "processed=!processed! !fname!"
+                goto found_name
+            )
+        )
+    )
+)
+
+if "%fname%"  == "" (
+    echo %RED%!FAIL.%LNG%! !etext2.%LNG%!%RES%
+    goto :eof
+)
+
+:found_name
+call :elog .
+set /p "translation_lang=!etext3.%LNG%!"
+if not defined translation_lang (
+	set "translation_lang=french"
+)
+
+if not exist "%WORKDIR%\game\tl\" (
+	mkdir "%WORKDIR%\game\tl"
+)
+
+call :elog .
+call :elog .
+echo !choicet.%LNG%!... >> "%UNRENLOG%"
+<nul set /p="!choicet.%LNG%!... "
+cd /d "%WORKDIR%"
+"%PYTHONHOME%python.exe" %PYNOASSERT% "%fname%.py" game translate %translation_lang% %debugredir%
+if %errorlevel% NEQ 0 (
+	echo %RED%!FAIL.%LNG%! !etext4.%LNG%!%RES%
+    call :elog .
+    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    goto :eof
+) else (
+    echo %GRE%!PASS.%LNG%!%RES%
+)
+
+goto :eof
+
+
+:: Add entry to registry
 :add_reg
-call :elog "	Adding the right-click menu entry to the registry..."
-REM Explanation
-call :elog "	+ This will add an entry to the right-click menu for folders."
-call :elog "	+ When you select this option, the script "%scriptdir%\unren-forall.bat" will be executed."
-REM Add registry key
-echo reg add "HKCR\Directory\shell\RunUnrenForAll" >>"%unrenlog%"
-reg add "HKCR\Directory\shell\RunUnrenForAll" /ve /d "Run UnRen-forall Script" /f >>"%unrenlog%" 2>&1
-reg add "HKCR\Directory\shell\RunUnrenForAll" /v "Icon" /d "%SystemRoot%\System32\shell32.dll,-154" /f >>"%unrenlog%" 2>&1
-reg add "HKCR\Directory\shell\RunUnrenForAll\command" /ve /d "cmd.exe /c cd /d \"%%V\" && \"%scriptdir%unren-forall.bat\"" /f >>"%unrenlog%" 2>&1
-if %errorlevel% == 0 (
-	call :elog "[33m	The entry has been successfully added to the context menu.[0m"
+set "areg1.en=This will add an entry to the right-click menu for folders."
+set "areg1.fr=Cela ajoutera une entrée au menu contextuel pour les dossiers."
+set "areg1.es=Esto añadirá una entrada al menú contextual para las carpetas."
+set "areg1.it=Questo aggiungerà una voce al menu contestuale per le cartelle."
+set "areg1.de=Dies wird einen Eintrag zum Rechtsklick-Menü für Ordner hinzufügen."
+set "areg1.ru=Это добавит элемент в контекстное меню для папок."
+
+set "areg2.en=When you select this option,"
+set "areg2.fr=Lorsque vous sélectionnez cette option,"
+set "areg2.es=Cuando seleccione esta opción,"
+set "areg2.it=Quando selezioni questa opzione,"
+set "areg2.de=Wenn Sie diese Option auswählen,"
+set "areg2.ru=Когда вы выберете эту опцию,"
+
+set "areg2a.en=the script "%SCRIPTDIR%%SCRIPTNAME%" will be executed."
+set "areg2a.fr=le script "%SCRIPTDIR%%SCRIPTNAME%" sera exécuté."
+set "areg2a.es=se ejecutará el script "%SCRIPTDIR%%SCRIPTNAME%"."
+set "areg2a.it=verrà eseguito lo script "%SCRIPTDIR%%SCRIPTNAME%"."
+set "areg2a.de=wird das Skript "%SCRIPTDIR%%SCRIPTNAME%" ausgeführt."
+set "areg2a.ru=будет выполнен скрипт "%SCRIPTDIR%%SCRIPTNAME%"."
+
+set "areg3.en=Adding the right-click menu entry to the registry... "
+set "areg3.fr=Ajout de l'entrée de menu contextuel au registre... "
+set "areg3.es=Adding the right-click menu entry to the registry... "
+set "areg3.it=Aggiunta della voce del menu contestuale al registro... "
+set "areg3.de=Hinzufügen des Rechtsklick-Menüeintrags zur Registrierung... "
+set "areg3.ru=Добавление элемента контекстного меню в реестр... "
+
+set "areg4.en=Run %SCRIPTNAME% Script"
+set "areg4.fr=Exécuter le script %SCRIPTNAME%"
+set "areg4.es=Ejecutar el script %SCRIPTNAME%"
+set "areg4.it=Esegui lo script %SCRIPTNAME%"
+set "areg4.de=Führen Sie das Skript %SCRIPTNAME% aus"
+set "areg4.ru=Запустить скрипт %SCRIPTNAME%"
+
+call :check_admin
+
+call :elog .
+echo %YEL%!areg1.%LNG%!%RES%
+echo %YEL%!areg2.%LNG%!%RES%
+echo %YEL%!areg2a.%LNG%!%RES%
+call :elog .
+echo !areg3.%LNG%! >> "%UNRENLOG%"
+<nul set /p="!areg3.%LNG%!"
+:: Add registry key
+reg add "HKCR\Directory\shell\Run%SCRIPTNAME%" /ve /d "!areg4.%LNG%!" /f %debugredir%
+reg add "HKCR\Directory\shell\Run%SCRIPTNAME%" /v "Icon" /d "%SystemRoot%\System32\shell32.dll,-154" /f %debugredir%
+reg add "HKCR\Directory\shell\Run%SCRIPTNAME%\command" /ve /d "cmd.exe /c cd /d \"%%V\" && \"%SCRIPTDIR%%SCRIPTNAME%\" \"%%V\"" /f %debugredir%
+if %errorlevel% EQU 0 (
+	echo %GRE%!PASS.%LNG%!%RES%
 ) else (
-	call :elog "[31m	! Error: Can't add entry to context menu [0m"
+	echo %RED%!FAIL.%LNG%!%RES%
+    call :elog .
+    echo !ARIGHT.%LNG%!
+    call :elog .
+    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    call :exitn 3
 )
 
-call :finish
-exit /b
+goto :eof
 
 
+:: Remove entry from registry
 :remove_reg
-call :elog "	Removing the right-click menu entry from the registry..."
-REM Explanation
-call :elog "	+ This will remove the previously added entry from the right-click menu for folders."
-REM Remove registry key
-echo reg delete "HKCR\Directory\shell\RunUnrenForAll" >>"%unrenlog%"
-reg delete "HKCR\Directory\shell\RunUnrenForAll" /f >>"%unrenlog%" 2>&1
-if %errorlevel% == 0 (
-	call :elog "[33m	The entry has been successfully removed from the context menu.[0m"
+set "rreg1.en=This will remove the previously added entry from the right-click menu for folders."
+set "rreg1.fr=Cela supprimera l'entrée précédemment ajoutée du menu contextuel pour les dossiers."
+set "rreg1.es=Esto eliminará la entrada previamente añadida del menú contextual para las carpetas."
+set "rreg1.it=Questo rimuoverà la voce precedentemente aggiunta dal menu contestuale per le cartelle."
+set "rreg1.de=Dies wird den zuvor hinzugefügten Eintrag aus dem Rechtsklick-Menü für Ordner entfernen."
+set "rreg1.ru=Это удалит ранее добавленный элемент из контекстного меню для папок."
+
+set "rreg2.en=Removing the right-click menu entry from the registry... "
+set "rreg2.fr=Suppression de l'entrée de menu contextuel du registre... "
+set "rreg2.es=Eliminando la entrada del menú contextual del registro... "
+set "rreg2.it=Rimozione della voce del menu contestuale dal registro... "
+set "rreg2.de=Entfernen des Rechtsklick-Menüeintrags aus der Registrierung... "
+set "rreg2.ru=Удаление элемента контекстного меню из реестра... "
+
+call :check_admin
+
+call :elog .
+echo %YEL%!rreg1.%LNG%!%RES%
+call :elog .
+echo !rreg2.%LNG%! >> "%UNRENLOG%"
+<nul set /p="!rreg2.%LNG%!"
+:: Remove registry key
+reg delete "HKCR\Directory\shell\RunUnrenForAll" /f %debugredir%
+reg delete "HKCR\Directory\shell\Run%SCRIPTNAME%" /f %debugredir%
+if %errorlevel% EQU 0 (
+	echo %GRE%!PASS.%LNG%!%RES%
 ) else (
-	call :elog "[31m	! Error: Can't remove entry from context menu.[0m"
+	echo %RED%!FAIL.%LNG%!.%RES%
+    call :elog .
+    echo !ARIGHT.%LNG%!
+    call :elog .
+    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    call :exitn 3
 )
 
-call :finish
+goto :eof
+
+
+:: Check for administrative privileges
+:check_admin
+set "admright.en=Check Admin right"
+set "admright.fr=Vérification des droits administrateur"
+set "admright.es=Comprobando derechos de administrador"
+set "admright.it=Controllo dei diritti di amministratore"
+set "admright.de=Überprüfung der Administratorrechte"
+set "admright.ru=Проверка прав администратора"
+
+set "admright2.en=You did not run this script with administrator privileges."
+set "admright2.fr=Vous n'avez pas lancé ce script avec des droits administrateur."
+set "admright2.es=No ha iniciado este script con derechos de administrador."
+set "admright2.it=Non hai avviato questo script con diritti di amministratore."
+set "admright2.de=Sie haben dieses Skript nicht mit Administratorrechten gestartet."
+set "admright2.ru=Вы не запустили этот скрипт с правами администратора."
+
+set "admright3.en=Restart the script with administrator rights."
+set "admright3.fr=Relance du script avec des droits administrateur."
+set "admright3.es=Reinicie el script con derechos de administrador."
+set "admright3.it=Riavvia lo script con diritti di amministratore."
+set "admright3.de=Starten Sie das Skript mit Administratorrechten neu."
+set "admright3.ru=Перезапустите скрипт с правами администратора."
+
+call :elog .
+call :elog .
+echo !admright.%LNG%!... >> "%UNRENLOG%"
+<nul set /p="!admright.%LNG%!... "
+
+net session %debugredir%
+if %errorlevel% EQU 0 (
+    echo %GRE%!PASS.%LNG%!%RES%
+) else (
+	echo %RED%!FAIL.%LNG%!.%RES%
+    call :elog .
+    echo !admright2.%LNG%!
+    echo !admright3.%LNG%!
+    call :elog .
+    pause
+    powershell -Command "Start-Process '%~f0' -ArgumentList '%WORKDIR%' -Verb RunAs"
+    goto exitn
+)
+
+goto :eof
+
+
+:: Replace batch file if updated an set relauch if needed
+:update_file
+set "updating.en=Updating batch file: "
+set "updating.fr=Mise à jour du fichier batch : "
+set "updating.es=Actualizando archivo por lotes: "
+set "updating.it=Aggiornamento del file batch: "
+set "updating.de=Aktualisierung der Batch-Datei: "
+set "updating.ru=Обновление пакетного файла: "
+
+set "rupdating.en=Updating the running batch file: "
+set "rupdating.fr=Mise à jour du fichier batch en cours : "
+set "rupdating.es=Actualizando el archivo por lotes en ejecución: "
+set "rupdating.it=Aggiornamento del file batch in esecuzione: "
+set "rupdating.de=Aktualisierung der laufenden Batch-Datei: "
+set "rupdating.ru=Обновление запущенного пакетного файла: "
+
+set "batch_name=%~1"
+set "running_batch=%~nx0"
+
+:: If no difference do nothing
+fc.exe "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%.bat" %debugredir%
+if %errorlevel% EQU 0 (
+    goto :eof
+)
+
+:: Check if the new batch file is different from the running one
+if "%batch_name%.bat" == "%running_batch%" goto special_upd
+
+echo !updating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%
+move /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old" %debugredir%
+if %errorlevel% NEQ 0 (
+    echo %RED%!FAIL.%LNG%! %RES%
+    call :elog .
+    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    call :exitn 2
+)
+copy /y "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%.bat" %debugredir%
+if %errorlevel% NEQ 0 (
+    echo %RED%!FAIL.%LNG%! %RES%
+    call :elog .
+    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    call :exitn 2
+) else (
+    echo %GRE%!PASS.%LNG%!%RES%
+)
+
+goto :eof
+
+:special_upd
+echo !rupdating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%
+copy /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old" %debugredir%
+if %errorlevel% NEQ 0 (
+    echo %RED%!FAIL.%LNG%! %RES%
+    call :elog .
+    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    call :exitn 2
+)
+copy /y "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%-new.bat" %debugredir%
+if %errorlevel% NEQ 0 (
+    echo %RED%!FAIL.%LNG%! %RES%
+    call :elog .
+    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    call :exitn 2
+) else (
+    echo %GRE%!PASS.%LNG%!%RES%
+)
+set "relaunch=1"
+
+goto :eof
+
+
+:: When it's not unavailable, show message and exit
+:unavailable
+if "%RENPYVERSION%" == "7" (
+    set "unavailable.en=This feature is unavailable in this version."
+    set "unavailable.fr=Cette fonctionnalité n'est pas disponible dans cette version."
+    set "unavailable.es=Esta función no está disponible en esta versión."
+    set "unavailable.it=Questa funzione non è disponibile in questa versione."
+    set "unavailable.de=Diese Funktion ist in dieser Version nicht verfügbar."
+    set "unavailable.ru=Эта функция недоступна в этой версии."
+)
+if "%RENPYVERSION%" == "8" (
+    set "unavailable.en=This feature is unavailable for now, need more coding."
+    set "unavailable.fr=Cette fonctionnalité n'est pas disponible pour le moment, nécessite plus de codage."
+    set "unavailable.es=Esta función no está disponible por ahora, necesita más codificación."
+    set "unavailable.it=Questa funzione non è disponibile per ora, necessita di più codice."
+    set "unavailable.de=Diese Funktion ist derzeit nicht verfügbar, es wird mehr Programmierung benötigt."
+    set "unavailable.ru=Эта функция недоступна, требуется больше кода."
+)
+
+call :elog .
+call :elog .
+echo !unavailable.%LNG%! >> "%UNRENLOG%"
+<nul set /p="%YEL%!unavailable.%LNG%!%RES%"
+
+timeout /t 2 >nul
+
+goto :menu
+
 exit /b
 
 
-:finish
-:: We are done, restore original settings or go back to menu
-echo  ----------------------------------------------------
-call :elog .
-call :elog "[32m	Finished![0m"
-call :elog .
-echo 	Enter "1" to go back to the menu,
-set /p "exitoption=.	 or any other key to exit: "
-call :elog .
-echo  ----------------------------------------------------
-call :elog .
-if "%exitoption%"=="1" goto menu
+:: Verify if an update is necessary
+:check_update
+:: This URL should point to a text file containing the latest version link
+set "upd_url=https://drive.google.com/uc?export=download&id=1KOuFsiOPNAcicCBSCk1EEn4g5MkZXelw"
+set "upd_link=UnRen-link"
+set "upd_file=UnRen-new"
+set "upd_clog=UnRen-Changelog"
+set "new_upd=0"
+set "relaunch=0"
 
-:: Restore screen size
-mode con: cols=%orig_cols% lines=%orig_lines%
-:: Restore original codepage
-chcp %OLD_CP% >nul
+set "cupd1.en=Checking for updates"
+set "cupd1.fr=Vérification des mises à jour"
+set "cupd1.es=Comprobando si hay actualizaciones"
+set "cupd1.it=Controllo degli aggiornamenti"
+set "cupd1.de=Überprüfung auf Updates"
+set "cupd1.ru=Проверка обновлений"
 
-exit 0
+set "cupd2.en=No updates found."
+set "cupd2.fr=Aucune mise à jour trouvée."
+set "cupd2.es=No se encontraron actualizaciones."
+set "cupd2.it=Nessun aggiornamento trovato."
+set "cupd2.de=Keine Updates gefunden."
+set "cupd2.ru=Обновлений не найдено."
+
+set "cupd3.en=An update is available."
+set "cupd3.fr=Une mise à jour est disponible."
+set "cupd3.es=Una actualización está disponible."
+set "cupd3.it=Un aggiornamento è disponibile."
+set "cupd3.de=Ein Update ist verfügbar."
+set "cupd3.ru=Доступно обновление."
+
+set "cupd4.en=Downloading the latest version from:"
+set "cupd4.fr=Téléchargement de la dernière version depuis :"
+set "cupd4.es=Descargando la última versión desde:"
+set "cupd4.it=Download dell'ultima versione da:"
+set "cupd4.de=Herunterladen der neuesten Version von:"
+set "cupd4.ru=Загрузка последней версии с:"
+
+set "cupd5.en=Update complete."
+set "cupd5.fr=Mise à jour terminée."
+set "cupd5.es=Actualización completa."
+set "cupd5.it=Aggiornamento completato."
+set "cupd5.de=Update abgeschlossen."
+set "cupd5.ru=Обновление завершено."
+
+set "cupd6.en=Error downloading update."
+set "cupd6.fr=Erreur lors du téléchargement de la mise à jour."
+set "cupd6.es=Error al descargar la actualización."
+set "cupd6.it=Errore durante il download dell'aggiornamento."
+set "cupd6.de=Fehler beim Herunterladen des Updates."
+set "cupd6.ru=Ошибка при загрузке обновления."
+
+set "cupd7.en=Do you want to update now? [y/n] (default: y):"
+set "cupd7.fr=Voulez-vous faire la mise à jour maintenant ? [o/n] (défaut : o) :"
+set "cupd7.es=¿Desea actualizar ahora? [s/n] (predeterminado: s):"
+set "cupd7.it=Vuoi aggiornare adesso? [s/n] (impostazione predefinita: s):"
+set "cupd7.de=Möchten Sie jetzt aktualisieren? [y/n] (Standard: y):"
+set "cupd7.ru=Хотите обновиться сейчас? [y/n] (по умолчанию: y):"
+
+set "cupd8.en=No download update link found."
+set "cupd8.fr=Aucun lien de téléchargement de mise à jour trouvé."
+set "cupd8.es=No se encontró el enlace de descarga de la actualización."
+set "cupd8.it=Non è stato trovato il link per il download dell'aggiornamento."
+set "cupd8.de=Kein Download-Update-Link gefunden."
+set "cupd8.ru=Ссылка для загрузки обновления не найдена."
+
+echo !cupd1.%LNG%!... >> "%UNRENLOG%"
+<nul set /p="!cupd1.%LNG%!..."
+del /f /q "%TEMP%\%upd_link%.tmp" %debugredir%
+if %debuglevel% EQU 1 echo powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%upd_url%', '%TEMP%\%upd_link%.tmp')"
+powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%upd_url%', '%TEMP%\%upd_link%.tmp')" %debugredir%
+if not exist "%TEMP%\%upd_link%.tmp" (
+    echo %RED% !FAIL.%LNG%! %YEL%!cupd6.%LNG%!%RES%
+    exit /b
+) else (
+    :: First time
+    if not exist "%SCRIPTDIR%%upd_link%.txt" (
+        copy nul "%SCRIPTDIR%%upd_link%.txt" %debugredir%
+    )
+    fc.exe "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" %debugredir%
+    if !errorlevel! geq 1 (
+        echo %YEL% !cupd3.%LNG%!%RES%
+
+        :: Rename and launch %upd_link%.bat to generate UnRen-Changelog.txt
+        copy /y "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.bat" %debugredir%
+        set "forall_url="
+        call "%SCRIPTDIR%%upd_link%.bat" %debugredir%
+        del /f /q "%SCRIPTDIR%%upd_link%.bat" %debugredir%
+        if not defined forall_url (
+            echo %RED% !FAIL.%LNG%! %YEL%!cupd8.%LNG%!%RES%
+            call :elog .
+            pause
+            goto :eof
+        )
+        move /y "%SCRIPTDIR%%upd_clog%.txt" "%SCRIPTDIR%%upd_clog%.b64" %debugredir%
+        if %debuglevel% EQU 1 echo powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllBytes('%SCRIPTDIR%%upd_clog%.tmp', [Convert]::FromBase64String((Get-Content '%SCRIPTDIR%%upd_clog%.b64' -Raw)))"
+        powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllBytes('%SCRIPTDIR%%upd_clog%.tmp', [Convert]::FromBase64String((Get-Content '%SCRIPTDIR%%upd_clog%.b64' -Raw)))" %debugredir%
+        call :elog .
+        type "%SCRIPTDIR%%upd_clog%.tmp"
+        call :elog .
+
+        set "coption="
+        set /p "coption=!cupd7.%LNG%! "
+        echo "!coption!" | find /i "n" >nul
+        if !errorlevel! EQU 0 goto :eof
+        set "new_upd=1"
+        del /f /q "%SCRIPTDIR%%upd_clog%.b64" %debugredir%
+        del /f /q "%SCRIPTDIR%%upd_clog%.tmp" %debugredir%
+    ) else (
+        echo %YEL% !cupd2.%LNG%!%RES%
+        goto :eof
+    )
+)
+
+echo %YEL%!INCASEOF.%LNG%! %RES%
+echo %MAG%%URL_REF%%RES%
+if %new_upd% EQU 1 (
+    call :elog .
+    echo !cupd4.%LNG%! %YEL%%forall_url%%RES%... >> "%UNRENLOG%"
+    <nul set /p="!cupd4.%LNG%! %YEL%%forall_url%%RES%... "
+    if %debuglevel% EQU 1 echo powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('!forall_url!','%TEMP%\%upd_file%.tmp')"
+    powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('!forall_url!','%TEMP%\%upd_file%.tmp')" %debugredir%
+    if not exist "%TEMP%\%upd_file%.tmp" (
+        echo %RED%!FAIL.%LNG%! %YEL%!cupd6.%LNG%!%RES%
+        call :elog .
+        pause
+        goto :eof
+    ) else (
+        echo %GRE%!PASS.%LNG%!%RES%
+        move /y "%TEMP%\%upd_file%.tmp" "%TEMP%\%upd_file%.zip" %debugredir%
+        if not exist "%TEMP%\%upd_file%.zip" (
+            echo %RED%!FAIL.%LNG%! %YEL%!cupd6.%LNG%!%RES%
+            call :elog .
+            pause
+            goto :eof
+        ) else (
+            if not exist "%UPD_TDIR%" rd /s /q "%UPD_TDIR%" %debugredir%
+            mkdir "%UPD_TDIR%" %debugredir%
+            if %debuglevel% EQU 1 echo powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Path '%TEMP%\%upd_file%.zip' -DestinationPath '%UPD_TDIR%' -Force"
+            powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Path '%TEMP%\%upd_file%.zip' -DestinationPath '%UPD_TDIR%' -Force" %debugredir%
+            if %errorlevel% NEQ 0 (
+                echo %RED%!FAIL.%LNG%! %YEL%!cupd6.%LNG%!%RES%
+                call :elog .
+                pause
+                goto :eof
+            ) else (
+                del /f /q "%TEMP%\%upd_file%.zip" %debugredir%
+            )
+            for %%f in (forall legacy current) do (
+                call :update_file "UnRen-%%~f"
+            )
+            copy /y "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" %debugredir%
+            rd /s /q "%UPD_TDIR%" %debugredir%
+            if !relaunch! EQU 1 (
+                echo .
+                pause
+                call "%SCRIPTDIR%%BASENAME%-new.bat" "%WORKDIR%"
+                goto exitn
+            )
+            call :elog .
+            echo %YEL%!cupd5.%LNG%!%RES%
+            call :elog .
+        )
+    )
+)
+
+goto :eof
 
 
-:DisplayVars
+:: Check if all files were downloaded successfully
+:check_all_files
+set "cfile.en=Verification that all files are present"
+set "cfile.fr=Vérification que tous les fichiers sont présents"
+set "cfile.es=Verificación de que todos los archivos están presentes"
+set "cfile.it=Verifica che tutti i file siano presenti"
+set "cfile.de=Überprüfung, ob alle Dateien vorhanden sind"
+set "cfile.ru=Проверка наличия всех файлов"
+
+set "cdwnld.en=Download the missing file from:"
+set "cdwnld.fr=Télécharger le fichier manquant depuis :"
+set "cdwnld.es=Descargar el archivo faltante de:"
+set "cdwnld.it=Scarica il file mancante da:"
+set "cdwnld.de=Fehlende Datei herunterladen von:"
+set "cdwnld.ru=Скачать недостающий файл с:"
+
+echo !cfile.%LNG%!... >> "%UNRENLOG%"
+<nul set /p="!cfile.%LNG%!..."
+for %%F in (legacy current forall) do (
+    if not exist "%SCRIPTDIR%UnRen-%%~F.bat" (
+        echo %RED% !FAIL.%LNG%! %YEL%!MISSING.%LNG%! UnRen-%%~F %RES%
+        echo !cdwnld.%LNG%! %RES%
+        echo %MAG%%URL_REF% %RES%
+        call :elog .
+        pause>nul|set/p=.      !ANYKEY.%LNG%!
+        goto exitn
+    ) else (
+        <nul set /p="."
+    )
+)
+
+:: Cleaning after an update
+if exist "%SCRIPTDIR%%BASENAME%-new.bat" (
+    if "%SCRIPTNAME%" == "%BASENAME%-new.bat" (
+        copy /y "%SCRIPTDIR%%BASENAME%-new.bat" "%SCRIPTDIR%%BASENAME%.bat" %debugredir%
+    ) else (
+        del /f /q "%SCRIPTDIR%%BASENAME%-new.bat" %debugredir%
+    )
+)
+del /f /q "%SCRIPTDIR%%BASENAME%.old" %debugredir%
+
+echo %GRE% !PASS.%LNG%!%RES%
+
+exit /b
+
+
 :: For debugging help
-echo. >>"%unrenlog%"
-echo %~1 >>"%unrenlog%"
-echo scriptdir		 = %scriptdir% >>"%unrenlog%"
-echo workdir		 = %workdir% >>"%unrenlog%"
-echo pythondir		 = %pythondir% >>"%unrenlog%"
-echo pynoassert		 = [%pynoassert%] >>"%unrenlog%"
-echo renpydir		 = %renpydir% >>"%unrenlog%"
-echo gamedir 		 = %gamedir% >>"%unrenlog%"
-echo PYTHONHOME		 = %PYTHONHOME% >>"%unrenlog%"
-echo PYTHONPATH		 = %PYTHONPATH% >>"%unrenlog%"
-echo PYTHONVERS		 = %PYTHONVERS% >>"%unrenlog%"
-echo rpatool-new 	 = %rpatool-new% >>"%unrenlog%"
-echo major_version 	 = [%major_version%] >>"%unrenlog%"
-echo offset			 = [%offset%] >>"%unrenlog%"
-echo. >>"%unrenlog%"
+:DisplayVars
+set "emsg=%~1"
+echo. >> "%UNRENLOG%"
+echo "%emsg%" >> "%UNRENLOG%"
+echo SCRIPTDIR		 = %SCRIPTDIR% >> "%UNRENLOG%"
+echo WORKDIR 		 = %WORKDIR% >> "%UNRENLOG%"
+echo pythondir		 = %pythondir% >> "%UNRENLOG%"
+echo PYNOASSERT		 = [%PYNOASSERT%] >> "%UNRENLOG%"
+echo RENPYDIR		 = %RENPYDIR% >> "%UNRENLOG%"
+echo GAMEDIR 		 = %GAMEDIR% >> "%UNRENLOG%"
+echo PYTHONHOME		 = %PYTHONHOME% >> "%UNRENLOG%"
+echo PYTHONPATH		 = %PYTHONPATH% >> "%UNRENLOG%"
+echo PYTHONVERS		 = %PYTHONVERS% >> "%UNRENLOG%"
+echo RPATOOL-NEW 	 = %RPATOOL-NEW% >> "%UNRENLOG%"
+echo RENPYVERSION 	 = [%RENPYVERSION%] >> "%UNRENLOG%"
+echo offset			 = [%offset%] >> "%UNRENLOG%"
+echo. >> "%UNRENLOG%"
 
 exit /b
 
 
+:: Define a function to log messages
 :elog
-REM --------------------------------------------------------------------------------
-REM Display msg (%~1) to console and "%unrenlog%"
-REM --------------------------------------------------------------------------------
+:: Display msg (%~1) to console and "%UNRENLOG%"
 set "msg=%~1"
 if "%msg%" == "." (
     echo.
-    if defined unrenlog (
-       echo. >> "%unrenlog%"
+    if defined UNRENLOG (
+       echo. >> "%UNRENLOG%"
     )
 ) else (
     echo %msg%
-    if defined unrenlog (
-        echo %msg% >> "%unrenlog%"
+
+    if defined UNRENLOG (
+        :: Strip color variables for logging
+        set "cleanmsg=!msg!"
+        for %%C in (GRY RED GRE YEL MAG CYA RES) do (
+            call set "cleanmsg=%%cleanmsg:!%%C!=%%"
+        )
+        echo !cleanmsg! >> "%UNRENLOG%"
     )
 )
 
 exit /b
+
+
+:: Call :exitn for cleanup only or goto exitn for ending script
+:exitn
+set "val=%~1"
+
+if %debuglevel% geq 1 (
+    echo === Variables ===
+    set
+    echo === Variables ===
+)
+
+:: Restore modified configuration and we exit with the appropriate code
+chcp %OLD_CP% >nul
+
+:: Restore original console mode
+if %debuglevel% EQU 0 (
+    mode con: cols=%ORIG_COLS% lines=%ORIG_LINES%
+    reg delete "HKCU\Console\MyScript" /f %debugredir%
+    reg delete "HKCU\Console\UnRen-forall.bat" /f %debugredir%
+)
+
+if defined val exit %val%
+
+exit /b 0
