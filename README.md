@@ -77,7 +77,7 @@ This project is designed to be lightweight, user-friendly, and respectful of you
 
 ## ❓ FAQ
 
-See [FAQ.md](FAQ.md) for answers to common questions.
+See [FAQ](FAQ) for answers to common questions.
 
 ---
 
@@ -101,6 +101,7 @@ This project is licensed under the GNU General Public License v3.0.
 You are free to use, modify, and distribute it under the same terms.
 Commercial use is not permitted unless the source remains open and licensed under GPL.
 See the [LICENSE](LICENSE) file for full details.
+
 
 
 
