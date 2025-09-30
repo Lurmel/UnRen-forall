@@ -38,7 +38,7 @@ What started as a simple launcher evolved into a multilingual toolkit with custo
 
 ## 📥 Download
 
-[⬇️ Download latest release](https://github.com/Lurmel/UnRen-forall/releases/download/UnRen-forall-la_0.35-le_9.6.47-cu_9.7.17/UnRen-forall-la_0.35-le_9.6.47-cu_9.7.17.zip)
+[⬇️ Download latest release](https://github.com/Lurmel/UnRen-forall/releases/download/UnRen-forall-la_0.35-le_9.6.47-cu_9.7.14/UnRen-forall-la_0.35-le_9.6.47-cu_9.7.14.zip)
 ---
 
 ## 🚀 Features
@@ -100,6 +100,7 @@ This project is licensed under the GNU General Public License v3.0.
 You are free to use, modify, and distribute it under the same terms.
 Commercial use is not permitted unless the source remains open and licensed under GPL.
 See the [LICENSE](LICENSE) file for full details.
+
 
 
 
