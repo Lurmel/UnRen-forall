@@ -9,6 +9,7 @@
 
 ## 📑 Table of Contents
 
+- [📥 Download](#-download)
 - [🔧 Features](#-features)
 - [📦 Included Files](#-included-files)
 - [🛠️ How to Use](#how-to-use)
@@ -33,6 +34,11 @@ What started as a simple launcher evolved into a multilingual toolkit with custo
 - `UnRen-cfg.zip` — Contains `UnRen-cfg.bat` to configure language and batch behavior
 - `UnRen-link.txt` — Contains the download link for the full package and a changelog for updates
 
+---
+
+## 📥 Download
+
+[⬇️ Download latest release](https://github.com/Lurmel/UnRen-forall/releases/download/UnRen-forall-la_0.34-le_9.6.47-cu_9.7.17/UnRen-forall-la_0.34-le_9.6.47-cu_9.7.17.zip)
 ---
 
 ## 🚀 Features
@@ -94,6 +100,7 @@ This project is licensed under the GNU General Public License v3.0.
 You are free to use, modify, and distribute it under the same terms.
 Commercial use is not permitted unless the source remains open and licensed under GPL.
 See the [LICENSE](LICENSE) file for full details.
+
 
 
 
