@@ -9,6 +9,7 @@ All dates are in the format MM/DD/YY.
   - More robust mcname change
   - URLlink for UnRen-link.txt moved to Google Drive
   - No more colors for Windows 7
+  - The Add entry to registry will now add the script currently running. So i you have only Ren'Py game version >= 8 just add it and you will skip the laucher.
 
 Specific for UnRen-current.bat:
   - Added multi-lingual support
@@ -143,5 +144,6 @@ Specific for UnRen-current.bat:
 ---
 
 If you encounter any issues, please refer to the `UnRen-forall.log` file and let me know. I’ll make corrections as needed.
+
 
 
