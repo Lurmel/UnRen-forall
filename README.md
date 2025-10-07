@@ -9,20 +9,36 @@
 
 ## 📑 Table of Contents
 
+- [🔧 Third-Party Tools Used](#-third-party-tools-used)
+- [📦 Included Files](#-included-files)
 - [📥 Download](#-download)
 - [🔧 Features](#-features)
-- [📦 Included Files](#-included-files)
 - [🛠️ How to Use](#how-to-use)
 - [❓ FAQ](#-faq)
 - [📜 Changelog](#-changelog)
 - [⚠️ Disclaimer](#disclaimer)
 - [⚖️ License](#license)
 
+---
+
 # 🎮 UnRen Toolkit — Multilingual Batch for Ren'Py Games
 
 I've made these scripts with ❤️ to simplify the management of your favorite Ren'Py games.
 
 What started as a simple launcher evolved into a multilingual toolkit with customizable options, version-aware execution, and update support. I hope it makes your experience smoother and more enjoyable.
+
+---
+
+<a name="third-party-tools-used"></a>
+## 🔧 Third-Party Tools Used
+
+UnRen relies on several external tools developed by the Ren'Py community to handle archive extraction and script decompilation. Full credit goes to their respective authors:
+
+- [rpatool](https://github.com/Shizmob/rpatool) – A command-line utility for extracting `.rpa` archives.
+- [unrpa](https://github.com/CensoredUsername/unrpa) – A Python-based extractor for Ren'Py `.rpa` files.
+- [unrpyc](https://github.com/CensoredUsername/unrpyc) – A decompiler for Ren'Py `.rpyc` compiled scripts.
+
+These tools are essential for UnRen's functionality and are used respectfully under their respective licenses.
 
 ---
 
@@ -101,16 +117,4 @@ This project is licensed under the GNU General Public License v3.0.
 You are free to use, modify, and distribute it under the same terms.
 Commercial use is not permitted unless the source remains open and licensed under GPL.
 See the [LICENSE](LICENSE) file for full details.
-
-
-
-
-
-
-
-
-
-
-
-
 
