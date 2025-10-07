@@ -12,7 +12,7 @@
 - [🔧 Third-Party Tools Used](#-third-party-tools-used)
 - [📦 Included Files](#-included-files)
 - [📥 Download](#-download)
-- [🔧 Features](#-features)
+- [🚀 Features](#-features)
 - [🛠️ How to Use](#how-to-use)
 - [❓ FAQ](#-faq)
 - [📜 Changelog](#-changelog)
@@ -117,4 +117,5 @@ This project is licensed under the GNU General Public License v3.0.
 You are free to use, modify, and distribute it under the same terms.
 Commercial use is not permitted unless the source remains open and licensed under GPL.
 See the [LICENSE](LICENSE) file for full details.
+
 
