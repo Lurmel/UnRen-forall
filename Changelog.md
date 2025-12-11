@@ -4,6 +4,33 @@ All dates are in the format MM/DD/YY.
 
 ---
 
+## 🟢 12/11/25: My biggest update since the beginning !
+	UnRen-forall.bat 0.38, UnRen-current.bat 9.7.23 & UnRen-legacy.bat 9.7.4
+
+	Common modifications for all scripts:
+	- Minor bug fixes, like Developer mode and the installation of TextBox mod...
+	- Code optimization and convergence of the three scripts for common parts.
+	- Added new code for changing MC name when you can't change it in the game.
+	  (works with MidnightParadise-1.1b-pc-elite and several other tested games)
+	- New code for extracting text, it now provide your language by default instead of French
+	- Added full support for spaces and () in the directory tree (very difficult)
+
+	UnRen-legacy.bat 9.7.4:
+	- Is now based from the same code as UnRen-current.bat (provisional situation before final version)
+
+	Common modifications for UnRen-current.bat & UnRen-legacy.bat:
+	- Script authors are now notified internally
+	- New code for decrypting base64 for all Python scripts
+	- Moving RPYC decompilation messages out of the loop to improve speed
+	- Use the download link on F95zone for 0x52_urm to avoid interception by antivirus software
+	  on the original dynamic download.
+	- Add 3 new Python scripts for the extract RPA fonction
+	- The 1st to detect the extension name more quickly
+	- The 2nd to determine whether the header is modified by the developer
+	- the 3rd to extract modified RPA files (tested with Jason & Lab Rats)
+
+---
+
 ## 🟢 09/30/25 — UnRen-forall.bat (launcher) version 0.35 and UnRen-current.bat version 9.7.15:
   - minor bugs fixes and optimizations
   - More robust mcname change
@@ -144,6 +171,7 @@ Specific for UnRen-current.bat:
 ---
 
 If you encounter any issues, please refer to the `UnRen-forall.log` file and let me know. I’ll make corrections as needed.
+
 
 
 
