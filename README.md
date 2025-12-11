@@ -1,8 +1,8 @@
 ### 🔖 Versions
 
-![UnRen-forall](https://img.shields.io/badge/UnRen--forall-0.35-blue)
-![UnRen-legacy](https://img.shields.io/badge/UnRen--legacy-9.6.43-green)
-![UnRen-current](https://img.shields.io/badge/UnRen--current-9.7.14-purple)
+![UnRen-forall](https://img.shields.io/badge/UnRen--forall-0.38-blue)
+![UnRen-legacy](https://img.shields.io/badge/UnRen--legacy-9.7.4-green)
+![UnRen-current](https://img.shields.io/badge/UnRen--current-9.7.23-purple)
 ![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
 ![Downloads](https://img.shields.io/github/downloads/Lurmel/UnRen-forall/total)
 
@@ -44,9 +44,9 @@ These tools are essential for UnRen's functionality and are used respectfully un
 
 ## 📦 Included Files
 
-- `UnRen-forall.bat` — Multilingual launcher (Version 0.35)
-- `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.6.43)
-- `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.14)
+- `UnRen-forall.bat` — Multilingual launcher (Version 0.38)
+- `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.7.4)
+- `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.23)
 - `UnRen-cfg.zip` — Contains `UnRen-cfg.bat` to configure language and batch behavior
 - `UnRen-link.txt` — Contains the download link for the full package and a changelog for updates
 
@@ -54,7 +54,7 @@ These tools are essential for UnRen's functionality and are used respectfully un
 
 ## 📥 Download
 
-[⬇️ Download latest release](https://github.com/Lurmel/UnRen-forall/releases/download/UnRen-forall-la_0.35-le_9.6.47-cu_9.7.17/UnRen-forall-la_0.35-le_9.6.47-cu_9.7.14.zip)
+[⬇️ Download latest release]((https://github.com/Lurmel/UnRen-forall/releases/download/UnRen-forall-la_0.38-le_9.7.4-cu_9.7.23/UnRen-forall-la_0.38-le_9.7.4-cu_9.7.23.zip)])
 
 ---
 
@@ -117,5 +117,6 @@ This project is licensed under the GNU General Public License v3.0.
 You are free to use, modify, and distribute it under the same terms.
 Commercial use is not permitted unless the source remains open and licensed under GPL.
 See the [LICENSE](LICENSE) file for full details.
+
 
 
