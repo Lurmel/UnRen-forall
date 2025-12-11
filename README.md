@@ -54,7 +54,7 @@ These tools are essential for UnRen's functionality and are used respectfully un
 
 ## 📥 Download
 
-[⬇️ Download latest release]((https://github.com/Lurmel/UnRen-forall/releases/download/UnRen-forall-la_0.38-le_9.7.4-cu_9.7.23/UnRen-forall-la_0.38-le_9.7.4-cu_9.7.23.zip)])
+[⬇️ Download latest release](https://github.com/Lurmel/UnRen-forall/releases/download/UnRen-forall-la_0.38-le_9.7.4-cu_9.7.23/UnRen-forall-la_0.38-le_9.7.4-cu_9.7.23.zip)
 
 ---
 
@@ -117,6 +117,7 @@ This project is licensed under the GNU General Public License v3.0.
 You are free to use, modify, and distribute it under the same terms.
 Commercial use is not permitted unless the source remains open and licensed under GPL.
 See the [LICENSE](LICENSE) file for full details.
+
 
 
 
