@@ -8,7 +8,7 @@ setlocal EnableDelayedExpansion
 :: DO NOT MODIFY BELOW THIS LINE unless you know what you're doing
 :: Define various global names
 set "NAME=forall"
-set "VERSION=(v0.35) (09/30/25)"
+set "VERSION=(v0.38) (12/01/25)"
 title UnRen-%NAME%.bat - %VERSION%
 set "URL_REF=https://f95zone.to/threads/unrengui-unren-forall-v9-4-unren-powershell-forall-v9-4-unren-old.92717/post-17110063/"
 set "SCRIPTDIR=%~dp0"
@@ -64,8 +64,8 @@ for /f "skip=1 tokens=1" %%l in ('wmic os get oslanguage') do (
 
 :found_lcid
 :: LCID correspondences
-if "!LNGID!" == "1036" set LNG=fr
 if "!LNGID!" == "1033" set LNG=en
+if "!LNGID!" == "1036" set LNG=fr
 if "!LNGID!" == "3082" set LNG=es
 if "!LNGID!" == "1040" set LNG=it
 if "!LNGID!" == "1031" set LNG=de
@@ -277,12 +277,12 @@ set "pshell.it=Verifica della disponibilità di PowerShell... "
 set "pshell.de=Überprüfung der Verfügbarkeit von PowerShell... "
 set "pshell.ru=Проверка доступности PowerShell... "
 
-set "pshell1.en=[Error] Powershell is required. !UNACONT.%LNG%!"
-set "pshell1.fr=[Erreur] Powershell est requis. !UNACONT.%LNG%!"
-set "pshell1.es=[Error] Se requiere Powershell. !UNACONT.%LNG%!"
-set "pshell1.it=[Errore] Powershell è richiesto. !UNACONT.%LNG%!"
-set "pshell1.de=[Fehler] Powershell ist erforderlich. !UNACONT.%LNG%!"
-set "pshell1.ru=[Ошибка] требуется PowerShell. !UNACONT.%LNG%!"
+set "pshell1.en=Powershell is required. !UNACONT.%LNG%!"
+set "pshell1.fr=Erreur Powershell est requis. !UNACONT.%LNG%!"
+set "pshell1.es=Error Se requiere Powershell. !UNACONT.%LNG%!"
+set "pshell1.it=Errore Powershell è richiesto. !UNACONT.%LNG%!"
+set "pshell1.de=Fehler Powershell ist erforderlich. !UNACONT.%LNG%!"
+set "pshell1.ru=Ошибка требуется PowerShell. !UNACONT.%LNG%!"
 
 set "pshell2.en=This is included in Windows 7, 8 and 10. XP/Vista users can"
 set "pshell2.fr=Ce programme est inclus dans Windows 7, 8 et 10. Les utilisateurs de XP/Vista peuvent"
@@ -299,17 +299,17 @@ set "pshell3.de=es hier herunterladen: %MAG%https://learn.microsoft.com/de-de/po
 set "pshell3.ru=скачать его здесь: %MAG%https://learn.microsoft.com/ru-ru/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
 <nul set /p=!pshell.%LNG%!
 if not exist "%SystemRoot%\system32\WindowsPowerShell\v1.0\powershell.exe" (
-    echo %RED%!FAIL.%LNG%!%RES%
-    echo.
-    echo        %RED%!pshell1.%LNG%!%RES%
-    echo        !pshell2.%LNG%!
-    echo        !pshell3.%LNG%!
-    echo.
+    call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog .
+    call :elog "    !pshell1.%LNG%!"
+    call :elog "    !pshell2.%LNG%!"
+    call :elog "    !pshell3.%LNG%!"
+    call :elog .
     pause>nul|set/p=.      !ANYKEY.%LNG%!
 
     goto exitn
 ) else (
-    echo %GRE%!PASS.%LNG%!%RES%
+    call :elog "%GRE%!PASS.%LNG%!%RES%"
 )
 
 :: Analysis of debug arguments
@@ -349,12 +349,13 @@ set "setpath3.es=Si arrastrar y soltar no funciona, copie/pegue la ruta en su lu
 set "setpath3.it=Se il trascinamento della selezione non funziona, copia/incolla il percorso invece: "
 set "setpath3.de=Wenn das Ziehen und Ablegen nicht funktioniert, kopieren Sie den Pfad bitte stattdessen hierher: "
 set "setpath3.ru=Если перетаскивание не работает, пожалуйста, скопируйте/вставьте путь вместо этого: "
+
 :: Check if game path is provided and set it
 if "%~1" == "" (
-    echo.
-    echo !setpath1.%LNG%!
-    echo !setpath2.%LNG%!
-    echo.
+    call :elog .
+    call :elog "!setpath1.%LNG%!"
+    call :elog "!setpath2.%LNG%!"
+    call :elog .
     set /p "WORKDIR=!setpath3.%LNG%!"
 ) else (
     set "WORKDIR=%~1"
@@ -375,12 +376,12 @@ call :check_update
 call :check_all_files
 
 
-set "wdir1.en=[Error] The specified directory does not exist."
-set "wdir1.fr=[Erreur] Le répertoire spécifié n'existe pas."
-set "wdir1.es=[Error] El directorio especificado no existe."
-set "wdir1.it=[Errore] la directory specificata non esiste."
-set "wdir1.de=[Fehler] Das angegebene Verzeichnis existiert nicht."
-set "wdir1.ru=[Ошибка] Указанный каталог не существует."
+set "wdir1.en=Error The specified directory does not exist."
+set "wdir1.fr=Erreur Le répertoire spécifié n'existe pas."
+set "wdir1.es=Error El directorio especificado no existe."
+set "wdir1.it=Errore la directory specificata non esiste."
+set "wdir1.de=Fehler Das angegebene Verzeichnis existiert nicht."
+set "wdir1.ru=Ошибка Указанный каталог не существует."
 
 set "wdir2.en=Are you sure we're in the game's root directory?"
 set "wdir2.fr=Êtes-vous sûr que nous sommes dans le répertoire racine du jeu ?"
@@ -402,13 +403,14 @@ set "wdir4.es=No puedes escribir en el directorio del juego."
 set "wdir4.it=Non puoi scrivere nella directory di gioco."
 set "wdir4.de=Sie können nicht im Spieledirectory schreiben."
 set "wdir4.ru=Вы не можете писать в каталоге игры."
+
 :: Remove surrounding quotes if any
 set "WORKDIR=%WORKDIR:"=%"
 if not exist "%WORKDIR%\" (
-    echo.
-    echo        %RED%!wdir1.%LNG%!%RES%
-    echo		!wdir2.%LNG%!
-    echo.
+    call :elog .
+    call :elog "    %RED%!wdir1.%LNG%!%RES%"
+    call :elog "    !wdir2.%LNG%!"
+    call :elog .
     pause>nul|set/p=.      !ANYKEY.%LNG%!
 
     goto exitn
@@ -422,12 +424,12 @@ set "reqdir1.it=Controllo dell'esistenza delle directory game, lib, renpy... "
 set "reqdir1.de=Überprüfung der Existenz der Verzeichnisse game, lib, renpy... "
 set "reqdir1.ru=Проверка наличия каталогов game, lib, renpy... "
 
-set "reqdir2.en=[Error] Cannot locate game, lib or renpy directories. !UNACONT.%LNG%!"
-set "reqdir2.fr=[Erreur] Impossible de localiser les répertoires game, lib ou renpy. !UNACONT.%LNG%!"
-set "reqdir2.es=[Error] No se pueden localizar los directorios game, lib o renpy. !UNACONT.%LNG%!"
-set "reqdir2.it=[Errore] Impossibile localizzare le directory game, lib o renpy. !UNACONT.%LNG%!"
-set "reqdir2.de=[Fehler] Unmöglich, die Verzeichnisse game, lib oder renpy zu finden. !UNACONT.%LNG%!"
-set "reqdir2.ru=[Ошибка] Не удалось найти каталоги game, lib или renpy. !UNACONT.%LNG%!"
+set "reqdir2.en=Cannot locate game, lib or renpy directories. !UNACONT.%LNG%!"
+set "reqdir2.fr=Erreur Impossible de localiser les répertoires game, lib ou renpy. !UNACONT.%LNG%!"
+set "reqdir2.es=Error No se pueden localizar los directorios game, lib o renpy. !UNACONT.%LNG%!"
+set "reqdir2.it=Errore Impossibile localizzare le directory game, lib o renpy. !UNACONT.%LNG%!"
+set "reqdir2.de=Fehler Unmöglich, die Verzeichnisse game, lib oder renpy zu finden. !UNACONT.%LNG%!"
+set "reqdir2.ru=Ошибка Не удалось найти каталоги game, lib или renpy. !UNACONT.%LNG%!"
 
 :: Check that you are in the root directory of the game.
 cd /d "%WORKDIR%"
@@ -447,32 +449,31 @@ if not exist "renpy\" (
 	set "RENPYDIR=%WORKDIR%\renpy\"
 )
 if %missing% EQU 1 (
-    echo %RED%!FAIL.%LNG%!%RES%
-    echo.
-    echo        !reqdir2.%LNG%!
-    echo        !wdir2.%LNG%!
-    echo.
+    call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog "    !reqdir2.%LNG%!"
+    call :elog "    !wdir2.%LNG%!"
+    call :elog .
     pause>nul|set/p=.      !ANYKEY.%LNG%!
 
     goto exitn
 ) else (
-    echo %GRE%!PASS.%LNG%!%RES%
+    call :elog "%GRE%!PASS.%LNG%!%RES%"
 )
 
 :: Check if %WORKDIR%\game is writable
 <nul set /p="!wdir3.%LNG%!... "
 copy nul "%WORKDIR%\game\test.txt" %debugredir%
 if %errorlevel% NEQ 0 (
-    echo %RED%!FAIL.%LNG%! !wdir4.%LNG%!%RES%
-    echo.
-    echo        !wdir2.%LNG%!
-    echo.
+    call :elog "%RED%!FAIL.%LNG%! !wdir4.%LNG%!%RES%"
+    call :elog .
+    call :elog "    !wdir2.%LNG%!"
+    call :elog .
     pause>nul|set/p=.      !ANYKEY.%LNG%!
 
     goto exitn
 ) else (
     del /f /q "%WORKDIR%\game\test.txt"
-    echo %GRE%!PASS.%LNG%!%RES%
+    call :elog "%GRE%!PASS.%LNG%!%RES%"
 )
 
 
@@ -484,12 +485,12 @@ set "python1.it=Controllo della disponibilità di Python..."
 set "python1.de=Überprüfung der Verfügbarkeit von Python..."
 set "python1.ru=Проверка наличия Python..."
 
-set "python2.en=[Error] Cannot locate python directory. !UNACONT.%LNG%!"
-set "python2.fr=[Erreur] Impossible de localiser le répertoire python. !UNACONT.%LNG%!"
-set "python2.es=[Error] No se puede localizar el directorio de Python. !UNACONT.%LNG%!"
-set "python2.it=[Errore] Impossibile localizzare la directory di Python. !UNACONT.%LNG%!"
-set "python2.de=[Fehler] Python-Verzeichnis kann nicht gefunden werden. !UNACONT.%LNG%!"
-set "python2.ru=[Ошибка] Не удалось найти каталог Python. !UNACONT.%LNG%!"
+set "python2.en=Cannot locate python directory. !UNACONT.%LNG%!"
+set "python2.fr=Impossible de localiser le répertoire python. !UNACONT.%LNG%!"
+set "python2.es=No se puede localizar el directorio de Python. !UNACONT.%LNG%!"
+set "python2.it=Impossibile localizzare la directory di Python. !UNACONT.%LNG%!"
+set "python2.de=Python-Verzeichnis kann nicht gefunden werden. !UNACONT.%LNG%!"
+set "python2.ru=Не удалось найти каталог Python. !UNACONT.%LNG%!"
 
 <nul set /p=!python1.%LNG%!
 
@@ -544,14 +545,14 @@ set "latest="
 set "latestver="
 
 :: Priority to Python 2.7 if present
-if exist "%WORKDIR%\lib\pythonlib2.7" (
+if exist "!WORKDIR!\lib\pythonlib2.7" (
     <nul set /p=.
-    set "PYTHONPATH=%WORKDIR%\lib\pythonlib2.7"
+    set "PYTHONPATH=!WORKDIR!\lib\pythonlib2.7"
     set "PYVERS=2.7"
     goto pyend
-) else if exist "%WORKDIR%\lib\python2.7" (
+) else if exist "!WORKDIR!\lib\python2.7" (
     <nul set /p=.
-    set "PYTHONPATH=%WORKDIR%\lib\python2.7"
+    set "PYTHONPATH=!WORKDIR\lib\python2.7"
     set "PYVERS=2.7"
     goto pyend
 )
@@ -590,18 +591,17 @@ if defined latest (
 )
 
 :pyend
-
 if not exist "%pythondir%\python.exe" (
-    echo %RED% !FAIL.%LNG%!%RES%
-    echo.
-    echo        %RED%!python2.%LNG%!%RES%
-    echo        !wdir2.%LNG%!
-    echo.
+    call :elog " %RED% !FAIL.%LNG%!%RES%"
+    call :elog .
+    call :elog "    %RED%!python2.%LNG%!%RES%"
+    call :elog "    !wdir2.%LNG%!"
+    call :elog .
     pause>nul|set/p=.      !ANYKEY.%LNG%!
 
     goto exitn
 ) else (
-    echo %YEL% Python %PYVERS% %GRE%!PASS.%LNG%!%RES%
+    call :elog " %GRE%!PASS.%LNG%!%YEL% Python %PYVERS%%RES%"
 )
 
 :: Check for Ren'Py version
@@ -612,26 +612,26 @@ set "renpyvers1.it=Versione Ren'Py rilevata: "
 set "renpyvers1.de=Ren'Py-Version gefunden: "
 set "renpyvers1.ru=Найдена версия Ren'Py: "
 
-set "renpyvers2.en=[Error] Failed to create detect_renpy_version.py. !UNACONT.%LNG%!"
-set "renpyvers2.fr=[Erreur] Impossible de créer detect_renpy_version.py. !UNACONT.%LNG%!"
-set "renpyvers2.es=[Error] No se pudo crear detect_renpy_version.py. !UNACONT.%LNG%!"
-set "renpyvers2.it=[Errore] Impossibile creare detect_renpy_version.py. !UNACONT.%LNG%!"
-set "renpyvers2.de=[Fehler] Die Erstellung von detect_renpy_version.py ist fehlgeschlagen. !UNACONT.%LNG%!"
-set "renpyvers2.ru=[Ошибка] Не удалось создать detect_renpy_version.py. !UNACONT.%LNG%!"
+set "renpyvers2.en=Failed to create detect_renpy_version.py. !UNACONT.%LNG%!"
+set "renpyvers2.fr=Erreur Impossible de créer detect_renpy_version.py. !UNACONT.%LNG%!"
+set "renpyvers2.es=Error No se pudo crear detect_renpy_version.py. !UNACONT.%LNG%!"
+set "renpyvers2.it=Errore Impossibile creare detect_renpy_version.py. !UNACONT.%LNG%!"
+set "renpyvers2.de=Fehler Die Erstellung von detect_renpy_version.py ist fehlgeschlagen. !UNACONT.%LNG%!"
+set "renpyvers2.ru=Ошибка Не удалось создать detect_renpy_version.py. !UNACONT.%LNG%!"
 
-set "renpyvers3.en=[Error] Unable to detect Ren'Py version,"
-set "renpyvers3.fr=[Erreur] Impossible de détecter la version de Ren'Py,"
-set "renpyvers3.es=[Error] No se puede detectar la versión de Ren'Py,"
-set "renpyvers3.it=[Errore] Impossibile rilevare la versione di Ren'Py,"
-set "renpyvers3.de=[Fehler] Unmöglich, die Ren'Py-Version zu erkennen, bitte sicherstellen,"
-set "renpyvers3.ru=[Ошибка] Не удалось обнаружить версию Ren'Py, пожалуйста,"
+set "renpyvers3.en=Unable to detect Ren'Py version,"
+set "renpyvers3.fr=Impossible de détecter la version de Ren'Py,"
+set "renpyvers3.es=No se puede detectar la versión de Ren'Py,"
+set "renpyvers3.it=Impossibile rilevare la versione di Ren'Py,"
+set "renpyvers3.de=Unmöglich, die Ren'Py-Version zu erkennen, bitte sicherstellen,"
+set "renpyvers3.ru=Не удалось обнаружить версию Ren'Py, пожалуйста,"
 
 set "renpyvers4.en=        please ensure the game is compatible with UnRen."
-set "renpyvers4.fr=         es-tu sûr que le jeu est compatible avec UnRen ?"
+set "renpyvers4.fr=        es-tu sûr que le jeu est compatible avec UnRen ?"
 set "renpyvers4.es=        asegúrese de que el juego sea compatible con UnRen."
-set "renpyvers4.it=         assicurati che il gioco sia compatibile con UnRen."
-set "renpyvers4.de=         dass das Spiel mit UnRen kompatibel ist."
-set "renpyvers4.ru=         убедитесь, что игра совместима с UnRen."
+set "renpyvers4.it=        assicurati che il gioco sia compatibile con UnRen."
+set "renpyvers4.de=        dass das Spiel mit UnRen kompatibel ist."
+set "renpyvers4.ru=        убедитесь, что игра совместима с UnRen."
 
 <nul set /p=!renpyvers1.%LNG%!
 
@@ -643,23 +643,23 @@ set "detect_renpy_version_py=detect_renpy_version.py"
 del /f /q "%detect_renpy_version_py%" %debugredir%
 
 powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllText('%detect_renpy_version_tmp%', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%detect_renpy_versionb64%')))" %debugredir%
-if exist "%detect_renpy_version_tmp%" (
-    move /y "%detect_renpy_version_tmp%" "%detect_renpy_version_py%" %debugredir%
+if exist "!detect_renpy_version_tmp!" (
+    move /y "!detect_renpy_version_tmp!" "!detect_renpy_version_py!" %debugredir%
 ) else (
-    echo %RED%!FAIL.%LNG%!%RES%
-    echo.
-    echo %RED%!renpyvers2.%LNG%!%RES%
-    echo.
+    call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog .
+    call :elog "%RED%!renpyvers2.%LNG%!%RES%"
+    call :elog .
     pause>nul|set/p=.      !ANYKEY.%LNG%!
 
     goto exitn
 )
 
 if not exist "%detect_renpy_version_py%" (
-    echo %RED%!FAIL.%LNG%!%RES%
-    echo.
-    echo !renpyvers2.%LNG%!
-    echo.
+    call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog .
+    call :elog "!renpyvers2.%LNG%!"
+    call :elog .
     pause>nul|set/p=.      !ANYKEY.%LNG%!
 
     goto exitn
@@ -671,18 +671,18 @@ if not exist "%detect_renpy_version_py%" (
         )
     )
     if not defined RENPYVERSION (
-        echo %RED%!FAIL.%LNG%!%RES%
-        echo.
-        echo    %RED%!renpyvers3.%LNG%!%RES%
-        echo    %RED%!renpyvers4.%LNG%!%RES%
+        call :elog "%RED%!FAIL.%LNG%!%RES%"
+        call :elog .
+        call :elog "    %RED%!renpyvers3.%LNG%!%RES%"
+        call :elog "    %RED%!renpyvers4.%LNG%!%RES%"
     ) else (
-        echo %YEL%!renpyversion!%RES%
+        call :elog "%YEL%!RENPYVERSION!%RES%"
     )
 )
 del /f /q "%detect_renpy_version_py%" %debugredir%
 
 :: Set the colors and default choice
-if %renpyversion% geq 8 (
+if %renpyversion% GEQ 8 (
     set "ESC1=%RED%"
     set "ESC2=%GRE%"
     set "def=2"
@@ -797,19 +797,19 @@ set "choicej.it=Scarica e aggiungi il "Universal Transparent Text Box Mod" di Pe
 set "choicej.de="Universal Transparent Text Box Mod" von Penfold Mole herunterladen und hinzufügen"
 set "choicej.ru=Скачать и добавить "Universal Transparent Text Box Mod" от Penfold Mole"
 
-set "choicek.en=Download and add 0x52 URM by 0x52"
-set "choicek.fr=Télécharger et ajouter "0x52 URM by 0x52""
-set "choicek.es=Descargar y agregar "0x52 URM by 0x52""
-set "choicek.it=Scarica e aggiungi "0x52 URM by 0x52""
-set "choicek.de="0x52 URM by 0x52" herunterladen und hinzufügen"
-set "choicek.ru=Скачать и добавить "0x52 URM by 0x52""
+set "choicek.en=Download and add "0x52_URM by 0x52""
+set "choicek.fr=Télécharger et ajouter "0x52_URM by 0x52""
+set "choicek.es=Descargar y agregar "0x52_URM by 0x52""
+set "choicek.it=Scarica e aggiungi "0x52_URM by 0x52""
+set "choicek.de="0x52_URM by 0x52" herunterladen und hinzufügen"
+set "choicek.ru=Скачать и добавить "0x52_URM by 0x52""
 
-set "choicel.en=Rename MC name if it's named mcname"
-set "choicel.fr=Renommer le MC name si il est nommé mcname"
-set "choicel.es=Renombrar el nombre de MC si se llama mcname"
-set "choicel.it=Rinomina il nome di MC se si chiama mcname"
-set "choicel.de=Den MC-Namen umbenennen, wenn er mcname heißt"
-set "choicel.ru=Переименовать имя MC, если оно называется mcname"
+set "choicel.en=Rename MC name with a new name"
+set "choicel.fr=Renommer le MC name avec un nouveau nom"
+set "choicel.es=Renombrar el nombre de MC con un nuevo nombre"
+set "choicel.it=Rinomina il nome di MC con un nuovo nome"
+set "choicel.de=Den MC-Namen mit einem neuen Namen umbenennen"
+set "choicel.ru=Переименовать имя MC с новым именем"
 
 set "choicem.en=Multiple choice in one shot"
 set "choicem.fr=Choix multiples en une seule fois"
@@ -848,9 +848,9 @@ set "choice-.ru=Удалить элемент контекстного меню 
 
 set "mquest.en=Your choice (1,2,a-m,t,+,-,x by default "
 set "mquest.fr=Votre choix (1,2,a-m,t,+,-,x par défaut "
-set "mquest.es=Tu elección (1,2,a-m,t,+,-,x por defecto "
+set "mquest.es=Su elección (1,2,a-m,t,+,-,x por defecto "
 set "mquest.it=La tua scelta (1,2,a-m,t,+,-,x predefinito "
-set "mquest.de=Ihr Wahl (1,2,a-m,t,+,-,x für Standard "
+set "mquest.de=Ihre Wahl (1,2,a-m,t,+,-,x für Standard "
 set "mquest.ru=Ваш выбор (1,2,a-m,t,+,-,x по умолчанию "
 
 set "choicex.en=Exit"
@@ -960,18 +960,18 @@ echo.
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choicea.%LNG%!... "
 if exist "%unren-console%" (
-    echo %YEL%!APRESENT.%LNG%!%RES%
+    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
 ) else (
     >"%unren-console%.b64" (
-        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KZGVmaW5lIDk5OSBjb25maWcuY29uc29sZSA9IFRydWUNCmRlZmluZSA5OTkgY29uZmlnX2RlYnVnID0gVHJ1ZQ0K
+        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KZGVmaW5lIDk5OSBjb25maWcuY29uc29sZSA9IFRydWUNCmRlZmluZSA5OTkgY29uZmlnLmRldmVsb3BlciA9IFRydWUNCg==
     )
     powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllText('%unren-console%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-console%.b64'))))" %debugredir%
     if not exist "%unren-console%.tmp" (
-        echo %RED%!FAIL.%LNG%!%RES%
+        call :elog "%RED%!FAIL.%LNG%!%RES%"
     ) else (
         move /y "%unren-console%.tmp" "%unren-console%" %debugredir%
         del /f /q "%unren-console%.b64" %debugredir%
-        echo %GRE%!PASS.%LNG%!%RES%
+        call :elog "%GRE%!PASS.%LNG%!%RES%"
     )
 )
 
@@ -990,18 +990,18 @@ if not "%OPTION%" == "m" echo.
 <nul set /p="!choiceb.%LNG%!... "
 
 if exist "%unren-debug%" (
-    echo %YEL%!APRESENT.%LNG%!%RES%
+    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
 ) else (
     >"%unren-debug%.b64" (
         echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KZGVmaW5lIDk5OSBjb25maWcuZGVidWcgPSBUcnVlDQo=
     )
     powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllText('%unren-debug%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-debug%.b64'))))" %debugredir%
     if not exist "%unren-debug%.tmp" (
-        echo %RED%!FAIL.%LNG%!%RES%
+        call :elog "%RED%!FAIL.%LNG%!%RES%"
     ) else (
         move /y "%unren-debug%.tmp" "%unren-debug%" %debugredir%
         del /f /q "%unren-debug%.b64" %debugredir%
-        echo %GRE%!PASS.%LNG%!%RES%
+        call :elog "%GRE%!PASS.%LNG%!%RES%"
     )
 )
 
@@ -1020,18 +1020,18 @@ if not "%OPTION%" == "m" echo.
 <nul set /p="!choicec.%LNG%!... "
 
 if exist "%unren-skip%" (
-    echo %YEL%!APRESENT.%LNG%!%RES%
+    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
 ) else (
     >"%unren-skip%.b64" (
         echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIF9wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCiAgICBjb25maWcuYWxsb3dfc2tpcHBpbmcgPSBUcnVlDQogICAgcmVucHkuZ2FtZS5wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCiAgICByZW5weS5nYW1lLnByZWZlcmVuY2VzLnNraXBfYWZ0ZXJfY2hvaWNlcyA9IFRydWUNCiAgICByZW5weS5jb25maWcuZmFzdF9za2lwcGluZyA9IFRydWUNCiAgICB0cnk6DQogICAgICAgIGNvbmZpZy5rZXltYXBbJ3NraXAnXSA9IFsgJ0tfTENUUkwnLCAnS19SQ1RSTCcgXQ0KICAgIGV4Y2VwdDoNCiAgICAgICAgcGFzcw0K
     )
     powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllText('%unren-skip%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-skip%.b64'))))" %debugredir%
     if not exist "%unren-skip%.tmp" (
-        echo %RED%!FAIL.%LNG%!%RES%
+        call :elog "%RED%!FAIL.%LNG%!%RES%"
     ) else (
         move /y "%unren-skip%.tmp" "%unren-skip%" %debugredir%
         del /f /q "%unren-skip%.b64" %debugredir%
-        echo %GRE%!PASS.%LNG%!%RES%
+        call :elog "%GRE%!PASS.%LNG%!%RES%"
     )
 )
 
@@ -1057,11 +1057,11 @@ if exist "%unren-skipall%" (
     )
     powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllText('%unren-skipall%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-skipall%.b64'))))" %debugredir%
     if not exist "%unren-skipall%.tmp" (
-        echo %RED%!FAIL.%LNG%!%RES%
+        call :elog "%RED%!FAIL.%LNG%!%RES%"
     ) else (
         move /y "%unren-skipall%.tmp" "%unren-skipall%" %debugredir%
         del /f /q "%unren-skipall%.b64" %debugredir%
-        echo %GRE%!PASS.%LNG%!%RES%
+        call :elog "%GRE%!PASS.%LNG%!%RES%"
     )
 )
 
@@ -1080,18 +1080,18 @@ if not "%OPTION%" == "m" echo.
 <nul set /p="!choicee.%LNG%!... "
 
 if exist "%unren-rollback%" (
-    echo %YEL%!APRESENT.%LNG%!%RES%
+    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
 ) else (
     > "%unren-rollback%.b64" (
         echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIHJlbnB5LmNvbmZpZy5yb2xsYmFja19lbmFibGVkID0gVHJ1ZQ0KICAgIHJlbnB5LmNvbmZpZy5oYXJkX3JvbGxiYWNrX2xpbWl0ID0gMjU2DQogICAgcmVucHkuY29uZmlnLnJvbGxiYWNrX2xlbmd0aCA9IDI1Ng0KICAgIGRlZiB1bnJlbl9ub2Jsb2NrKCphcmdzLCAqKmt3YXJncyk6DQogICAgICAgIHJldHVybg0KICAgIHJlbnB5LmJsb2NrX3JvbGxiYWNrID0gdW5yZW5fbm9ibG9jaw0KICAgIHRyeToNCiAgICAgICAgY29uZmlnLmtleW1hcFsncm9sbGJhY2snXSA9IFsgJ0tfUEFHRVVQJywgJ3JlcGVhdF9LX1BBR0VVUCcsICdLX0FDX0JBQ0snLCAnbW91c2Vkb3duXzQnIF0NCiAgICBleGNlcHQ6DQogICAgICAgIHBhc3MNCg==
     )
     powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllText('%unren-rollback%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-rollback%.b64'))))" %debugredir%
     if not exist "%unren-rollback%.tmp" (
-        echo %RED%!FAIL.%LNG%!%RES%
+        call :elog "%RED%!FAIL.%LNG%!%RES%"
     ) else (
         move /y "%unren-rollback%.tmp" "%unren-rollback%" %debugredir%
         del /f /q "%unren-rollback%.b64" %debugredir%
-        echo %GRE%!PASS.%LNG%!%RES%
+        call :elog "%GRE%!PASS.%LNG%!%RES%"
     )
 )
 
@@ -1110,18 +1110,18 @@ if not "%OPTION%" == "m" echo.
 <nul set /p="!choicef.%LNG%!... "
 
 if exist "%unren-quick%" (
-    echo %YEL%!APRESENT.%LNG%!%RES%
+    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
 ) else (
     >"%unren-quick%.b64" (
         echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIHRyeToNCiAgICAgICAgY29uZmlnLnVuZGVybGF5WzBdLmtleW1hcFsncXVpY2tTYXZlJ10gPSBRdWlja1NhdmUoKQ0KICAgICAgICBjb25maWcua2V5bWFwWydxdWlja1NhdmUnXSA9ICdLX0Y1Jw0KICAgICAgICBjb25maWcudW5kZXJsYXlbMF0ua2V5bWFwWydxdWlja0xvYWQnXSA9IFF1aWNrTG9hZCgpDQogICAgICAgIGNvbmZpZy5rZXltYXBbJ3F1aWNrTG9hZCddID0gJ0tfRjknDQogICAgZXhjZXB0Og0KICAgICAgICBwYXNzDQo=
     )
     powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllText('%unren-quick%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-quick%.b64'))))" %debugredir%
     if not exist "%unren-quick%.tmp" (
-        echo %RED%!FAIL.%LNG%!%RES%
+        call :elog "%RED%!FAIL.%LNG%!%RES%"
     ) else (
         move /y "%unren-quick%.tmp" "%unren-quick%" %debugredir%
         del /f /q "%unren-quick%.b64" %debugredir%
-        echo %GRE%!PASS.%LNG%!%RES%
+        call :elog "%GRE%!PASS.%LNG%!%RES%"
     )
 )
 
@@ -1140,18 +1140,18 @@ if not "%OPTION%" == "m" echo.
 <nul set /p="!choiceg.%LNG%!... "
 
 if exist "%unren-qmenu%" (
-    echo %YEL%!APRESENT.%LNG%!%RES%
+    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
 ) else (
     >"%unren-qmenu%.b64" (
         echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCBweXRob246DQogICAgZGVmIGFsd2F5c19lbmFibGVfcXVpY2tfbWVudSgpOg0KICAgICAgICBzdG9yZS5xdWlja19tZW51ID0gVHJ1ZQ0KICAgICAgICByZW5weS5zaG93X3NjcmVlbigicXVpY2tfbWVudSIpDQogICAgY29uZmlnLm92ZXJsYXlfZnVuY3Rpb25zLmFwcGVuZChhbHdheXNfZW5hYmxlX3F1aWNrX21lbnUpDQoNCiAgICBkZWYgZm9yY2VfcXVpY2tfbWVudV9vbl9pbnRlcmFjdCgpOg0KICAgICAgICBzdG9yZS5xdWlja19tZW51ID0gVHJ1ZQ0KICAgIGNvbmZpZy5pbnRlcmFjdF9jYWxsYmFja3MuYXBwZW5kKGZvcmNlX3F1aWNrX21lbnVfb25faW50ZXJhY3Qp
     )
     powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllText('%unren-qmenu%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-qmenu%.b64'))))" %debugredir%
     if not exist "%unren-qmenu%.tmp" (
-        echo %RED%!FAIL.%LNG%!%RES%
+        call :elog "%RED%!FAIL.%LNG%!%RES%"
     ) else (
         move /y "%unren-qmenu%.tmp" "%unren-qmenu%" %debugredir%
         del /f /q "%unren-qmenu%.b64" %debugredir%
-        echo %GRE%!PASS.%LNG%!%RES%
+        call :elog "%GRE%!PASS.%LNG%!%RES%"
     )
 )
 
@@ -1179,16 +1179,16 @@ echo.
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choiceh.%LNG%!... "
 
-if %debuglevel% geq 1 (
-    echo.
+if %debuglevel% GEQ 1 (
+    call :elog .
     echo powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%url%','%uguzip%')"
 )
 powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%url%','%uguzip%')" %debugredir%
-if %errorlevel% neq 0 (
-    echo %RED%!FAIL.%LNG%!%RES%
+if %errorlevel% NEQ 0 (
+    call :elog "%RED%!FAIL.%LNG%!%RES%"
 ) else (
-    if %debuglevel% geq 1 (
-        echo.
+    if %debuglevel% GEQ 1 (
+        call :elog .
         echo powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%uguzip%' '%TEMP%'"
     )
     powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%uguzip%' '%TEMP%'" %debugredir%
@@ -1200,16 +1200,16 @@ if %errorlevel% neq 0 (
         echo %RED%!FAIL.%LNG%! !MISSING.%LNG%! %ugusoftzip% %RES%
         goto skip_ugu
     )
-    if %debuglevel% geq 1 (
-        echo.
-        echo powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%ugusoftzip%' %WORKDIR%"
+    if %debuglevel% GEQ 1 (
+        call :elog .
+        echo powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%ugusoftzip%' '!WORKDIR!'"
     )
-    powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%ugusoftzip%' %WORKDIR%" %debugredir%
-    if %errorlevel% neq 0 (
-        echo %RED%!FAIL.%LNG%! !UNEXTRACT.%LNG%! %ugusoftzip% %RES%
+    powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%ugusoftzip%' '!WORKDIR!'" %debugredir%
+    if %errorlevel% NEQ 0 (
+        call :elog "%RED%!FAIL.%LNG%! !UNEXTRACT.%LNG%! %ugusoftzip% %RES%"
         goto skip_ucd
     ) else (
-        echo %GRE%!PASS.%LNG%!%RES%
+        call :elog "%GRE%!PASS.%LNG%!%RES%"
     )
     del /f /q "%ugusoftzip%" %debugredir%
     del /f /q "%uguhardzip%" %debugredir%
@@ -1242,51 +1242,51 @@ echo %YEL%%ucddir%%RES%
 echo.
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choicei.%LNG%!... "
-if %debuglevel% geq 1 (
-    echo.
+if %debuglevel% GEQ 1 (
+    call :elog .
     echo powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%url%','%ucdzip%')"
 )
 powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%url%','%ucdzip%')" %debugredir%
 if not exist "%ucdzip%" (
-	echo %RED%!FAIL.%LNG%! !UNDWNLD.%LNG%! %url% %RES%
+	call :elog "%RED%!FAIL.%LNG%! !UNDWNLD.%LNG%! %url% %RES%"
 	goto skip_ucd
 ) else (
-	if %debuglevel% geq 1 (
-        echo.
+	if %debuglevel% GEQ 1 (
+        call :elog .
         echo powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%ucdzip%' '%TEMP%'"
     )
 	powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%ucdzip%' '%TEMP%'" %debugredir%
     if not exist "%ucdzip_part1%" (
-        echo %RED%!FAIL.%LNG%! !MISSING.%LNG%! %ucdzip_part1% %RES%
+        call :elog "%RED%!FAIL.%LNG%! !MISSING.%LNG%! %ucdzip_part1% %RES%"
         goto skip_ucd
     ) else (
         move /y "%ucdzip_part1%" %TEMP%\part1.zip %debugredir%
     )
     if not exist "%ucdzip_part2%" (
-        echo %RED%!FAIL.%LNG%! !MISSING.%LNG%! %ucdzip_part2% %RES%
+        call :elog "%RED%!FAIL.%LNG%! !MISSING.%LNG%! %ucdzip_part2% %RES%"
         goto skip_ucd
     ) else (
         move /y "%ucdzip_part2%" %TEMP%\part2.zip %debugredir%
     )
-    if %debuglevel% geq 1 (
-        echo.
-        echo powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%TEMP%\part1.zip' %WORKDIR%"
+    if %debuglevel% GEQ 1 (
+        call :elog .
+        echo powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%TEMP%\part1.zip' '!WORKDIR!'"
     )
-    powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%TEMP%\part1.zip' %WORKDIR%" %debugredir%
-    if %errorlevel% neq 0 (
-        echo %RED%!FAIL.%LNG%! !UNEXTRACT.%LNG%! %ucdzip_part1% %RES%
+    powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%TEMP%\part1.zip' '!WORKDIR!'" %debugredir%
+    if %errorlevel% NEQ 0 (
+        call :elog "%RED%!FAIL.%LNG%! !UNEXTRACT.%LNG%! %ucdzip_part1% %RES%"
         goto skip_ucd
     )
-    if %debuglevel% geq 1 (
-        echo.
-        echo powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%TEMP%\part2.zip' %WORKDIR%"
+    if %debuglevel% GEQ 1 (
+        call :elog .
+        echo powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%TEMP%\part2.zip' '!WORKDIR!'"
     )
-    powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%TEMP%\part2.zip' %WORKDIR%" %debugredir%
-    if %errorlevel% neq 0 (
-        echo %RED%!FAIL.%LNG%! !UNEXTRACT.%LNG%! %ucdzip_part2% %RES%
+    powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%TEMP%\part2.zip' '!WORKDIR!'" %debugredir%
+    if %errorlevel% NEQ 0 (
+        call :elog "%RED%!FAIL.%LNG%! !UNEXTRACT.%LNG%! %ucdzip_part2% %RES%"
         goto skip_ucd
     )
-    echo %GRE%!PASS.%LNG%!%RES%
+    call :elog "%GRE%!PASS.%LNG%!%RES%"
     :skip_ucd
 	del /f /q "%ucdzip%" %debugredir%
     del /f /q "%ucdzip_part1%" %debugredir%
@@ -1313,18 +1313,22 @@ if not exist "%ProgramFiles%\7-Zip\7z.exe" (
     goto skip_utbox
 )
 
-del /f /q "%utbox_file%" %debugredir%
+del /f /q "!utbox_file!" %debugredir%
 
-echo %YEL%!TWADD.%LNG%! %ucddir%.%RES%
+echo %YEL%!TWADD.%LNG%! !utbox_file! %RES%
 echo %YEL%!INCASEOF.%LNG%! %RES%
 echo %MAG%https://f95zone.to/threads/renpy-transparent-text-box-mod-v2-6-4.11925/%RES%
 echo %YEL%!INCASEDEL.%LNG%!%RES%
-echo %YEL%%ucddir%%RES%
+echo %YEL%!utbox_file!%RES%
 echo.
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choicej.%LNG%!..."
-if %debuglevel% geq 1 (
-    echo.
+
+del /f /q "!utboxzip!" %debugredir%
+rd /s /q "!utbox_tdir!" %debugredir%
+
+if %debuglevel% GEQ 1 (
+    call :elog .
     echo powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%url%','%utboxzip%')"
 )
 powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%url%','%utboxzip%')" %debugredir%
@@ -1332,25 +1336,25 @@ if not exist "%utboxzip%" (
     echo %RED% !FAIL.%LNG%! !UNDWNLD.%LNG%! %url% %RES%
     goto skip_utbox
 ) else (
-    if %debuglevel% geq 1 (
-        echo.
-        echo "%ProgramFiles%\7-Zip\7z.exe" x -y -o"%utbox_tdir%" "%utboxzip%"
+    if %debuglevel% GEQ 1 (
+        call :elog .
+        echo "%ProgramFiles%\7-Zip\7z.exe" x -y -o"!utbox_tdir!" "!utboxzip!"
     )
-    "%ProgramFiles%\7-Zip\7z.exe" x -y -o"%utbox_tdir%" "%utboxzip%" %debugredir%
-    if %errorlevel% neq 0 (
-        echo %RED% !FAIL.%LNG%! !UNEXTRACT.%LNG%! %utboxzip% %RES%
+    "%ProgramFiles%\7-Zip\7z.exe" x -y -o"!utbox_tdir!" "!utboxzip!" %debugredir%
+    if not exist "!utbox_tdir!\game\y_outline.rpy" (
+        echo %RED% !FAIL.%LNG%! !UNEXTRACT.%LNG%! "!utboxzip!" %RES%
         goto skip_utbox
     ) else (
-        move /y "%utbox_tdir%\game\y_outline.rpy" "%WORKDIR%\game" %debugredir%
-        if exist "%utbox_file%" (
+        move /y "!utbox_tdir!\game\y_outline.rpy" "!WORKDIR!\game" %debugredir%
+        if exist "!utbox_file!" (
             echo %GRE% !PASS.%LNG%!%RES%
         ) else (
-            echo %RED% !FAIL.%LNG%! !MISSING.%LNG%! %YEL%%utbox_file% %RES%
+            echo %RED% !FAIL.%LNG%! !MISSING.%LNG%! %YEL%!utbox_file! %RES%
         )
     )
     :skip_utbox
-    del /f /q "%utboxzip%" %debugredir%
-    rd /s /q "%utbox_tdir%" %debugredir%
+    del /f /q "!utboxzip!" %debugredir%
+    rd /s /q "!utbox_tdir!" %debugredir%
 )
 
 goto finish
@@ -1358,9 +1362,9 @@ goto finish
 
 :: Download 0x52_URM and add to the game
 :add_urm
-set "urm_name=0x52 URM"
-set "url=https://api.0x52.dev/modversions/1223/download"
-set "urm_zip=%WORKDIR%\0x52_URM.zip"
+set "urm_name=0x52_URM"
+set "url=https://attachments.f95zone.to/2025/07/5028578_0x52_URM.zip"
+set "urm_zip=%TEMP%\0x52_URM.zip"
 set "urm_rpa=%WORKDIR%\game\0x52_URM.rpa"
 del /f /q "%urm_zip%" %debugredir%
 
@@ -1373,12 +1377,22 @@ echo %YEL%%urm_rpa%%RES%
 echo.
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choicek.%LNG%!... "
-powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%url%','%urm_zip%')" %debugredir%
-if not exist "%urm_zip%" (
-	echo %RED%!FAIL.%LNG%! !UNDWNLD.%LNG%!%urm_name%.zip.%RES%
+
+if %debuglevel% GEQ 1 (
+    call :elog .
+    echo powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%url%','%urm_zip%.tmp')"
+)
+powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('%url%','%urm_zip%.tmp')" %debugredir%
+if not exist "%urm_zip%.tmp" (
+	echo %RED%!FAIL.%LNG%! !UNDWNLD.%LNG%! %urm_name%.zip.%RES%
 ) else (
-	powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%urm_zip%' '%WORKDIR%\game'" %debugredir%
-	if %errorlevel% neq 0 (
+    move /y "%urm_zip%.tmp" "%urm_zip%" %debugredir%
+    if %debuglevel% GEQ 1 (
+        call :elog .
+        echo powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%urm_zip%' '!WORKDIR!\game'"
+    )
+	powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Force '%urm_zip%' '!WORKDIR!\game'" %debugredir%
+	if %errorlevel% NEQ 0 (
 		echo %RED%!FAIL.%LNG%! !UNINSTALL.%LNG%! %urm_name% %RES%
 	) else (
 		echo %GRE%!PASS.%LNG%!%RES%
@@ -1418,7 +1432,8 @@ echo %YEL%!TWADD.%LNG%! %unr-mcchange%.%RES%
 echo %YEL%!INCASEDEL.%LNG%!%RES%
 echo %YEL%%unr-mcchange%%RES%
 echo %YEL%%unr-mcchange%c%RES%
-echo.
+
+call :elog .
 if not "%OPTION%" == "m" echo.
 set "oldmcname="
 set /p "oldmcname=!rmcname3.%LNG%!"
@@ -1427,7 +1442,7 @@ if "%oldmcname%" == "" (
     goto mcend
 )
 
-echo.
+call :elog .
 set "newmcname="
 set /p "newmcname=!rmcname.%LNG%!"
 if "%newmcname%" == "" (
@@ -1435,26 +1450,26 @@ if "%newmcname%" == "" (
     goto mcend
 )
 
-echo.
+call :elog .
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choicel.%LNG%!... "
 
 >"%unr-mcchange%.b64" (
-    echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KZGVmaW5lIDk5OSBtY25hbWUgPSAibmV3bWNuYW1lIg0KZGVmaW5lIDk5OSBNQyA9ICJuZXdtY25hbWUiIA0KZGVmaW5lIDk5OSBNQ19uYW1lID0gIm5ld21jbmFtZSINCmRlZmluZSA5OTkgbWNfbmFtZSA9ICJuZXdtY25hbWUiDQogDQppbml0IDk5OSBweXRob246IA0KICAgIGRlZiByZXBsYWNlX3RleHQodCk6IA0KICAgICAgICByZXR1cm4gdC5yZXBsYWNlKCJvbGRtY25hbWUiLCAibmV3bWNuYW1lIikgDQogDQogICAgY29uZmlnLnJlcGxhY2VfdGV4dCA9IHJlcGxhY2VfdGV4dCANCiANCiAgICBkZWwgcmVwbGFjZV90ZXh0IA0K
+    echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KZGVmaW5lIDk5OSBtY25hbWUgPSAibmV3bWNuYW1lIg0KZGVmaW5lIDk5OSBNQyA9ICJuZXdtY25hbWUiDQpkZWZpbmUgOTk5IE1DX25hbWUgPSAibmV3bWNuYW1lIg0KZGVmaW5lIDk5OSBtY19uYW1lID0gIm5ld21jbmFtZSINCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIGltcG9ydCByZQ0KDQogICAgIyBQbGFjZWhvbGRlcnMgcmVwbGFjZWQgYnkgUG93ZXJTaGVsbCBiZWZvcmUgZXhlY3V0aW9uDQogICAgT0xEID0gIm9sZG1jbmFtZSINCiAgICBORVcgPSAibmV3bWNuYW1lIg0KDQogICAgZGVmIF9jYXNlX2xpa2UocywgbW9kZWwpOg0KICAgICAgICAjIEFsaWduIHRoZSBjYXNlIG9mIHMgd2l0aCB0aGF0IG9mIG1vZGVsICh1cHBlciwgVGl0bGUsIGxvd2VyKQ0KICAgICAgICBpZiBtb2RlbC5pc3VwcGVyKCk6DQogICAgICAgICAgICByZXR1cm4gcy51cHBlcigpDQogICAgICAgIGVsaWYgbW9kZWxbOjFdLmlzdXBwZXIoKSBhbmQgbW9kZWxbMTpdLmlzbG93ZXIoKToNCiAgICAgICAgICAgIHJldHVybiBzLmNhcGl0YWxpemUoKQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgcmV0dXJuIHMubG93ZXIoKQ0KDQogICAgZGVmIHJlcGxhY2VfdGV4dCh0KToNCiAgICAgICAgb2xkID0gT0xEDQogICAgICAgIG5ldyA9IE5FVw0KDQogICAgICAgIG9fZXNjID0gcmUuZXNjYXBlKG9sZCkNCiAgICAgICAgZl9vbGQgPSBvbGRbOjFdDQogICAgICAgIGZfbmV3ID0gbmV3WzoxXQ0KDQogICAgICAgICMgMSkgUmVwbGFjZW1lbnQgb2YgdGhlIGVudGlyZSB3b3JkIChjYXNlLWluc2Vuc2l0aXZlKSB3aXRoIGNhc2UgcmVzdG9yYXRpb24NCiAgICAgICAgYmFzZV9wYXQgPSByZS5jb21waWxlKHJmIlxiKD9pOih7b19lc2N9KSlcYiIpDQogICAgICAgIGRlZiBiYXNlX3JlcGwobSk6DQogICAgICAgICAgICByZXR1cm4gX2Nhc2VfbGlrZShuZXcsIG0uZ3JvdXAoMSkpDQogICAgICAgIHQgPSBiYXNlX3BhdC5zdWIoYmFzZV9yZXBsLCB0KQ0KDQogICAgICAgICMgMikgU3R1dHRlcmluZyB0eXBlOiBjLWNvbm5vciDihpIgai1qb2UgKGFuZCBjYXNlIHZhcmlhbnRzKQ0KICAgICAgICBzdDFfcGF0ID0gcmUuY29tcGlsZShyZiJcYihbe2Zfb2xkLmxvd2VyKCl9e2Zfb2xkLnVwcGVyKCl9XSktKD9pOih7b19lc2N9KSlcYiIpDQogICAgICAgIGRlZiBzdDFfcmVwbChtKToNCiAgICAgICAgICAgIHByZWYgPSBtLmdyb3VwKDEpICAgICAgICMgcHJlZml4IGxldHRlciAoYy9DKQ0KICAgICAgICAgICAgb2xkX3BhcnQgPSBtLmdyb3VwKDIpICAgIyB3b3JkIChjb25ub3IvQ29ubm9yL0NPTk5PUikNCiAgICAgICAgICAgIG5ld193b3JkID0gX2Nhc2VfbGlrZShuZXcsIG9sZF9wYXJ0KQ0KICAgICAgICAgICAgbmV3X2ZpcnN0ID0gZl9uZXcudXBwZXIoKSBpZiBwcmVmLmlzdXBwZXIoKSBlbHNlIGZfbmV3Lmxvd2VyKCkNCiAgICAgICAgICAgIHJldHVybiBmIntuZXdfZmlyc3R9LXtuZXdfd29yZH0iDQogICAgICAgIHQgPSBzdDFfcGF0LnN1YihzdDFfcmVwbCwgdCkNCg0KICAgICAgICAjIDMpIFN0dXR0ZXJpbmcgdHlwZTogY28tY29ubm9yIOKGkiBqby1qb2UgKGFuZCBjYXNlIHZhcmlhbnRzKQ0KICAgICAgICBzdDJfcGF0ID0gcmUuY29tcGlsZShyZiJcYihbe2Zfb2xkLmxvd2VyKCl9e2Zfb2xkLnVwcGVyKCl9XSkoW29PXSktKD9pOih7b19lc2N9KSlcYiIpDQogICAgICAgIGRlZiBzdDJfcmVwbChtKToNCiAgICAgICAgICAgIHByZWYgPSBtLmdyb3VwKDEpICAgICAgICMgcHJlZml4IGxldHRlciAoYy9DKQ0KICAgICAgICAgICAgb2NoYXIgPSBtLmdyb3VwKDIpICAgICAgIyAnbycgb3IgJ08nDQogICAgICAgICAgICBvbGRfcGFydCA9IG0uZ3JvdXAoMykgICAjIHdvcmQgKGNvbm5vci9Db25ub3IvQ09OTk9SKQ0KICAgICAgICAgICAgbmV3X3dvcmQgPSBfY2FzZV9saWtlKG5ldywgb2xkX3BhcnQpDQogICAgICAgICAgICBuZXdfZmlyc3QgPSBmX25ldy51cHBlcigpIGlmIHByZWYuaXN1cHBlcigpIGVsc2UgZl9uZXcubG93ZXIoKQ0KICAgICAgICAgICAgIyBLZWVwIHRoZSBjYXNlIG9mIHRoZSAnbycgbGV0dGVyIGFzIGVuY291bnRlcmVkDQogICAgICAgICAgICByZXR1cm4gZiJ7bmV3X2ZpcnN0fXtvY2hhcn0te25ld193b3JkfSINCiAgICAgICAgdCA9IHN0Ml9wYXQuc3ViKHN0Ml9yZXBsLCB0KQ0KDQogICAgICAgIHJldHVybiB0DQoNCiAgICBjb25maWcucmVwbGFjZV90ZXh0ID0gcmVwbGFjZV90ZXh0DQogICAgZGVsIHJlcGxhY2VfdGV4dA0K
 )
-powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllBytes('%unr-mcchange%.tmp', [Convert]::FromBase64String((Get-Content '%unr-mcchange%.b64' -Raw)))" %debugredir%
-if not exist "%unr-mcchange%.tmp" (
-    echo %RED%!FAIL.%LNG%!%RES%
+powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllBytes('!unr-mcchange!.tmp', [Convert]::FromBase64String((Get-Content '!unr-mcchange!.b64' -Raw)))" %debugredir%
+if not exist "!unr-mcchange!.tmp" (
+    echo %RED%!FAIL.%LNG%!%RES% !MISSING.%LNG%! !unr-mcchange!.tmp
     goto mcend
 ) else (
-    del /f /q "%unr-mcchange%.b64" %debugredir%
-    powershell.exe -nologo -noprofile -noninteractive -command "(Get-Content '%unr-mcchange%.tmp') -replace 'newmcname', '%newmcname%' | Set-Content '%unr-mcchange%'" %debugredir%
-    powershell.exe -nologo -noprofile -noninteractive -command "(Get-Content '%unr-mcchange%') -replace 'oldmcname', '%oldmcname%' | Set-Content '%unr-mcchange%'" %debugredir%
-    if %errorlevel% NEQ 0 (
-        echo %RED%!FAIL.%LNG%!%RES%
+    del /f /q "!unr-mcchange!.b64" %debugredir%
+    powershell.exe -nologo -noprofile -noninteractive -command "(Get-Content '!unr-mcchange!.tmp') -replace 'newmcname', '!newmcname!' | Set-Content '!unr-mcchange!'" %debugredir%
+    powershell.exe -nologo -noprofile -noninteractive -command "(Get-Content '!unr-mcchange!') -replace 'oldmcname', '!oldmcname!' | Set-Content '!unr-mcchange!'" %debugredir%
+    if not exist "!unr-mcchange!" (
+        echo %RED%!FAIL.%LNG%!%RES% !MISSING.%LNG%! !unr-mcchange!
         goto mcend
     )
-    del "%unr-mcchange%.tmp" %debugredir%
+    del /f /q "!unr-mcchange!.tmp" %debugredir%
     echo %GRE%!PASS.%LNG%!%RES%
 )
 
@@ -1529,6 +1544,13 @@ goto menu
 
 :: Extract text for translation purpose
 :extract_text
+if "%LNG%" == "en"  set translation_lang=english
+if "%LNG%" == "fr"  set translation_lang=french
+if "%LNG%" == "es"  set translation_lang=spanish
+if "%LNG%" == "it"  set translation_lang=italian
+if "%LNG%" == "de"  set translation_lang=german
+if "%LNG%" == "ru"  set translation_lang=russian
+
 cd /d "%WORKDIR%"
 
 set "etext1.en=Searching for game name"
@@ -1545,12 +1567,12 @@ set "etext2.it=Nessun file di gioco trovato con le estensioni .exe, .py o .sh."
 set "etext2.de=Keine Spieldateien mit den Erweiterungen .exe, .py oder .sh gefunden."
 set "etext2.ru=Не найдено игровых файлов с расширениями .exe, .py или .sh."
 
-set "etext3.en=Enter the target translation language (french by default): "
-set "etext3.fr=Entrez la langue de traduction cible (french par défaut) : "
-set "etext3.es=Ingrese el idioma de traducción objetivo (french por defecto): "
-set "etext3.it=Inserisci la lingua di traduzione di destinazione (french per impostazione predefinita): "
-set "etext3.de=Geben Sie die Zielsprache für die Übersetzung ein (french standardmäßig): "
-set "etext3.ru=Введите целевой язык перевода (french по умолчанию): "
+set "etext3.en=Enter the target translation language (%YEL%%translation_lang%%RES% by default): "
+set "etext3.fr=Entrez la langue de traduction cible (%YEL%%translation_lang%%RES% par défaut) : "
+set "etext3.es=Ingrese el idioma de traducción objetivo (%YEL%%translation_lang%%RES% por defecto): "
+set "etext3.it=Inserisci la lingua di traduzione di destinazione (%YEL%%translation_lang%%RES% per impostazione predefinita): "
+set "etext3.de=Geben Sie die Zielsprache für die Übersetzung ein (%YEL%%translation_lang%%RES% standardmäßig): "
+set "etext3.ru=Введите целевой язык перевода (%YEL%%translation_lang%%RES% по умолчанию): "
 
 set "etext4.en=Unable to extract text for translation."
 set "etext4.fr=Impossible d'extraire le texte pour la traduction."
@@ -1559,65 +1581,91 @@ set "etext4.it=Impossibile estrarre il testo per la traduzione."
 set "etext4.de=Fehler beim Extrahieren des Textes für die Übersetzung."
 set "etext4.ru=Не удалось извлечь текст для перевода."
 
+set "etext5.en=Please input the game name (without extension): "
+set "etext5.fr=Veuillez saisir le nom du jeu (sans extension) : "
+set "etext5.es=Por favor, ingrese el nombre del juego (sin extensión): "
+set "etext5.it=Si prega di inserire il nome del gioco (senza estensione): "
+set "etext5.de=Bitte geben Sie den Namen des Spiels ein (ohne Erweiterung): "
+set "etext5.ru=Пожалуйста, введите название игры (без расширения): "
+
 :: find the current game name by checking the presence of same name with .exe, .py and .sh extension
-echo.
+call :elog .
 if not "%OPTION%" == "m" echo.
 <nul set /p="!etext1.%LNG%!... "
 
 set "processed="
+set "fname="
 
 for %%e in (exe py sh) do (
-    for %%f in (*%%e) do (
-        set "fname=%%~nf"
+    for %%f in (*.%%e) do (
+        set "tempfname=%%~nf"
 
         :: Check if this name has already been processed
-        echo !processed! | findstr /i "\<!fname\>" >nul
+        echo !processed! | findstr /i "\!tempfname!" >nul
         if errorlevel 1 (
             :: Count how many files with this name exist
             set /a count=0
             for %%x in (exe py sh) do (
-                if exist "%%~dpf!fname!.%%x" (
+                if exist "%%~dpf!tempfname!.%%x" (
                     set /a count+=1
                 )
             )
             if !count! EQU 3 (
-                echo %YEL%!fname! %GRE%!PASS.%LNG%!%YEL%%RES%
-                set "processed=!processed! !fname!"
+                echo %YEL%!tempfname! %GRE%!PASS.%LNG%!%YEL%%RES%
+                set "processed=!processed! !tempfname!"
+                set "fname=!tempfname!"
                 goto found_name
             )
         )
     )
 )
 
-if "%fname%"  == "" (
+:: If no name found, ask user to input the name
+if "!fname!"  == "" (
     echo %RED%!FAIL.%LNG%! !etext2.%LNG%!%RES%
-    goto :eof
+    goto input_name
+)
+
+:input_name
+    call :elog .
+    set /p "fname=!etext5.%LNG%!"
+    if "!fname!" == "" (
+        echo %RED%!FAIL.%LNG%! !etext2.%LNG%!%RES%
+        goto input_name
+    ) else (
+        REM set "fname=%fname:.=%"
+        if not exist "!WORKDIR!\!fname!.exe" (
+            echo %RED%!FAIL.%LNG%! !etext2.%LNG%!%RES%
+            goto input_name
+        )
+    )
 )
 
 :found_name
-echo.
+call :elog .
 set /p "translation_lang=!etext3.%LNG%!"
+
 if not defined translation_lang (
 	set "translation_lang=french"
 )
 
-if not exist "%WORKDIR%\game\tl\" (
-	mkdir "%WORKDIR%\game\tl"
+if not exist "!WORKDIR!\game\tl\" (
+	mkdir "!WORKDIR!\game\tl"
 )
 
-echo.
+call :elog .
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choicet.%LNG%!... "
-cd /d "%WORKDIR%"
-"%PYTHONHOME%python.exe" %PYNOASSERT% "%fname%.py" game translate %translation_lang% %debugredir%
+
+cd /d "!WORKDIR!"
+if %debuglevel% GEQ 1 echo "!PYTHONHOME!python.exe" %PYNOASSERT% "!fname!.py" game translate !translation_lang!
+"!PYTHONHOME!python.exe" %PYNOASSERT% "!fname!.py" game translate !translation_lang! %debugredir%
 if %errorlevel% NEQ 0 (
 	echo %RED%!FAIL.%LNG%! !etext4.%LNG%!%RES%
-    echo.
-    pause>nul|set/p=.      !ANYKEY.%LNG%!
-    goto :eof
 ) else (
     echo %GRE%!PASS.%LNG%!%RES%
 )
+call :elog .
 
 goto finish
 
@@ -1661,11 +1709,11 @@ set "areg4.ru=Запустить скрипт %SCRIPTNAME%"
 
 call :check_admin
 
-echo.
+call :elog .
 echo %YEL%!areg1.%LNG%!%RES%
 echo %YEL%!areg2.%LNG%!%RES%
 echo %YEL%!areg2a.%LNG%!%RES%
-echo.
+call :elog .
 <nul set /p="!areg3.%LNG%!"
 :: Add registry key
 reg add "HKCR\Directory\shell\Run%SCRIPTNAME%" /ve /d "!areg4.%LNG%!" /f %debugredir%
@@ -1675,9 +1723,9 @@ if %errorlevel% EQU 0 (
 	echo %GRE%!PASS.%LNG%!%RES%
 ) else (
 	echo %RED%!FAIL.%LNG%!%RES%
-    echo.
+    call :elog .
     echo !ARIGHT.%LNG%!
-    echo.
+    call :elog .
     pause>nul|set/p=.      !ANYKEY.%LNG%!
     call :exitn 3
 )
@@ -1703,9 +1751,9 @@ set "rreg2.ru=Удаление элемента контекстного мен�
 
 call :check_admin
 
-echo.
+call :elog .
 echo %YEL%!rreg1.%LNG%!%RES%
-echo.
+call :elog .
 <nul set /p="!rreg2.%LNG%!"
 :: Remove registry key
 reg delete "HKCR\Directory\shell\RunUnrenForAll" /f %debugredir%
@@ -1714,9 +1762,9 @@ if %errorlevel% EQU 0 (
 	echo %GRE%!PASS.%LNG%!%RES%
 ) else (
 	echo %RED%!FAIL.%LNG%!.%RES%
-    echo.
+    call :elog .
     echo !ARIGHT.%LNG%!
-    echo.
+    call :elog .
     pause>nul|set/p=.      !ANYKEY.%LNG%!
     call :exitn 3
 )
@@ -1747,7 +1795,7 @@ set "admright3.it=Riavvia lo script con diritti di amministratore."
 set "admright3.de=Starten Sie das Skript mit Administratorrechten neu."
 set "admright3.ru=Перезапустите скрипт с правами администратора."
 
-echo.
+call :elog .
 if not "%OPTION%" == "m" echo.
 <nul set /p="!admright.%LNG%!... "
 
@@ -1756,10 +1804,10 @@ if %errorlevel% EQU 0 (
     echo %GRE%!PASS.%LNG%!%RES%
 ) else (
 	echo %RED%!FAIL.%LNG%!.%RES%
-    echo.
+    call :elog .
     echo !admright2.%LNG%!
     echo !admright3.%LNG%!
-    echo.
+    call :elog .
     pause
     powershell -Command "Start-Process '%~f0' -ArgumentList '%WORKDIR%' -Verb RunAs"
     goto exitn
@@ -1800,14 +1848,14 @@ echo !updating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%
 move /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old" %debugredir%
 if %errorlevel% NEQ 0 (
     echo %RED%!FAIL.%LNG%! %RES%
-    echo.
+    call :elog .
     pause>nul|set/p=.      !ANYKEY.%LNG%!
     call :exitn 2
 )
 copy /y "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%.bat" %debugredir%
 if %errorlevel% NEQ 0 (
     echo %RED%!FAIL.%LNG%! %RES%
-    echo.
+    call :elog .
     pause>nul|set/p=.      !ANYKEY.%LNG%!
     call :exitn 2
 ) else (
@@ -1821,14 +1869,14 @@ echo !rupdating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%
 copy /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old" %debugredir%
 if %errorlevel% NEQ 0 (
     echo %RED%!FAIL.%LNG%! %RES%
-    echo.
+    call :elog .
     pause>nul|set/p=.      !ANYKEY.%LNG%!
     call :exitn 2
 )
 copy /y "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%-new.bat" %debugredir%
 if %errorlevel% NEQ 0 (
     echo %RED%!FAIL.%LNG%! %RES%
-    echo.
+    call :elog .
     pause>nul|set/p=.      !ANYKEY.%LNG%!
     call :exitn 2
 ) else (
@@ -1839,10 +1887,41 @@ set "relaunch=1"
 goto :eof
 
 
+:: When it's not unavailable, show message and exit
+:unavailable
+if "%RENPYVERSION%" == "7" (
+    set "unavailable.en=This feature is unavailable in this version."
+    set "unavailable.fr=Cette fonctionnalité n'est pas disponible dans cette version."
+    set "unavailable.es=Esta función no está disponible en esta versión."
+    set "unavailable.it=Questa funzione non è disponibile in questa versione."
+    set "unavailable.de=Diese Funktion ist in dieser Version nicht verfügbar."
+    set "unavailable.ru=Эта функция недоступна в этой версии."
+)
+if "%RENPYVERSION%" == "8" (
+    set "unavailable.en=This feature is unavailable for now, need more coding."
+    set "unavailable.fr=Cette fonctionnalité n'est pas disponible pour le moment, nécessite plus de codage."
+    set "unavailable.es=Esta función no está disponible por ahora, necesita más codificación."
+    set "unavailable.it=Questa funzione non è disponibile per ora, necessita di più codice."
+    set "unavailable.de=Diese Funktion ist derzeit nicht verfügbar, es wird mehr Programmierung benötigt."
+    set "unavailable.ru=Эта функция недоступна, требуется больше кода."
+)
+
+call :elog .
+call :elog .
+echo !unavailable.%LNG%! >> "%UNRENLOG%"
+<nul set /p="%YEL%!unavailable.%LNG%!%RES%"
+
+timeout /t 2 >nul
+
+goto :menu
+
+exit /b
+
+
 :: Verify if an update is necessary
 :check_update
 :: This URL should point to a text file containing the latest version link
-set "upd_url=https://drive.google.com/uc?export=download&id=1KOuFsiOPNAcicCBSCk1EEn4g5MkZXelw"
+set "upd_url=https://github.com/Lurmel/UnRen-forall/releases/download/UnRen-forall-la_0.35-le_9.6.47-cu_9.7.17/UnRen-link.txt"
 set "upd_link=UnRen-link"
 set "upd_file=UnRen-new"
 set "upd_clog=UnRen-Changelog"
@@ -1918,7 +1997,7 @@ if not exist "%TEMP%\%upd_link%.tmp" (
         copy nul "%SCRIPTDIR%%upd_link%.txt" %debugredir%
     )
     fc.exe "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" %debugredir%
-    if !errorlevel! geq 1 (
+    if !errorlevel! GEQ 1 (
         echo %YEL% !cupd3.%LNG%!%RES%
 
         :: Rename and launch %upd_link%.bat to generate UnRen-Changelog.txt
@@ -1928,16 +2007,16 @@ if not exist "%TEMP%\%upd_link%.tmp" (
         del /f /q "%SCRIPTDIR%%upd_link%.bat" %debugredir%
         if not defined forall_url (
             echo %RED% !FAIL.%LNG%! %YEL%!cupd8.%LNG%!%RES%
-            echo.
+            call :elog .
             pause
             goto :eof
         )
         move /y "%SCRIPTDIR%%upd_clog%.txt" "%SCRIPTDIR%%upd_clog%.b64" %debugredir%
         if %debuglevel% EQU 1 echo powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllBytes('%SCRIPTDIR%%upd_clog%.tmp', [Convert]::FromBase64String((Get-Content '%SCRIPTDIR%%upd_clog%.b64' -Raw)))"
         powershell.exe -nologo -noprofile -noninteractive -command "[IO.File]::WriteAllBytes('%SCRIPTDIR%%upd_clog%.tmp', [Convert]::FromBase64String((Get-Content '%SCRIPTDIR%%upd_clog%.b64' -Raw)))" %debugredir%
-        echo.
+        call :elog .
         type "%SCRIPTDIR%%upd_clog%.tmp"
-        echo.
+        call :elog .
 
         set "coption="
         set /p "coption=!cupd7.%LNG%! "
@@ -1955,13 +2034,13 @@ if not exist "%TEMP%\%upd_link%.tmp" (
 echo %YEL%!INCASEOF.%LNG%! %RES%
 echo %MAG%%URL_REF%%RES%
 if %new_upd% EQU 1 (
-    echo.
+    call :elog .
     <nul set /p="!cupd4.%LNG%! %YEL%%forall_url%%RES%... "
     if %debuglevel% EQU 1 echo powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('!forall_url!','%TEMP%\%upd_file%.tmp')"
     powershell.exe -nologo -noprofile -noninteractive -command "(New-Object System.Net.WebClient).DownloadFile('!forall_url!','%TEMP%\%upd_file%.tmp')" %debugredir%
     if not exist "%TEMP%\%upd_file%.tmp" (
         echo %RED%!FAIL.%LNG%! %YEL%!cupd6.%LNG%!%RES%
-        echo.
+        call :elog .
         pause
         goto :eof
     ) else (
@@ -1969,7 +2048,7 @@ if %new_upd% EQU 1 (
         move /y "%TEMP%\%upd_file%.tmp" "%TEMP%\%upd_file%.zip" %debugredir%
         if not exist "%TEMP%\%upd_file%.zip" (
             echo %RED%!FAIL.%LNG%! %YEL%!cupd6.%LNG%!%RES%
-            echo.
+            call :elog .
             pause
             goto :eof
         ) else (
@@ -1979,7 +2058,7 @@ if %new_upd% EQU 1 (
             powershell.exe -nologo -noprofile -noninteractive -command "Expand-Archive -Path '%TEMP%\%upd_file%.zip' -DestinationPath '%UPD_TDIR%' -Force" %debugredir%
             if %errorlevel% NEQ 0 (
                 echo %RED%!FAIL.%LNG%! %YEL%!cupd6.%LNG%!%RES%
-                echo.
+                call :elog .
                 pause
                 goto :eof
             ) else (
@@ -1996,9 +2075,9 @@ if %new_upd% EQU 1 (
                 call "%SCRIPTDIR%%BASENAME%-new.bat" "%WORKDIR%"
                 goto exitn
             )
-            echo.
+            call :elog .
             echo %YEL%!cupd5.%LNG%!%RES%
-            echo.
+            call :elog .
         )
     )
 )
@@ -2028,7 +2107,7 @@ for %%F in (legacy current forall) do (
         echo %RED% !FAIL.%LNG%! %YEL%!MISSING.%LNG%! UnRen-%%~F %RES%
         echo !cdwnld.%LNG%! %RES%
         echo %MAG%%URL_REF% %RES%
-        echo.
+        call :elog .
         pause>nul|set/p=.      !ANYKEY.%LNG%!
         goto exitn
     ) else (
@@ -2037,14 +2116,15 @@ for %%F in (legacy current forall) do (
 )
 
 :: Cleaning after an update
-if exist "%SCRIPTDIR%%BASENAME%-new.bat" (
-    if "%SCRIPTNAME%" == "%BASENAME%-new.bat" (
-        copy /y "%SCRIPTDIR%%BASENAME%-new.bat" "%SCRIPTDIR%%BASENAME%.bat" %debugredir%
+set "BASENAMENONEW=%BASENAME:-new=%"
+if exist "%SCRIPTDIR%%BASENAMENONEW%-new.bat" (
+    if "%SCRIPTNAME%" == "%BASENAMENONEW%-new.bat" (
+        copy /y "%SCRIPTDIR%%BASENAMENONEW%-new.bat" "%SCRIPTDIR%%BASENAMENONEW%.bat" %debugredir%
     ) else (
         del /f /q "%SCRIPTDIR%%BASENAME%-new.bat" %debugredir%
     )
 )
-del /f /q "%SCRIPTDIR%%BASENAME%.old" %debugredir%
+del /f /q "%SCRIPTDIR%%BASENAMENONEW%.old" %debugredir%
 
 echo %GRE% !PASS.%LNG%!%RES%
 
@@ -2062,11 +2142,36 @@ if "%nocls%" EQU 0 cls
 goto menu
 
 
+:: Define a function to log messages
+:elog
+:: Display msg (%~1) to console and "%UNRENLOG%"
+set "msg=%~1"
+if "!msg!" == "." (
+    echo.
+    if defined UNRENLOG (
+       echo. >> "!UNRENLOG!"
+    )
+) else (
+    echo !msg!
+
+    if defined UNRENLOG (
+        :: Strip color variables for logging
+        set "cleanmsg=!msg!"
+        for %%C in (GRY RED GRE YEL MAG CYA RES) do (
+            call set "cleanmsg=%%cleanmsg:!%%C!=%%"
+        )
+        echo !cleanmsg! >> "!UNRENLOG!"
+    )
+)
+
+exit /b
+
+
 :: Call :exitn for cleanup only or goto exitn for ending script
 :exitn
 set "val=%~1"
 
-if %debuglevel% geq 1 (
+if %debuglevel% GEQ 1 (
     echo === Variables ===
     set
     echo === Variables ===
