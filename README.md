@@ -1,25 +1,22 @@
 ### 🔖 Versions
 
-![UnRen-forall](https://img.shields.io/badge/UnRen--forall-0.38-blue)
-![UnRen-legacy](https://img.shields.io/badge/UnRen--legacy-9.7.4-green)
-![UnRen-current](https://img.shields.io/badge/UnRen--current-9.7.23-purple)
+![UnRen-forall](https://img.shields.io/badge/UnRen--forall-0.40-blue)
+![UnRen-legacy](https://img.shields.io/badge/UnRen--legacy-9.7.6-green)
+![UnRen-current](https://img.shields.io/badge/UnRen--current-9.7.27-purple)
 ![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
 ![Downloads](https://img.shields.io/github/downloads/Lurmel/UnRen-forall/total)
 
 
 ## 📑 Table of Contents
 
-- [🔧 Third-Party Tools Used](#-third-party-tools-used)
-- [📦 Included Files](#-included-files)
 - [📥 Download](#-download)
-- [🚀 Features](#-features)
+- [🔧 Features](#-features)
+- [📦 Included Files](#-included-files)
 - [🛠️ How to Use](#how-to-use)
 - [❓ FAQ](#-faq)
 - [📜 Changelog](#-changelog)
 - [⚠️ Disclaimer](#disclaimer)
 - [⚖️ License](#license)
-
----
 
 # 🎮 UnRen Toolkit — Multilingual Batch for Ren'Py Games
 
@@ -29,24 +26,11 @@ What started as a simple launcher evolved into a multilingual toolkit with custo
 
 ---
 
-<a name="third-party-tools-used"></a>
-## 🔧 Third-Party Tools Used
-
-UnRen relies on several external tools developed by the Ren'Py community to handle archive extraction and script decompilation. Full credit goes to their respective authors:
-
-- [rpatool](https://github.com/Shizmob/rpatool) – A command-line utility for extracting `.rpa` archives.
-- [unrpa](https://github.com/CensoredUsername/unrpa) – A Python-based extractor for Ren'Py `.rpa` files.
-- [unrpyc](https://github.com/CensoredUsername/unrpyc) – A decompiler for Ren'Py `.rpyc` compiled scripts.
-
-These tools are essential for UnRen's functionality and are used respectfully under their respective licenses.
-
----
-
 ## 📦 Included Files
 
-- `UnRen-forall.bat` — Multilingual launcher (Version 0.38)
-- `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.7.4)
-- `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.23)
+- `UnRen-forall.bat` — Multilingual launcher (Version 0.40)
+- `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.7.6)
+- `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.27)
 - `UnRen-cfg.zip` — Contains `UnRen-cfg.bat` to configure language and batch behavior
 - `UnRen-link.txt` — Contains the download link for the full package and a changelog for updates
 
@@ -54,8 +38,7 @@ These tools are essential for UnRen's functionality and are used respectfully un
 
 ## 📥 Download
 
-[⬇️ Download latest release](https://github.com/Lurmel/UnRen-forall/releases/download/UnRen-forall-la_0.38-le_9.7.4-cu_9.7.23/UnRen-forall-la_0.38-le_9.7.4-cu_9.7.23.zip)
-
+[⬇️ Download latest release](https://github.com/Lurmel/UnRen-forall/releases/download/UnRen-forall-la_0.40-le_9.7.6-cu_9.7.27/UnRen-forall-la_0.40-le_9.7.6-cu_9.7.27.zip)
 ---
 
 ## 🚀 Features
@@ -93,7 +76,7 @@ This project is designed to be lightweight, user-friendly, and respectful of you
 
 ## ❓ FAQ
 
-See [FAQ](FAQ) for answers to common questions.
+See [FAQ.md](FAQ.md) for answers to common questions.
 
 ---
 
@@ -117,6 +100,11 @@ This project is licensed under the GNU General Public License v3.0.
 You are free to use, modify, and distribute it under the same terms.
 Commercial use is not permitted unless the source remains open and licensed under GPL.
 See the [LICENSE](LICENSE) file for full details.
+
+
+
+
+
 
 
 

@@ -4,6 +4,22 @@ All dates are in the format MM/DD/YY.
 
 ---
 
+## 🟢 12/24/25:
+	UnRen-forall.bat 0.40, UnRen-current.bat 9.7.27 & UnRen-legacy.bat 9.7.6
+
+	Common modifications for all scripts:
+	- Fixed a bug that sometimes prevented the entered game directory from being processed correctly.
+	- Added detection of prohibited characters when used with a Windows batch file
+	  However, the characters & ! ^ are completely prohibited and cannot be included in the detection
+
+	Common modifications for UnRen-current.bat & UnRen-legacy.bat:
+	- Fixed bug with RPA archive type detection not working with Python 2.7
+	- A better Python script for detectng RPA extensin archive name, even if dev have modified the Ren'Py shipped
+	- Added code to prohibit the use of UnRen[legacy|current].bat in the wrong environment.
+	- Added more infos in the UnRen-forall.log
+
+---
+
 ## 🟢 12/11/25: My biggest update since the beginning !
 	UnRen-forall.bat 0.38, UnRen-current.bat 9.7.23 & UnRen-legacy.bat 9.7.4
 
@@ -45,7 +61,6 @@ Specific for UnRen-current.bat:
   -  You can select multiple options from main menu. By default you have the equivalent of option 9 from the old UnReb-forall.bat
   -  You can manage the default execution by downloading UnRen-cfg.zip, extract to where the scripts are and edit to modify MDEFS2 to reflect what you want to be the default action when UnRen-current.bat is launched
   -  After the first execution, the default entry for main menu will be x (Exit).
-
 
 ---
 
@@ -171,7 +186,3 @@ Specific for UnRen-current.bat:
 ---
 
 If you encounter any issues, please refer to the `UnRen-forall.log` file and let me know. I’ll make corrections as needed.
-
-
-
-
