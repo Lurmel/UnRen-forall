@@ -5,7 +5,7 @@ All dates are in the format MM/DD/YY.
 ---
 
 ## 🟢 12/24/25:
-	UnRen-forall.bat 0.40, UnRen-current.bat 9.7.27 & UnRen-legacy.bat 9.7.6
+	UnRen-forall.bat 0.40, UnRen-current.bat 9.7.27b & UnRen-legacy.bat 9.7.6b
 
 	Common modifications for all scripts:
 	- Fixed a bug that sometimes prevented the entered game directory from being processed correctly.
@@ -13,6 +13,8 @@ All dates are in the format MM/DD/YY.
 	  However, the characters & ! ^ are completely prohibited and cannot be included in the detection
 
 	Common modifications for UnRen-current.bat & UnRen-legacy.bat:
+  - Bug correction about the improper detection of the extension RPA archive name
+	- Add the ability to force RPA archive unpack if it's not properly identified
 	- Fixed bug with RPA archive type detection not working with Python 2.7
 	- A better Python script for detectng RPA extensin archive name, even if dev have modified the Ren'Py shipped
 	- Added code to prohibit the use of UnRen[legacy|current].bat in the wrong environment.
