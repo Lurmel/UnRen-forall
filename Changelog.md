@@ -4,6 +4,32 @@ All dates are in the format MM/DD/YY.
 
 ---
 
+## 🟢 12/30/25:
+	UnRen-forall.bat 0.42, UnRen-current.bat 9.7.38 & UnRen-legacy.bat 9.7.18
+
+	Common modifications for all scripts:
+	- Microsoft has removed wmic from certain versions of Windows because it can be used by malware.
+	  I have therefore added powershell code to replace it so that UnRen scripts can be displayed in your language.
+	- Correction of the code page that was not applied to UnRen scripts calls from forall.
+	  This could cause Latin or Slavic characters to display incorrectly.
+	-
+
+	Common modifications for UnRen-current.bat & UnRen-legacy.bat:
+	- Minor bug & typo fixes
+	- Add the CTIME option in UnRen-cfg.bat if you want to stay longer on the choice questions (Default 5s).
+	- Unrpyc print now the version number and issue/PR applied by me.
+	- Removed Cyrillic character from choice and updated sentences to remove bug in a non UTF-8 system.
+	- Activation of option 6 to chain deobfuscation and decompilation.
+	- Added option 7 to force extraction of RPA archives that still have an intact header.
+	- Added processing in the order you enter it, whereas previously it was processed alphanumerically.
+	  Now you can enter 72k1 for a game where the RPA archives would be encrypted,
+	  follow up with decompilation, add 0x52_urm, then decompress it if the game no longer supports
+	  standard RPAs. All in one go.
+	- The choice.exe command is now launched with the full path to avoid using another program.
+	- I have improved the altrpatool.py for extracting RPA archives crypted.
+
+---
+
 ## 🟢 12/24/25:
 	UnRen-forall.bat 0.40, UnRen-current.bat 9.7.27b & UnRen-legacy.bat 9.7.6b
 

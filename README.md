@@ -1,8 +1,8 @@
 ### 🔖 Versions
 
-![UnRen-forall](https://img.shields.io/badge/UnRen--forall-0.40-blue)
-![UnRen-legacy](https://img.shields.io/badge/UnRen--legacy-9.7.6-green)
-![UnRen-current](https://img.shields.io/badge/UnRen--current-9.7.27-purple)
+![UnRen-forall](https://img.shields.io/badge/UnRen--forall-0.42-blue)
+![UnRen-legacy](https://img.shields.io/badge/UnRen--legacy-9.7.18-green)
+![UnRen-current](https://img.shields.io/badge/UnRen--current-9.7.38-purple)
 ![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
 ![Downloads](https://img.shields.io/github/downloads/Lurmel/UnRen-forall/total)
 
@@ -28,9 +28,9 @@ What started as a simple launcher evolved into a multilingual toolkit with custo
 
 ## 📦 Included Files
 
-- `UnRen-forall.bat` — Multilingual launcher (Version 0.40)
-- `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.7.6)
-- `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.27)
+- `UnRen-forall.bat` — Multilingual launcher (Version 0.42)
+- `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.7.18)
+- `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.38)
 - `UnRen-cfg.zip` — Contains `UnRen-cfg.bat` to configure language and batch behavior
 - `UnRen-link.txt` — Contains the download link for the full package and a changelog for updates
 

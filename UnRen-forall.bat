@@ -1,4 +1,8 @@
 @echo off
+:: Get the current code page
+for /f "tokens=2 delims=:" %%a in ('chcp') do set "OLD_CP=%%a"
+:: Switch to code page 65001 for UTF-8
+chcp 65001 >nul
 setlocal EnableDelayedExpansion
 
 :: UnRen-forall.bat - UnRen Launcher Script named UnRen-forall.bat for compatibility
@@ -8,7 +12,7 @@ setlocal EnableDelayedExpansion
 :: DO NOT MODIFY BELOW THIS LINE unless you know what you're doing
 :: Define various global names
 set "NAME=forall"
-set "VERSION=(v0.40) (12/24/25)"
+set "VERSION=(v0.42) (12/29/25)"
 title UnRen-%NAME%.bat - %VERSION%
 set "URL_REF=https://f95zone.to/threads/unrengui-unren-forall-v9-4-unren-powershell-forall-v9-4-unren-old.92717/post-17110063/"
 set "SCRIPTDIR=%~dp0"
@@ -51,15 +55,18 @@ set "NEW_COLS=110"
 mode con: cols=%NEW_COLS% lines=62
 
 if defined LNG goto lngtest
-:: Get the current code page
-for /f "tokens=2 delims=:" %%a in ('chcp') do set "OLD_CP=%%a"
-:: Switch to code page 65001 for UTF-8
-chcp 65001 >nul
 
-:: Clean retrieval of language code via WMIC
-for /f "skip=1 tokens=1" %%l in ('wmic os get oslanguage') do (
-    set LNGID=%%l
-    goto found_lcid
+:: Clean retrieval of language code via WMIC or PowerShell
+if exist C:\Windows\System32\wbem\wmic.exe (
+    for /f "skip=1 tokens=1" %%l in ('wmic os get oslanguage') do (
+        set LNGID=%%l
+        goto found_lcid
+    )
+) else (
+    for /f %%l in ('powershell.exe -Command "Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object -ExpandProperty OSLanguage"') do (
+        set LNGID=%%l
+        goto found_lcid
+    )
 )
 
 :found_lcid
@@ -385,7 +392,7 @@ set "invchars.de=Ungültiges Zeichen im Pfad gefunden..."
 set "invchars.ru=Обнаружен недействительный символ в пути доступа..."
 set "HAS_BAD="
 :: Characters that CAN appear in a valid Windows path but WILL break batch logic:
-for %%C in ("=" ";" "'" "`" "[" "]" "{" "}" "+" "," "~") do (
+for %%C in ("=" ";" "'" "`" "[" "]" "{" "}" "+" "~") do (
     echo "!WORKDIR!" | find "%%~C" >nul && set "HAS_BAD=%%~C"
 )
 
@@ -728,11 +735,11 @@ if not exist "!detect_renpy_version_py!" (
 del /f /q "%detect_renpy_version_py%" %DEBUGREDIR%
 
 :: Set the colors and default choice
-if %renpyversion% GEQ 8 (
+if %RENPYVERSION% GEQ 8 (
     set "ESC1=%RED%"
     set "ESC2=%GRE%"
     set "def=2"
-) else if %renpyversion% LEQ 7 (
+) else if %RENPYVERSION% LEQ 7 (
     set "ESC1=%GRE%"
     set "ESC2=%RED%"
     set "def=1"
@@ -1643,7 +1650,7 @@ set "etext5.ru=Пожалуйста, введите название игры (�
 
 :: find the current game name by checking the presence of same name with .exe, .py and .sh extension
 call :elog .
-if not "%OPTION%" == "m" echo.
+if not "!OPTION!" == "m" echo.
 <nul set /p="!etext1.%LNG%!... "
 
 set "processed="
