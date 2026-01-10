@@ -12,7 +12,7 @@ setlocal EnableDelayedExpansion
 :: DO NOT MODIFY BELOW THIS LINE unless you know what you're doing
 :: Define various global names
 set "NAME=forall"
-set "VERSION=(v0.42) (12/29/25)"
+set "VERSION=(v0.42a) (01/10/26)"
 title UnRen-%NAME%.bat - %VERSION%
 set "URL_REF=https://f95zone.to/threads/unrengui-unren-forall-v9-4-unren-powershell-forall-v9-4-unren-old.92717/post-17110063/"
 set "SCRIPTDIR=%~dp0"
@@ -392,7 +392,7 @@ set "invchars.de=Ungültiges Zeichen im Pfad gefunden..."
 set "invchars.ru=Обнаружен недействительный символ в пути доступа..."
 set "HAS_BAD="
 :: Characters that CAN appear in a valid Windows path but WILL break batch logic:
-for %%C in ("=" ";" "'" "`" "[" "]" "{" "}" "+" "~") do (
+for %%C in ("(" ")" "=" ";" "'" "`" "[" "]" "{" "}" "+" "~") do (
     echo "!WORKDIR!" | find "%%~C" >nul && set "HAS_BAD=%%~C"
 )
 

@@ -6,7 +6,7 @@ REM NO BORRE ESTAS LÍNEAS, SON NECESARIAS PARA LA ACTUALIZACIÓN AUTOMÁTICA.
 REM NO ELIMINE ESTAS LÍNEAS, SON NECESARIAS PARA LA ACTUALIZACIÓN AUTOMÁTICA.
 REM DIESE ZEILEN NICHT LÖSCHEN, SIE SIND FÜR DIE AUTOMATISCHE AKTUALISIERUNG ERFORDERLICH.
 REM ВЫ НЕ ДОЛЖНЫ УДАЛЯТЬ ЭТИ СТРОКИ, ОНИ НЕОБХОДИМЫ ДЛЯ АВТОМАТИЧЕСКОГО ОБНОВЛЕНИЯ.
-set "forall_url=https://github.com/Lurmel/UnRen-forall/releases/download/main/UnRen-forall-la_0.42-le_9.7.18-cu_9.7.38.zip"
+set "forall_url=https://github.com/Lurmel/UnRen-forall/releases/download/main/UnRen-forall-la_0.42a-le_9.7.18a-cu_9.7.38a.zip"
 
 
 >"%scriptdir%/UnRen-Changelog.txt" (
