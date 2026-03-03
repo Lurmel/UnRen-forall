@@ -1,8 +1,8 @@
 ### 🔖 Versions
 
-![UnRen-forall](https://img.shields.io/badge/UnRen--forall-0.42-blue)
-![UnRen-legacy](https://img.shields.io/badge/UnRen--legacy-9.7.18-green)
-![UnRen-current](https://img.shields.io/badge/UnRen--current-9.7.38-purple)
+![UnRen-forall](https://img.shields.io/badge/UnRen--forall-0.50-blue)
+![UnRen-legacy](https://img.shields.io/badge/UnRen--legacy-9.7.31-green)
+![UnRen-current](https://img.shields.io/badge/UnRen--current-9.7.51-purple)
 ![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
 ![Downloads](https://img.shields.io/github/downloads/Lurmel/UnRen-forall/total)
 
@@ -28,9 +28,9 @@ What started as a simple launcher evolved into a multilingual toolkit with custo
 
 ## 📦 Included Files
 
-- `UnRen-forall.bat` — Multilingual launcher (Version 0.42)
-- `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.7.18)
-- `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.38)
+- `UnRen-forall.bat` — Multilingual launcher (Version 0.50)
+- `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.7.31)
+- `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.51)
 - `UnRen-cfg.zip` — Contains `UnRen-cfg.bat` to configure language and batch behavior
 - `UnRen-link.txt` — Contains the download link for the full package and a changelog for updates
 
@@ -46,7 +46,7 @@ What started as a simple launcher evolved into a multilingual toolkit with custo
 
 - Automatic detection of Ren'Py version
 - Launches the appropriate batch script (`legacy` or `current`)
-- Multilingual interface: 🇩🇪 🇬🇧 🇪🇸 🇫🇷 🇮🇹 🇷🇺
+- Multilingual interface: 🇩🇪 🇬🇧 🇪🇸 🇫🇷 🇮🇹 🇷🇺 zh
 - Independent options not tied to Ren'Py (e.g. unpacking, extraction)
 - Configurable behavior via `UnRen-cfg.bat`
 - Update system with changelog display
@@ -101,7 +101,6 @@ This project is licensed under the GNU General Public License v3.0.
 You are free to use, modify, and distribute it under the same terms.
 Commercial use is not permitted unless the source remains open and licensed under GPL.
 See the [LICENSE](LICENSE) file for full details.
-
 
 
 

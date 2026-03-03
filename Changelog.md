@@ -4,6 +4,28 @@ All dates are in the format MM/DD/YY.
 
 ---
 
+## 03/03/26:
+	UnRen-forall.bat 0.50, UnRen-current.bat 9.7.51 & UnRen-legacy.bat 9.7.31
+
+	Common modifications for all scripts:
+	- Optimisation code and bug fixes.
+	- All commands are now launched with the full path, to avoid overly long PATHs.
+	- PowerShell Core are now searched and used instead of PowerShell .NET in order to improve speed.
+	- Added additional code for debugging assistance.
+	- Chinese added to the list of languages.
+	- Move the auto-update from startup to manual update with the ‘u’ option.
+	- Improved detection of prohibited characters in the tree structure and improved display of these characters.
+	- New code to detect the Ren'Py version, in case the script_version.txt file is not present.
+	- Replacing the choice.exe command with a Python script, so that the timer can be interrupted if a keyboard action occurs.
+
+	Common modifications for UnRen-current.bat & UnRen-legacy.bat:
+	- No more check presence of all files at startup, so legacy and current can be used alone.
+	- New improved RPA archive type to add support of SVAC-1.0 true and fake.
+	- Added new beta code for supporting the new Ren'Py format SVAC-1.0.
+	- Updated CensoredUsername unrpyc.py to the master 2.0.4 version.
+
+---
+
 ## 🟢 12/30/25:
 	UnRen-forall.bat 0.42, UnRen-current.bat 9.7.38 & UnRen-legacy.bat 9.7.18
 
