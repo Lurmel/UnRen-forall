@@ -15,7 +15,7 @@ setlocal EnableDelayedExpansion
 set "NAME=forall"
 set "VERSION=(v0.53) (03/09/26)"
 title UnRen-%NAME%.bat - %VERSION%
-set "URL_REF=https://f95zone.to/threads/92717/post-17110063//"
+set "URL_REF=https://f95zone.to/threads/92717/post-17110063/"
 set "SCRIPTDIR=%~dp0"
 set "UPD_TDIR=%TEMP%\UnRenUpdate"
 set "SCRIPTNAME=%~nx0"
@@ -205,6 +205,30 @@ set "UNACONT.it=Impossibile continuare."
 set "UNACONT.de=Kann nicht fortgesetzt werden."
 set "UNACONT.ru=Не удалось продолжить."
 set "UNACONT.zh=无法继续。"
+
+set "LOGCHK.en=Please check the "%UNRENLOG%" for details."
+set "LOGCHK.fr=Veuillez consulter le "%UNRENLOG%" pour plus de détails."
+set "LOGCHK.es=Por favor, consulte el "%UNRENLOG%" para más detalles."
+set "LOGCHK.it=Controlla il "%UNRENLOG%" per ulteriori dettagli."
+set "LOGCHK.de=Bitte überprüfen Sie das "%UNRENLOG%" auf Einzelheiten."
+set "LOGCHK.ru=Пожалуйста, проверьте "%UNRENLOG%" для получения дополнительных сведений."
+set "LOGCHK.zh=请查看 "%UNRENLOG%" 以了解详情。"
+
+set "DONE.en=Operation completed."
+set "DONE.fr=Opération terminée."
+set "DONE.es=Operación completada."
+set "DONE.it=Operazione completata."
+set "DONE.de=Vorgang abgeschlossen."
+set "DONE.ru=Операция завершена."
+set "DONE.zh=操作完成。"
+
+set "UNIT.en=bytes"
+set "UNIT.fr=octets"
+set "UNIT.es=bytes"
+set "UNIT.it=byte"
+set "UNIT.de=Bytes"
+set "UNIT.ru=байт"
+set "UNIT.zh=字节"
 
 set "GRY=[90m"
 set "RED=[91m"
@@ -1958,7 +1982,7 @@ if %ERRORLEVEL% EQU 0 (
 :: Check if the new batch file is different from the running one
 if "%batch_name%.bat" == "%running_batch%" goto special_upd
 
-echo !updating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%
+<nul set /p="!updating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%"
 move /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old" %DEBUGREDIR%
 if %ERRORLEVEL% NEQ 0 (
     echo %RED%!FAIL.%LNG%! %RES%
@@ -1980,8 +2004,9 @@ if %ERRORLEVEL% NEQ 0 (
 
 goto :eof
 
+
 :special_upd
-echo !rupdating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%
+<nul set /p="!rupdating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%"
 copy /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old" %DEBUGREDIR%
 if %ERRORLEVEL% NEQ 0 (
     echo %RED%!FAIL.%LNG%! %RES%
@@ -2096,13 +2121,13 @@ set "cupd6.de=Fehler beim Herunterladen des Updates."
 set "cupd6.ru=Ошибка при загрузке обновления."
 set "cupd6.zh=下载更新时出错。"
 
-set "cupd7.en=Do you want to update now? [y/n] (default: y):"
-set "cupd7.fr=Voulez-vous faire la mise à jour maintenant ? [o/n] (défaut : o) :"
-set "cupd7.es=¿Desea actualizar ahora? [s/n] (predeterminado: s):"
-set "cupd7.it=Vuoi aggiornare adesso? [s/n] (impostazione predefinita: s):"
-set "cupd7.de=Möchten Sie jetzt aktualisieren? [y/n] (Standard: y):"
-set "cupd7.ru=Хотите обновиться сейчас? [y/n] (по умолчанию: y):"
-set "cupd7.zh=是否立即更新？[y/n]（默认 y）："
+set "cupd7.en=Do you want to update now? [y/n] (default: n):"
+set "cupd7.fr=Voulez-vous faire la mise à jour maintenant ? [o/n] (défaut : n) :"
+set "cupd7.es=¿Desea actualizar ahora? [s/n] (predeterminado: n):"
+set "cupd7.it=Vuoi aggiornare adesso? [s/n] (impostazione predefinita: n):"
+set "cupd7.de=Möchten Sie jetzt aktualisieren? [y/n] (Standard: n):"
+set "cupd7.ru=Хотите обновиться сейчас? [y/n] (по умолчанию: n):"
+set "cupd7.zh=是否立即更新？[y/n]（默认 n）："
 
 set "cupd8.en=No download update link found."
 set "cupd8.fr=Aucun lien de téléchargement de mise à jour trouvé."
@@ -2112,6 +2137,7 @@ set "cupd8.de=Kein Download-Update-Link gefunden."
 set "cupd8.ru=Ссылка для загрузки обновления не найдена."
 set "cupd8.zh=未找到下载更新链接。"
 
+echo.
 <nul set /p="!cupd1.%LNG%!..."
 del /f /q "%TEMP%\%upd_link%.tmp" %DEBUGREDIR%
 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%upd_url%', '%TEMP%\%upd_link%.tmp')" >> "%UNRENLOG%"
@@ -2146,11 +2172,11 @@ if not exist "%TEMP%\%upd_link%.tmp" (
         type "%SCRIPTDIR%%upd_clog%.tmp"
         del /f /q "%SCRIPTDIR%%upd_clog%.b64" %DEBUGREDIR%
         del /f /q "%SCRIPTDIR%%upd_clog%.tmp" %DEBUGREDIR%
-        call :elog .
 
-        set "coption="
+        call :elog .
+        call :elog .
         call :choiceEx "!cupd7.%LNG%!" "OSJYN" "N" "%CTIME%" "-rawMsg"
-        if ERRORLEVEL 5 goto :eof
+        if !ERRORLEVEL! EQU 5 goto :eof
         set "new_upd=1"
     ) else (
         call :elog "%YEL% !cupd2.%LNG%!%RES%"

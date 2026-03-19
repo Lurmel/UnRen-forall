@@ -2991,7 +2991,7 @@ if %ERRORLEVEL% EQU 0 (
 :: Check if the new batch file is different from the running one
 if "%batch_name%.bat" == "%running_batch%" goto special_upd
 
-echo !updating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%
+<nul set /p="!updating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%"
 move /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old" %DEBUGREDIR%
 if %ERRORLEVEL% NEQ 0 (
     echo %RED%!FAIL.%LNG%! %RES%
@@ -3013,8 +3013,9 @@ if %ERRORLEVEL% NEQ 0 (
 
 goto :eof
 
+
 :special_upd
-echo !rupdating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%
+<nul set /p="!rupdating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%"
 copy /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old" %DEBUGREDIR%
 if %ERRORLEVEL% NEQ 0 (
     echo %RED%!FAIL.%LNG%! %RES%
@@ -3129,13 +3130,13 @@ set "cupd6.de=Fehler beim Herunterladen des Updates."
 set "cupd6.ru=Ошибка при загрузке обновления."
 set "cupd6.zh=下载更新时出错。"
 
-set "cupd7.en=Do you want to update now? [y/n] (default: y):"
-set "cupd7.fr=Voulez-vous faire la mise à jour maintenant ? [o/n] (défaut : o) :"
-set "cupd7.es=¿Desea actualizar ahora? [s/n] (predeterminado: s):"
-set "cupd7.it=Vuoi aggiornare adesso? [s/n] (impostazione predefinita: s):"
-set "cupd7.de=Möchten Sie jetzt aktualisieren? [y/n] (Standard: y):"
-set "cupd7.ru=Хотите обновиться сейчас? [y/n] (по умолчанию: y):"
-set "cupd7.zh=是否立即更新？[y/n]（默认 y）："
+set "cupd7.en=Do you want to update now? [y/n] (default: n):"
+set "cupd7.fr=Voulez-vous faire la mise à jour maintenant ? [o/n] (défaut : n) :"
+set "cupd7.es=¿Desea actualizar ahora? [s/n] (predeterminado: n):"
+set "cupd7.it=Vuoi aggiornare adesso? [s/n] (impostazione predefinita: n):"
+set "cupd7.de=Möchten Sie jetzt aktualisieren? [y/n] (Standard: n):"
+set "cupd7.ru=Хотите обновиться сейчас? [y/n] (по умолчанию: n):"
+set "cupd7.zh=是否立即更新？[y/n]（默认 n）："
 
 set "cupd8.en=No download update link found."
 set "cupd8.fr=Aucun lien de téléchargement de mise à jour trouvé."
@@ -3181,11 +3182,11 @@ if not exist "%TEMP%\%upd_link%.tmp" (
         type "%SCRIPTDIR%%upd_clog%.tmp"
         del /f /q "%SCRIPTDIR%%upd_clog%.b64" %DEBUGREDIR%
         del /f /q "%SCRIPTDIR%%upd_clog%.tmp" %DEBUGREDIR%
-        call :elog .
 
-        set "coption="
+        call :elog .
+        call :elog .
         call :choiceEx "!cupd7.%LNG%!" "OSJYN" "N" "%CTIME%" "-rawMsg"
-        if ERRORLEVEL 5 goto :eof
+        if !ERRORLEVEL! EQU 5 goto :eof
         set "new_upd=1"
     ) else (
         call :elog "%YEL% !cupd2.%LNG%!%RES%"
