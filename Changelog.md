@@ -4,6 +4,24 @@ All dates are in the format MM/DD/YY.
 
 ---
 
+## 03/09/26:
+	UnRen-forall.bat 0.53, UnRen-current.bat 9.7.56 & UnRen-legacy.bat 9.7.36
+
+	Common modifications for all scripts:
+	- Optimisation code and bug fixes.
+	- Another new code to detect the Ren'Py version, in case the script_version.txt file is not present.
+	- Improved detection of the Python version running on x86 and x64 architectures,
+	  and fixed the bug related to selecting the wrong version with Ren'Py 8.3.x.
+	- Removed the wrong chcp 937 for Chinese language.
+	- No more call of UnRen-cfg.bat, it's now read as a standard text file.
+
+	Common modifications for UnRen-current.bat & UnRen-legacy.bat:
+	- File size are now displayed for all RPA and RPYC, to explain why sometime it's slow.
+	- Added support for the new .jas format, from JASON game.
+	- Added decryption support for RPYC with WOS SHIELD, from World of Secrets game.
+
+---
+
 ## 03/03/26:
 	UnRen-forall.bat 0.50, UnRen-current.bat 9.7.51 & UnRen-legacy.bat 9.7.31
 

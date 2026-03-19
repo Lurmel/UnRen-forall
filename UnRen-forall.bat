@@ -3,7 +3,7 @@
 :: Get the current code page
 for /f "tokens=2 delims=:" %%a in ('%SYSTEMROOT%\System32\chcp.com') do set "OLD_CP=%%a"
 :: Switch to code page 65001 for UTF-8
-%SYSTEMROOT%\System32\chcp.com 65001 >nul
+"%SYSTEMROOT%\System32\chcp.com" 65001 >nul
 setlocal EnableDelayedExpansion
 
 :: UnRen-forall.bat - UnRen Launcher Script named UnRen-forall.bat for compatibility
@@ -13,9 +13,9 @@ setlocal EnableDelayedExpansion
 :: DO NOT MODIFY BELOW THIS LINE unless you know what you're doing
 :: Define various global names
 set "NAME=forall"
-set "VERSION=(v0.50) (03/02/26)"
+set "VERSION=(v0.53) (03/09/26)"
 title UnRen-%NAME%.bat - %VERSION%
-set "URL_REF=https://f95zone.to/threads/unrengui-unren-forall-v9-4-unren-powershell-forall-v9-4-unren-old.92717/post-17110063/"
+set "URL_REF=https://f95zone.to/threads/92717/post-17110063//"
 set "SCRIPTDIR=%~dp0"
 set "UPD_TDIR=%TEMP%\UnRenUpdate"
 set "SCRIPTNAME=%~nx0"
@@ -28,8 +28,10 @@ set "CTIME=5"
 :: External configuration file for LNG, MDEFS, MDEFS2 and CTIME.
 set "UNREN_CFG=%SCRIPTDIR%UnRen-cfg.bat"
 :: Load external configuration
-if exist "%UNREN_CFG%" (
-    call "%UNREN_CFG%"
+for /f "usebackq tokens=1,* delims== " %%A in ("%UNREN_CFG%") do (
+    if /i "%%A"=="set" (
+        set %%B
+    )
 )
 
 :: Set the cmd screen size with backup of old settings
@@ -72,14 +74,14 @@ if exist "%SYSTEMROOT%\System32\wbem\wmic.exe" (
 )
 
 :found_lcid
-:: LCID correspondences
-if "!LNGID!" == "1033" set "LNG=en"
-if "!LNGID!" == "1036" set "LNG=fr"
-if "!LNGID!" == "3082" set "LNG=es"
-if "!LNGID!" == "1040" set "LNG=it"
-if "!LNGID!" == "1031" set "LNG=de"
-if "!LNGID!" == "1049" set "LNG=ru"
-if "!LNGID!" == "2052" set "LNG=zh"
+:: LCID correspondence
+if "%LNGID%" == "1033" set "LNG=en"
+if "%LNGID%" == "1036" set "LNG=fr"
+if "%LNGID%" == "3082" set "LNG=es"
+if "%LNGID%" == "1040" set "LNG=it"
+if "%LNGID%" == "1031" set "LNG=de"
+if "%LNGID%" == "1049" set "LNG=ru"
+if "%LNGID%" == "2052" set "LNG=zh"
 
 if not defined LNG set "LNG=en"
 
@@ -94,8 +96,8 @@ if %ERRORLEVEL% NEQ 0 set "LNG=en"
 if not "%~2" == "" (
     set "LNG=%~2"
 )
-if "!LNG!" == "zh" (
-    %SYSTEMROOT%\System32\chcp.com 936 >nul
+if "%LNGID%" == "1036" if "%LNG%" == "zh" (
+    "%SYSTEMROOT%\System32\chcp.com" 936 >nul
 )
 
 :: Definition of reusable texts
@@ -212,7 +214,7 @@ set "MAG=[95m"
 set "CYA=[96m"
 set "RES=[0m"
 for /f "tokens=4-5 delims=. " %%i in ('ver') do set OSVERS=%%i.%%j
-if "!OSVERS!" == "6.1" (
+if "%OSVERS%" == "6.1" (
     set "GRY="
     set "RED="
     set "GRE="
@@ -252,7 +254,7 @@ set "sscreen3.ru=Сделано с <3 для фанатов - JoeLurmel @ f95zon
 set "sscreen3.zh=为粉丝倾情制作 - 作者 JoeLurmel @ f95zone.to"
 
 :: Splash screen
-if "!NOCLS!" == "0" cls
+if "%NOCLS%" == "0" cls
 echo.
 echo           %YEL%  ---------------------------------------------------------------------------------%RES%
 echo           %YEL%     __  __      ____                  __          __%RES%
@@ -290,7 +292,7 @@ if !rand! == 16 echo          %GRY%  "You have been recruited by the Star League
 echo           %YEL%  ---------------------------------------------------------------------------------%RES%
 echo.
 
-if "!INITIALIZED!" == "1" goto skipInit
+if "%INITIALIZED%" == "1" goto skipInit
 
 :: Initializing debug mode
 set "DEBUGREDIR=>nul 2>&1"
@@ -307,30 +309,6 @@ set "pshell.de=Überprüfung der Verfügbarkeit von PowerShell... "
 set "pshell.ru=Проверка доступности PowerShell... "
 set "pshell.zh=检查 PowerShell 是否可用... "
 
-set "pshell1.en=Powershell is required."
-set "pshell1.fr=Erreur Powershell est requis."
-set "pshell1.es=Error Se requiere Powershell."
-set "pshell1.it=Errore Powershell è richiesto."
-set "pshell1.de=Fehler Powershell ist erforderlich."
-set "pshell1.ru=Ошибка требуется PowerShell."
-set "pshell1.zh=需要 PowerShell。"
-
-set "pshell2.en=This is included in Windows 7, 8 and 10. XP/Vista users can"
-set "pshell2.fr=Ce programme est inclus dans Windows 7, 8 et 10. Les utilisateurs de XP/Vista peuvent"
-set "pshell2.es=Esto está incluido en Windows 7, 8 y 10. Los usuarios de XP/Vista pueden"
-set "pshell2.it=Questo programma è incluso in Windows 7, 8 e 10. Gli utenti di XP/Vista possono"
-set "pshell2.de=Dieses Programm ist in Windows 7, 8 und 10 enthalten. XP/Vista-Benutzer können"
-set "pshell2.ru=Это включено в Windows 7, 8 и 10. Пользователи XP/Vista могут"
-set "pshell2.zh=Windows 7、8 和 10 包含此组件。XP/Vista 用户可以"
-
-set "pshell3.en=download it here: %MAG%https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
-set "pshell3.fr=le télécharger ici : %MAG%https://learn.microsoft.com/fr-fr/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
-set "pshell3.es=descargarlo aquí: %MAG%https://learn.microsoft.com/es-es/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
-set "pshell3.it=scaricarlo qui: %MAG%https://learn.microsoft.com/it-it/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
-set "pshell3.de=es hier herunterladen: %MAG%https://learn.microsoft.com/de-de/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
-set "pshell3.ru=скачать его здесь: %MAG%https://learn.microsoft.com/ru-ru/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
-set "pshell3.zh=在此下载：%MAG%https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
-
 echo !pshell.%LNG%! >> "%UNRENLOG%"
 <nul set /p=!pshell.%LNG%!
 set "PWRSHELL=%SYSTEMROOT%\system32\WindowsPowerShell\v1.0\powershell.exe"
@@ -338,6 +316,30 @@ for /f "delims=" %%A in ('"!SYSTEMROOT!\System32\where.exe" pwsh.exe 2^>nul') do
     if not "%%A" == "" set "PWRSHELL=%%A"
 )
 if not exist "%PWRSHELL%" (
+    set "pshell1.en=Powershell is required."
+    set "pshell1.fr=Erreur Powershell est requis."
+    set "pshell1.es=Error Se requiere Powershell."
+    set "pshell1.it=Errore Powershell è richiesto."
+    set "pshell1.de=Fehler Powershell ist erforderlich."
+    set "pshell1.ru=Ошибка требуется PowerShell."
+    set "pshell1.zh=需要 PowerShell。"
+
+    set "pshell2.en=This is included in Windows 7, 8 and 10. XP/Vista users can"
+    set "pshell2.fr=Ce programme est inclus dans Windows 7, 8 et 10. Les utilisateurs de XP/Vista peuvent"
+    set "pshell2.es=Esto está incluido en Windows 7, 8 y 10. Los usuarios de XP/Vista pueden"
+    set "pshell2.it=Questo programma è incluso in Windows 7, 8 e 10. Gli utenti di XP/Vista possono"
+    set "pshell2.de=Dieses Programm ist in Windows 7, 8 und 10 enthalten. XP/Vista-Benutzer können"
+    set "pshell2.ru=Это включено в Windows 7, 8 и 10. Пользователи XP/Vista могут"
+    set "pshell2.zh=Windows 7、8 和 10 包含此组件。XP/Vista 用户可以"
+
+    set "pshell3.en=download it here: %MAG%https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+    set "pshell3.fr=le télécharger ici : %MAG%https://learn.microsoft.com/fr-fr/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+    set "pshell3.es=descargarlo aquí: %MAG%https://learn.microsoft.com/es-es/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+    set "pshell3.it=scaricarlo qui: %MAG%https://learn.microsoft.com/it-it/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+    set "pshell3.de=es hier herunterladen: %MAG%https://learn.microsoft.com/de-de/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+    set "pshell3.ru=скачать его здесь: %MAG%https://learn.microsoft.com/ru-ru/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+    set "pshell3.zh=在此下载：%MAG%https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+
     call :elog "%RED%!FAIL.%LNG%!%RES%"
     call :elog .
     call :elog "    !pshell1.%LNG%! !UNACONT.%LNG%!"
@@ -368,34 +370,34 @@ if /i "%~3" == "-dd" (
 
 
 :: Set the working directory
-set "setpath1.en=Enter the path to the game, drag'n'drop it here,"
-set "setpath1.fr=Entrez le chemin vers le jeu, faites-le glisser ici,"
-set "setpath1.es=Introduzca la ruta al juego, arrástrelo aquí,"
-set "setpath1.it=Inserisci il percorso del gioco, trascinalo qui,"
-set "setpath1.de=Geben Sie den Pfad zum Spiel ein, ziehen Sie es hierher,"
-set "setpath1.ru=Введите путь к игре, перетащите его сюда,"
-set "setpath1.zh=输入游戏路径，将其拖放到此处，"
-
-set "setpath2.en=or press Enter if this tool is already in the desired folder."
-set "setpath2.fr=ou appuyez sur Entrée si cet outil se trouve déjà dans le dossier souhaité."
-set "setpath2.es=o presione Entrar si esta herramienta ya se encuentra en la carpeta deseada."
-set "setpath2.it=oppure premi Invio se questo strumento si trova già nella cartella desiderata."
-set "setpath2.de=oder drücken Sie die Eingabetaste, wenn sich dieses Tool bereits im gewünschten Ordner befindet."
-set "setpath2.ru=или нажмите Enter, если этот инструмент уже находится в нужной папке."
-set "setpath2.zh=或者如果此工具已在所需文件夹中，请按 Enter 键。"
-
-set "setpath3.en=If drag'n'drop does not work, please copy/paste the path instead: "
-set "setpath3.fr=Si le glisser-déposer ne fonctionne pas, veuillez copier/coller le chemin à la place : "
-set "setpath3.es=Si arrastrar y soltar no funciona, copie/pegue la ruta en su lugar: "
-set "setpath3.it=Se il trascinamento della selezione non funziona, copia/incolla il percorso invece: "
-set "setpath3.de=Wenn das Ziehen und Ablegen nicht funktioniert, kopieren Sie den Pfad bitte stattdessen hierher: "
-set "setpath3.ru=Если перетаскивание не работает, пожалуйста, скопируйте/вставьте путь вместо этого: "
-set "setpath3.zh=如果拖放不起作用，请复制/粘贴路径："
-
 :: Check if game path is provided and set it
 set "WORKDIR="
 setlocal disabledelayedexpansion
 if "%~1" == "" (
+    set "setpath1.en=Enter the path to the game, drag'n'drop it here,"
+    set "setpath1.fr=Entrez le chemin vers le jeu, faites-le glisser ici,"
+    set "setpath1.es=Introduzca la ruta al juego, arrástrelo aquí,"
+    set "setpath1.it=Inserisci il percorso del gioco, trascinalo qui,"
+    set "setpath1.de=Geben Sie den Pfad zum Spiel ein, ziehen Sie es hierher,"
+    set "setpath1.ru=Введите путь к игре, перетащите его сюда,"
+    set "setpath1.zh=输入游戏路径，将其拖放到此处，"
+
+    set "setpath2.en=or press Enter if this tool is already in the desired folder."
+    set "setpath2.fr=ou appuyez sur Entrée si cet outil se trouve déjà dans le dossier souhaité."
+    set "setpath2.es=o presione Entrar si esta herramienta ya se encuentra en la carpeta deseada."
+    set "setpath2.it=oppure premi Invio se questo strumento si trova già nella cartella desiderata."
+    set "setpath2.de=oder drücken Sie die Eingabetaste, wenn sich dieses Tool bereits im gewünschten Ordner befindet."
+    set "setpath2.ru=или нажмите Enter, если этот инструмент уже находится в нужной папке."
+    set "setpath2.zh=或者如果此工具已在所需文件夹中，请按 Enter 键。"
+
+    set "setpath3.en=If drag'n'drop does not work, please copy/paste the path instead: "
+    set "setpath3.fr=Si le glisser-déposer ne fonctionne pas, veuillez copier/coller le chemin à la place : "
+    set "setpath3.es=Si arrastrar y soltar no funciona, copie/pegue la ruta en su lugar: "
+    set "setpath3.it=Se il trascinamento della selezione non funziona, copia/incolla il percorso invece: "
+    set "setpath3.de=Wenn das Ziehen und Ablegen nicht funktioniert, kopieren Sie den Pfad bitte stattdessen hierher: "
+    set "setpath3.ru=Если перетаскивание не работает, пожалуйста, скопируйте/вставьте путь вместо этого: "
+    set "setpath3.zh=如果拖放不起作用，请复制/粘贴路径："
+
     setlocal enabledelayedexpansion
     call :elog .
     call :elog "!setpath1.%LNG%!"
@@ -418,22 +420,13 @@ set "WORKDIR=%WORKDIR:"=%"
 :: Normalize WORKDIR to an absolute path
 for %%A in ("%WORKDIR%") do set "WORKDIR=%%~fA"
 
-set "invchars.en=Invalid character detected in the path..."
-set "invchars.fr=Caractère invalide détecté dans le chemin..."
-set "invchars.es=Se ha detectado un carácter no válido en la ruta de acceso..."
-set "invchars.it=Carattere non valido rilevato nel percorso di accesso..."
-set "invchars.de=Ungültiges Zeichen im Pfad gefunden..."
-set "invchars.ru=Обнаружен недействительный символ в пути доступа..."
-set "invchars.zh=路径中检测到无效字符..."
 set "HAS_BAD="
 :: Characters that CAN appear in a valid Windows path but WILL break batch logic:
 for %%C in ("&" "!" "(" ")" "=" ";" "'" "`" "[" "]" "{" "}" "+" "~") do (
     echo "%WORKDIR%" | find "%%~C" >nul && (
         if not defined HAS_BAD (
-            rem Premier caractère trouvé
             call set "HAS_BAD=%%~C"
         ) else (
-            rem On ajoute à la liste existante
             call set "HAS_BAD=%%HAS_BAD%%,%%~C"
         )
     )
@@ -441,6 +434,14 @@ for %%C in ("&" "!" "(" ")" "=" ";" "'" "`" "[" "]" "{" "}" "+" "~") do (
 
 setlocal enabledelayedexpansion
 if defined HAS_BAD (
+    set "invchars.en=Invalid character detected in the path..."
+    set "invchars.fr=Caractère invalide détecté dans le chemin..."
+    set "invchars.es=Se ha detectado un carácter no válido en la ruta de acceso..."
+    set "invchars.it=Carattere non valido rilevato nel percorso di accesso..."
+    set "invchars.de=Ungültiges Zeichen im Pfad gefunden..."
+    set "invchars.ru=Обнаружен недействительный символ в пути доступа..."
+    set "invchars.zh=路径中检测到无效字符..."
+
     echo.
     echo !invchars.%LNG%! '%RED%!HAS_BAD!%RES%' !UNACONT.%LNG%!
     echo.
@@ -449,13 +450,7 @@ if defined HAS_BAD (
     call :exitn 3
 )
 
-set "wdir1.en=Error The specified directory does not exist."
-set "wdir1.fr=Erreur Le répertoire spécifié n'existe pas."
-set "wdir1.es=Error El directorio especificado no existe."
-set "wdir1.it=Errore la directory specificata non esiste."
-set "wdir1.de=Fehler Das angegebene Verzeichnis existiert nicht."
-set "wdir1.ru=Ошибка Указанный каталог не существует."
-set "wdir1.zh=错误：指定的目录不存在。"
+:: set "wdir1.xx=" are set later
 
 set "wdir2.en=Are you sure we're in the game's root directory?"
 set "wdir2.fr=Êtes-vous sûr que nous sommes dans le répertoire racine du jeu ?"
@@ -473,16 +468,16 @@ set "wdir3.de=Testen des Schreibzugriffs auf das Spieledirectory"
 set "wdir3.ru=Проверка доступа на запись в каталог игры"
 set "wdir3.zh=测试对游戏目录的写入权限"
 
-set "wdir4.en=You can't write in game directory."
-set "wdir4.fr=Vous ne pouvez pas écrire dans le répertoire du jeu."
-set "wdir4.es=No puedes escribir en el directorio del juego."
-set "wdir4.it=Non puoi scrivere nella directory di gioco."
-set "wdir4.de=Sie können nicht im Spieledirectory schreiben."
-set "wdir4.ru=Вы не можете писать в каталоге игры."
-set "wdir4.zh=无法写入游戏目录。"
-
 cd /d "%WORKDIR%"
 if %ERRORLEVEL% NEQ 0 (
+    set "wdir1.en=Error The specified directory does not exist."
+    set "wdir1.fr=Erreur Le répertoire spécifié n'existe pas."
+    set "wdir1.es=Error El directorio especificado no existe."
+    set "wdir1.it=Errore la directory specificata non esiste."
+    set "wdir1.de=Fehler Das angegebene Verzeichnis existiert nicht."
+    set "wdir1.ru=Ошибка Указанный каталог не существует."
+    set "wdir1.zh=错误：指定的目录不存在。"
+
     call :elog .
     call :elog "    %RED%!wdir1.%LNG%!%RES%"
     call :elog "    !wdir2.%LNG%!"
@@ -526,7 +521,7 @@ if not exist ".\lib" (
 if not exist ".\renpy" (
     set missing=1
 )
-if !missing! EQU 1 (
+if %missing% EQU 1 (
     call :elog " %RED%!FAIL.%LNG%!%RES%"
     call :elog "    !reqdir2.%LNG%! !UNACONT.%LNG%!"
     call :elog "    !wdir2.%LNG%!"
@@ -543,6 +538,14 @@ echo !wdir3.%LNG%!... >> "%UNRENLOG%"
 <nul set /p="!wdir3.%LNG%!... "
 copy nul "%WORKDIR%\game\test.txt" %DEBUGREDIR%
 if %ERRORLEVEL% NEQ 0 (
+    set "wdir4.en=You can't write in game directory."
+    set "wdir4.fr=Vous ne pouvez pas écrire dans le répertoire du jeu."
+    set "wdir4.es=No puedes escribir en el directorio del juego."
+    set "wdir4.it=Non puoi scrivere nella directory di gioco."
+    set "wdir4.de=Sie können nicht im Spieledirectory schreiben."
+    set "wdir4.ru=Вы не можете писать в каталоге игры."
+    set "wdir4.zh=无法写入游戏目录。"
+
     call :elog "%RED%!FAIL.%LNG%! %YEL%!wdir4.%LNG%!%RES%"
     call :elog .
     call :elog "    !wdir2.%LNG%!"
@@ -565,17 +568,11 @@ set "python1.de=Überprüfung der Verfügbarkeit von Python..."
 set "python1.ru=Проверка наличия Python..."
 set "python1.zh=检查 Python 是否可用..."
 
-set "python2.en=Cannot locate python directory."
-set "python2.fr=Impossible de localiser le répertoire python."
-set "python2.es=No se puede localizar el directorio de Python."
-set "python2.it=Impossibile localizzare la directory di Python."
-set "python2.de=Python-Verzeichnis kann nicht gefunden werden."
-set "python2.ru=Не удалось найти каталог Python."
-set "python2.zh=找不到 python 目录。"
-
 <nul set /p=!python1.%LNG%!
 
 :: Doublecheck to avoid issues with Milfania games
+set "PYTHONHOME="
+set "PYTHONPATH="
 if exist "%WORKDIR%\lib\py3-windows-x86_64\pythonw.exe" if exist "%WORKDIR%\lib\py3-windows-x86_64\python.exe" (
     if not "%PROCESSOR_ARCHITECTURE%" == "x86" (
         <nul set /p=.
@@ -613,6 +610,8 @@ if exist "%WORKDIR%\lib\windows-x86_64\python.exe" (
     set "PYTHONHOME=%WORKDIR%\lib\windows-i686\"
 )
 
+set "PYTHONPATH=%PYTHONHOME%"
+
 :: Set the PYNOASSERT according to “%PYTHONHOME%Lib”.
 if exist "%PYTHONHOME%Lib" (
     set "PYNOASSERT=-O"
@@ -620,58 +619,43 @@ if exist "%PYTHONHOME%Lib" (
     set "PYNOASSERT="
 )
 
-set "PYTHONPATH=%PYTHONHOME%"
-set "latest="
-set "latestver="
+for /f "tokens=2 delims= " %%a in ('"%PYTHONHOME%\python.exe" -V 2^>^&1') do set PYTHONVERS=%%a
+:: Extraction of major and minor versions
+for /f "tokens=1,2 delims=." %%b in ("%PYTHONVERS%") do (
+    set PYTHONMAJOR=%%b
+    set PYTHONMINOR=%%c
+)
 
-:: Priority to Python 2.7 if present
-if exist "%WORKDIR%\lib\pythonlib2.7" (
+set "RPATOOL-NEW="
+:: Priority to Python 3.x if present
+if %PYTHONMAJOR% GEQ 3 if exist "%WORKDIR%\lib\python%PYTHONMAJOR%.%PYTHONMINOR%" (
     <nul set /p=.
-    set "PYTHONPATH=%WORKDIR%\lib\pythonlib2.7"
-    set "PYVERS=2.7"
-    goto pyend
-) else if exist "%WORKDIR%\lib\python2.7" (
-    <nul set /p=.
-    set "PYTHONPATH=%WORKDIR%\lib\python2.7"
-    set "PYVERS=2.7"
+    set "PYTHONPATH=%WORKDIR%\lib\python%PYTHONMAJOR%.%PYTHONMINOR%"
+    set "RPATOOL-NEW=y"
     goto pyend
 )
 
 :: Searching for the latest version of Python 3.x
-for /D %%D in ("%WORKDIR%\lib\python3.*") do (
+if exist "%WORKDIR%\lib\pythonlib%PYTHONMAJOR%.%PYTHONMINOR%" (
     <nul set /p=.
-    set "ver=%%~nxD"
-    set "found="
-    for %%M in (os importlib encodings) do (
-        if exist "%%D\%%M" (
-            set "found=1"
-        )
-    )
-    if defined found (
-        for /f "tokens=2 delims=." %%V in ("!ver!") do (
-            <nul set /p=.
-            if not defined latest (
-                set "latest=%%D"
-                set "latestver=%%V"
-                set "PYVERS=3.%%V"
-            ) else (
-                if %%V GTR !latestver! (
-                    set "latest=%%D"
-                    set "latestver=%%V"
-                    set "PYVERS=3.%%V"
-                )
-            )
-        )
-    )
-)
-
-if defined latest (
+    set "PYTHONPATH=%WORKDIR%\lib\pythonlib%PYTHONMAJOR%.%PYTHONMINOR%"
+    set "RPATOOL-NEW=n"
+) else if exist "%WORKDIR%\lib\python%PYTHONMAJOR%.%PYTHONMINOR%" (
     <nul set /p=.
-    set "PYTHONPATH=!latest!"
+    set "PYTHONPATH=%WORKDIR%\lib\python%PYTHONMAJOR%.%PYTHONMINOR%"
+    set "RPATOOL-NEW=n"
 )
 
 :pyend
-if not exist "%PYTHONHOME%\python.exe" (
+if not exist "%PYTHONPATH%" (
+    set "python2.en=Cannot locate python directory."
+    set "python2.fr=Impossible de localiser le répertoire python."
+    set "python2.es=No se puede localizar el directorio de Python."
+    set "python2.it=Impossibile localizzare la directory di Python."
+    set "python2.de=Python-Verzeichnis kann nicht gefunden werden."
+    set "python2.ru=Не удалось найти каталог Python."
+    set "python2.zh=找不到 python 目录。"
+
     call :elog " %RED%!FAIL.%LNG%!%RES%"
     call :elog .
     call :elog "    %RED%!python2.%LNG%!%RES% !UNACONT.%LNG%!"
@@ -681,29 +665,7 @@ if not exist "%PYTHONHOME%\python.exe" (
 
     call :exitn 3
 ) else (
-    call :elog " %GRE%!PASS.%LNG%!%YEL% Python %PYVERS%%RES%"
-)
-
-echo Check Python Version... >> "%UNRENLOG%"
-for /f "tokens=2 delims= " %%a in ('"%PYTHONHOME%\python.exe" -V 2^>^&1') do set PYTHONVERS=%%a
-:: Extraction of major and minor versions
-for /f "tokens=1,2 delims=." %%b in ("%PYTHONVERS%") do (
-    set PYTHONMAJOR=%%b
-    set PYTHONMINOR=%%c
-)
-
-:: Check if Python ^>= 3.8
-if %PYTHONMAJOR% GEQ 3 (
-	if %PYTHONMINOR% GEQ 8 (
-		echo Python version is %PYTHONVERS%, which is upper or equal to 3.8 >> "%UNRENLOG%"
-    	set "RPATOOL-NEW=y"
-	) else (
-		echo Python version is %PYTHONVERS%, which is lower than 3.8 >> "%UNRENLOG%"
-		set "RPATOOL-NEW=n"
-	)
-) else (
-	echo Python version is %PYTHONVERS%, which is lower than 3 >> "%UNRENLOG%"
-    set "RPATOOL-NEW=n"
+    call :elog " %GRE%!PASS.%LNG%!%RES% Python %YEL%%PYTHONVERS%%RES%"
 )
 
 :: Check for Ren'Py version
@@ -723,31 +685,14 @@ set "renpyvers2.de=Fehler Die Erstellung von detect_renpy_version.py ist fehlges
 set "renpyvers2.ru=Ошибка Не удалось создать detect_renpy_version.py."
 set "renpyvers2.zh=无法创建 detect_renpy_version.py。"
 
-set "renpyvers3.en=Unable to detect Ren'Py version,"
-set "renpyvers3.fr=Impossible de détecter la version de Ren'Py,"
-set "renpyvers3.es=No se puede detectar la versión de Ren'Py,"
-set "renpyvers3.it=Impossibile rilevare la versione di Ren'Py,"
-set "renpyvers3.de=Unmöglich, die Ren'Py-Version zu erkennen, bitte sicherstellen,"
-set "renpyvers3.ru=Не удалось обнаружить версию Ren'Py, пожалуйста,"
-set "renpyvers3.zh=无法检测 Ren'Py 版本，"
-
-set "renpyvers4.en=        please ensure the game is compatible with UnRen."
-set "renpyvers4.fr=        es-tu sûr que le jeu est compatible avec UnRen ?"
-set "renpyvers4.es=        asegúrese de que el juego sea compatible con UnRen."
-set "renpyvers4.it=        assicurati che il gioco sia compatibile con UnRen."
-set "renpyvers4.de=        dass das Spiel mit UnRen kompatibel ist."
-set "renpyvers4.ru=        убедитесь, что игра совместима с UnRen."
-set "renpyvers4.zh=        请确保游戏与 UnRen 兼容。"
-
 echo !renpyvers1.%LNG%! >> "%UNRENLOG%"
 <nul set /p=!renpyvers1.%LNG%!
 
 cd /d "%WORKDIR%"
-set "detect_renpy_version_py=detect_renpy_version.py"
+set "detect_renpy_version_py=%WORKDIR%\detect_renpy_version.py"
 del /f /q "%detect_renpy_version_py%" %DEBUGREDIR%
 >"%detect_renpy_version_py%.b64" (
-    echo IyEvdXNyL2Jpbi9lbnYgcHl0aG9uCiMgLSotIGNvZGluZzogdXRmLTggLSotCgppbXBvcnQgb3MKaW1wb3J0IHN5cwppbXBvcnQgcmUKI2ltcG9ydCBzdHJ1Y3QKCgppbXBvcnQgb3MsIHJlCgpkZWYgZGV0ZWN0X2Zyb21fc2NyaXB0X3ZlcnNpb24oZ2FtZV9kaXIpOgogICAgIyAxKSBSZW4nUHkgNy84IDogc2NyaXB0X3ZlcnNpb24udHh0CiAgICBwYXRoID0gb3MucGF0aC5qb2luKGdhbWVfZGlyLCAic2NyaXB0X3ZlcnNpb24udHh0IikKICAgIGlmIG9zLnBhdGguaXNmaWxlKHBhdGgpOgogICAgICAgIHRyeToKICAgICAgICAgICAgd2l0aCBvcGVuKHBhdGgsICJyIikgYXMgZjoKICAgICAgICAgICAgICAgIGNvbnRlbnQgPSBmLnJlYWQoKS5zdHJpcCgpCgogICAgICAgICAgICAjIFR1cGxlIGZvcm1hdCA6ICg4LCAxLCAwKQogICAgICAgICAgICBtID0gcmUuc2VhcmNoKHInXChccyooXGQrKVxzKiwnLCBjb250ZW50KQogICAgICAgICAgICBpZiBtOgogICAgICAgICAgICAgICAgcmV0dXJuIGludChtLmdyb3VwKDEpKQoKICAgICAgICAgICAgIyBTaW1wbGUgZm9ybWF0IDogOC4xLjAgb3UgOAogICAgICAgICAgICBtID0gcmUubWF0Y2gocidccyooXGQrKScsIGNvbnRlbnQpCiAgICAgICAgICAgIGlmIG06CiAgICAgICAgICAgICAgICByZXR1cm4gaW50KG0uZ3JvdXAoMSkpCgogICAgICAgIGV4Y2VwdCBFeGNlcHRpb246CiAgICAgICAgICAgIHBhc3MKCiAgICAjIDIpIFJlbidQeSA2IDogcmVucHkvdmVyc2lvbi5weQogICAgdmVyc2lvbl9weSA9IG9zLnBhdGguam9pbihnYW1lX2RpciwgInJlbnB5IiwgInZlcnNpb24ucHkiKQogICAgaWYgb3MucGF0aC5pc2ZpbGUodmVyc2lvbl9weSk6CiAgICAgICAgdHJ5OgogICAgICAgICAgICB3aXRoIG9wZW4odmVyc2lvbl9weSwgInIiKSBhcyBmOgogICAgICAgICAgICAgICAgY29udGVudCA9IGYucmVhZCgpCgogICAgICAgICAgICAjIHZlcnNpb24gPSAiNi45OS4xNCIKICAgICAgICAgICAgbSA9IHJlLnNlYXJjaChyJ3ZlcnNpb25ccyo9XHMqIihcZCspJywgY29udGVudCkKICAgICAgICAgICAgaWYgbToKICAgICAgICAgICAgICAgIHJldHVybiBpbnQobS5ncm91cCgxKSkKCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbjoKICAgICAgICAgICAgcGFzcwoKICAgIHJldHVybiBOb25lCgoKZGVmIGRldGVjdF9mcm9tX3JweWMoZ2FtZV9kaXIpOgogICAgIiIiCiAgICBSZWFkcyB0aGUgbWFnaWMgbnVtYmVyIG9mIC5ycHljIC8gLnJweW1jIGZpbGVzLgogICAgUmVuJ1B5IDY6IG1hZ2ljIOKAnFJFTlBZIFJQQzHigJ0gIC0+IG1ham9yIDYgKGFuZCBzb21lIGVhcmx5IDcpCiAgICBSZW4nUHkgNzogbWFnaWMg4oCcUkVOUFkgUlBDMuKAnSAgLT4gbWFqb3IgNwogICAgUmVuJ1B5IDg6IG1hZ2ljIOKAnFJFTlBZIFJQQzLigJ0gIHdpdGggUHl0aG9uIDMgKGNhbm5vdCBiZSBlYXNpbHkgZGlzdGluZ3Vpc2hlZAogICAgICAgICAgICAgICAgZnJvbSA3IHVzaW5nIG1hZ2ljIGFsb25lLCBvdGhlciBtZXRob2RzIGFyZSB1c2VkIHRvIGNvbXBsZXRlIHRoZSBwcm9jZXNzKQogICAgTm90ZTogc29tZSBlYXJseSBSZW4nUHkgNyBtYXkgc3RpbGwgdXNlIOKAnFJFTlBZIFJQQzHigJ0gbWFnaWMsIGJ1dCB0aGV5IGFyZSByYXJlIGFuZCB3ZSBwcmlvcml0aXplIHRoZSBtb3JlIGNvbW1vbiBjYXNlLgogICAgIiIiCiAgICBtYWdpY19tYXAgPSB7CiAgICAgICAgYiJSRU5QWSBSUEMxIjogNiwKICAgICAgICBiIlJFTlBZIFJQQzIiOiA3LCAgIyBjYW4gYWxzbyBiZSA4CiAgICB9CiAgICBmb3Igcm9vdCwgZGlycywgZmlsZXMgaW4gb3Mud2FsayhnYW1lX2Rpcik6CiAgICAgICAgZm9yIGZuYW1lIGluIGZpbGVzOgogICAgICAgICAgICBpZiBmbmFtZS5lbmRzd2l0aCgiLnJweWMiKSBvciBmbmFtZS5lbmRzd2l0aCgiLnJweW1jIik6CiAgICAgICAgICAgICAgICBmcGF0aCA9IG9zLnBhdGguam9pbihyb290LCBmbmFtZSkKICAgICAgICAgICAgICAgIHRyeToKICAgICAgICAgICAgICAgICAgICB3aXRoIG9wZW4oZnBhdGgsICJyYiIpIGFzIGY6CiAgICAgICAgICAgICAgICAgICAgICAgIGhlYWRlciA9IGYucmVhZCgxMCkKICAgICAgICAgICAgICAgICAgICBmb3IgbWFnaWMsIG1ham9yIGluIG1hZ2ljX21hcC5pdGVtcygpOgogICAgICAgICAgICAgICAgICAgICAgICBpZiBoZWFkZXIuc3RhcnRzd2l0aChtYWdpYyk6CiAgICAgICAgICAgICAgICAgICAgICAgICAgICByZXR1cm4gbWFqb3IKICAgICAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb246CiAgICAgICAgICAgICAgICAgICAgY29udGludWUKICAgIHJldHVybiBOb25lCgoKZGVmIGRldGVjdF9mcm9tX2V4ZWN1dGFibGUoZ2FtZV9kaXIpOgogICAgIiIiCiAgICBMb29rIGZvciB2ZXJzaW9uIGNsdWVzIGluIHRoZSBleGVjdXRhYmxlcy9saWJzIHByZXNlbnQKICAgIGluIHRoZSBnYW1lIGZvbGRlciAoc3RyaW5ncyDigJw3LuKAnSBvciDigJw4LuKAnSBjbG9zZSB0byDigJxSZW4nUHnigJ0pLgogICAgIiIiCiAgICBiYXNlID0gb3MucGF0aC5kaXJuYW1lKGdhbWVfZGlyKSAgIyBwYXJlbnQgZm9sZGVyIG9mIHRoZSBnYW1lLyBmb2xkZXIKICAgIHNlYXJjaF9kaXJzID0gW2Jhc2UsIGdhbWVfZGlyXQogICAgcGF0dGVybnMgPSBbCiAgICAgICAgKHJlLmNvbXBpbGUociJSZW4uP1B5XHMrKFxkKVwuXGQiKSwgTm9uZSksCiAgICAgICAgKHJlLmNvbXBpbGUociJyZW5weVtfXC1dKFxkKVwuXGQiKSwgcmUuSUdOT1JFQ0FTRSksCiAgICBdCiAgICBmb3Igc2RpciBpbiBzZWFyY2hfZGlyczoKICAgICAgICBmb3IgZm5hbWUgaW4gb3MubGlzdGRpcihzZGlyKToKICAgICAgICAgICAgZnBhdGggPSBvcy5wYXRoLmpvaW4oc2RpciwgZm5hbWUpCiAgICAgICAgICAgIGlmIG5vdCBvcy5wYXRoLmlzZmlsZShmcGF0aCk6CiAgICAgICAgICAgICAgICBjb250aW51ZQogICAgICAgICAgICAjIE9ubHkgc21hbGwgdGV4dCBvciBsb2cgZmlsZXMgYXJlIHJlYWQuCiAgICAgICAgICAgIGlmIGZuYW1lLmVuZHN3aXRoKCgiLnR4dCIsICIubG9nIiwgIi5pbmkiLCAiLmNmZyIsICIuanNvbiIpKToKICAgICAgICAgICAgICAgIHRyeToKICAgICAgICAgICAgICAgICAgICB3aXRoIG9wZW4oZnBhdGgsICJyIikgYXMgZjoKICAgICAgICAgICAgICAgICAgICAgICAgY29udGVudCA9IGYucmVhZCg0MDk2KQogICAgICAgICAgICAgICAgICAgIGZvciBwYXQsIGZsYWdzIGluIHBhdHRlcm5zOgogICAgICAgICAgICAgICAgICAgICAgICBtID0gcGF0LnNlYXJjaChjb250ZW50KQogICAgICAgICAgICAgICAgICAgICAgICBpZiBtOgogICAgICAgICAgICAgICAgICAgICAgICAgICAgbWFqb3IgPSBpbnQobS5ncm91cCgxKSkKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGlmIG1ham9yIGluICg2LCA3LCA4KToKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICByZXR1cm4gbWFqb3IKICAgICAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb246CiAgICAgICAgICAgICAgICAgICAgcGFzcwogICAgcmV0dXJuIE5vbmUKCgpkZWYgZGV0ZWN0X2Zyb21fYXJjaGl2ZShnYW1lX2Rpcik6CiAgICAiIiIKICAgIEluc3BlY3QgdGhlIC5ycGEgYXJjaGl2ZXMgdG8gZGV0ZWN0IHRoZSB2ZXJzaW9uLgogICAgUlBBLTEuMCAtPiBSZW4nUHkgNiBlYXJseQogICAgUlBBLTIuMCAtPiBSZW4nUHkgNgogICAgUlBBLTMuMCAtPiBSZW4nUHkgNi83CiAgICBSUEFOMy4wIC0+IFJlbidQeSA4IChuZXcgbmV1dHJvbiBhcmNoaXZlKQogICAgWmlYLTEyQSAtPiBSZW4nUHkgOCAobmV3IG5ldXRyb24gYXJjaGl2ZSkKICAgIFppWC0xMkIgLT4gUmVuJ1B5IDggKG5ldyBuZXV0cm9uIGFyY2hpdmUpCiAgICAiIiIKICAgIHJwYV9tYWpvcl9tYXAgPSB7CiAgICAgICAgYiJSUEEtMS4wIjogNiwKICAgICAgICBiIlJQQS0yLjAiOiA2LAogICAgICAgIGIiUlBBLTMuMCI6IDcsICAgIyBNYXliZSA2IGFzIHdlbGwsIGJ1dCB3ZSdsbCByZWZpbmUgaXQgbGF0ZXIuCiAgICAgICAgYiJSUEFOMy4wIjogOCwKICAgICAgICBiIlppWC0xMkEiOiA4LAogICAgICAgIGIiWmlYLTEyQiI6IDgsCiAgICB9CiAgICBmb3VuZCA9IE5vbmUKICAgIGZvciBmbmFtZSBpbiBvcy5saXN0ZGlyKGdhbWVfZGlyKToKICAgICAgICBpZiBub3QgZm5hbWUuZW5kc3dpdGgoIi5ycGEiKToKICAgICAgICAgICAgY29udGludWUKICAgICAgICBmcGF0aCA9IG9zLnBhdGguam9pbihnYW1lX2RpciwgZm5hbWUpCiAgICAgICAgdHJ5OgogICAgICAgICAgICB3aXRoIG9wZW4oZnBhdGgsICJyYiIpIGFzIGY6CiAgICAgICAgICAgICAgICBoZWFkZXIgPSBmLnJlYWQoOCkKICAgICAgICAgICAgZm9yIG1hZ2ljLCBtYWpvciBpbiBycGFfbWFqb3JfbWFwLml0ZW1zKCk6CiAgICAgICAgICAgICAgICBpZiBoZWFkZXIuc3RhcnRzd2l0aChtYWdpYyk6CiAgICAgICAgICAgICAgICAgICAgIyBXZSBrZWVwIHRoZSBoaWdoZXN0IG1ham9yIGZvdW5kLgogICAgICAgICAgICAgICAgICAgIGlmIGZvdW5kIGlzIE5vbmUgb3IgbWFqb3IgPiBmb3VuZDoKICAgICAgICAgICAgICAgICAgICAgICAgZm91bmQgPSBtYWpvcgogICAgICAgIGV4Y2VwdCBFeGNlcHRpb246CiAgICAgICAgICAgIHBhc3MKICAgIHJldHVybiBmb3VuZAoKCmRlZiBkZXRlY3RfcmVucHlfbWFqb3IoZ2FtZV9wYXRoKToKICAgICIiIgogICAgRGV0ZWN0cyB0aGUgbWFqb3IgUmVuJ1B5IHZlcnNpb24gKDYsIDcsIG9yIDgpIGZyb20gdGhlIGdhbWUgcGF0aC4KICAgIGdhbWVfcGF0aCBjYW4gYmUgdGhlIGdhbWUncyByb290IGZvbGRlciBvciB0aGUg4oCcZ2FtZS/igJ0gc3ViZm9sZGVyLgogICAgIiIiCiAgICAjIE5vcm1hbGl6ZTogd2Ugd2FudCB0aGUg4oCcZ2FtZS/igJ0gZm9sZGVyCiAgICBpZiBvcy5wYXRoLmJhc2VuYW1lKGdhbWVfcGF0aCkgPT0gImdhbWUiOgogICAgICAgIGdhbWVfZGlyID0gZ2FtZV9wYXRoCiAgICBlbHNlOgogICAgICAgIGNhbmRpZGF0ZSA9IG9zLnBhdGguam9pbihnYW1lX3BhdGgsICJnYW1lIikKICAgICAgICBpZiBvcy5wYXRoLmlzZGlyKGNhbmRpZGF0ZSk6CiAgICAgICAgICAgIGdhbWVfZGlyID0gY2FuZGlkYXRlCiAgICAgICAgZWxzZToKICAgICAgICAgICAgZ2FtZV9kaXIgPSBnYW1lX3BhdGggICMgd2UgdHJ5IGRpcmVjdGx5CgogICAgaWYgbm90IG9zLnBhdGguaXNkaXIoZ2FtZV9kaXIpOgogICAgICAgIHByaW50KCJFUlJPUjogZGlyZWN0b3J5IG5vdCBmb3VuZDoge30iLmZvcm1hdChnYW1lX2RpcikpCiAgICAgICAgc3lzLmV4aXQoMSkKCiAgICAjIDEuIHNjcmlwdF92ZXJzaW9uLnR4dCAocHJpb3JpdHkgYnV0IG9wdGlvbmFsKQogICAgbWFqb3IgPSBkZXRlY3RfZnJvbV9zY3JpcHRfdmVyc2lvbihnYW1lX2RpcikKICAgIGlmIG1ham9yIGlzIG5vdCBOb25lOgogICAgICAgIHJldHVybiBtYWpvcgoKICAgICMgMi4gQXJjaGl2ZXMgLnJwYSAoUmVsaWFibGUgc2lnbmF0dXJlcyBmb3IgUmVuJ1B5IDgpCiAgICBtYWpvciA9IGRldGVjdF9mcm9tX2FyY2hpdmUoZ2FtZV9kaXIpCiAgICBpZiBtYWpvciBpcyBub3QgTm9uZToKICAgICAgICAjIFJQQS0zLjAgY2FuIGJlIDYgb3IgNzsgd2UgcmVmaW5lIGl0IHdpdGggdGhlIC5ycHljIGZpbGVzLgogICAgICAgIGlmIG1ham9yID09IDc6CiAgICAgICAgICAgIHJweWNfbWFqb3IgPSBkZXRlY3RfZnJvbV9ycHljKGdhbWVfZGlyKQogICAgICAgICAgICBpZiBycHljX21ham9yIGlzIG5vdCBOb25lOgogICAgICAgICAgICAgICAgcmV0dXJuIHJweWNfbWFqb3IKICAgICAgICByZXR1cm4gbWFqb3IKCiAgICAjIDMuIC5ycHljIGZpbGVzICh2ZXJ5IHJlbGlhYmxlIGZvciBSZW4nUHkgNiBhbmQgNywgYnV0IGRvIG5vdCBkaXN0aW5ndWlzaCBiZXR3ZWVuIDcgYW5kIDgpOgogICAgbWFqb3IgPSBkZXRlY3RfZnJvbV9ycHljKGdhbWVfZGlyKQogICAgaWYgbWFqb3IgaXMgbm90IE5vbmU6CiAgICAgICAgcmV0dXJuIG1ham9yCgogICAgIyA0LiBUZXh0IGZpbGVzIGluIHRoZSByb290IGZvbGRlciAobWF5IGNvbnRhaW4gdmVyc2lvbiBpbmZvLCBlc3BlY2lhbGx5IGZvciBSZW4nUHkgOCk6CiAgICBtYWpvciA9IGRldGVjdF9mcm9tX2V4ZWN1dGFibGUoZ2FtZV9kaXIpCiAgICBpZiBtYWpvciBpcyBub3QgTm9uZToKICAgICAgICByZXR1cm4gbWFqb3IKCiAgICByZXR
-    echo 1cm4gTm9uZQoKCmRlZiBtYWluKCk6CiAgICBpZiBsZW4oc3lzLmFyZ3YpIDwgMjoKICAgICAgICBwcmludCgiVXNhZ2U6IHt9IDxnYW1lX3BhdGg+Ii5mb3JtYXQoc3lzLmFyZ3ZbMF0pKQogICAgICAgIHN5cy5leGl0KDEpCgogICAgZ2FtZV9wYXRoID0gc3lzLmFyZ3ZbMV0KCiAgICBtYWpvciA9IGRldGVjdF9yZW5weV9tYWpvcihnYW1lX3BhdGgpCgogICAgaWYgbWFqb3IgaXMgTm9uZToKICAgICAgICBwcmludCgiRVJST1I6IGltcG9zc2libGUgdG8gZGV0ZWN0IFJlbidQeSB2ZXJzaW9uIGluIDoge30iLmZvcm1hdChnYW1lX3BhdGgpKQogICAgICAgIHN5cy5leGl0KDEpCgogICAgaWYgbWFqb3Igbm90IGluICg2LCA3LCA4KToKICAgICAgICBwcmludCgiRVJST1I6IHVuZXhwZWN0ZWQgUmVuJ1B5IHZlcnNpb24gZGV0ZWN0ZWQgOiB7fSIuZm9ybWF0KG1ham9yKSkKICAgICAgICBzeXMuZXhpdCgxKQoKICAgIHByaW50KG1ham9yKQoKCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6CiAgICBtYWluKCkK
+    echo IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQojIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLQ0KDQppbXBvcnQgb3MNCmltcG9ydCBzeXMNCmltcG9ydCByZQ0KDQojIDEpIFN0YW5kYXJkIG1ldGhvZDogaW1wb3J0IHJlbnB5IC0tLQ0KdHJ5Og0KICAgIGltcG9ydCByZW5weQ0KICAgIG1ham9yID0gcmVucHkudmVyc2lvbl90dXBsZVswXQ0KICAgIGlmIGlzaW5zdGFuY2UobWFqb3IsIGludCkgYW5kIDYgPD0gbWFqb3IgPD0gODoNCiAgICAgICAgcHJpbnQobWFqb3IpDQogICAgICAgIHN5cy5leGl0KDApDQpleGNlcHQgRXhjZXB0aW9uOg0KICAgIHBhc3MNCg0KIyAyKSBSZW4nUHkgNy84IDogc2NyaXB0X3ZlcnNpb24udHh0DQpwYXRoID0gb3MucGF0aC5qb2luKG9zLnBhdGguZGlybmFtZShfX2ZpbGVfXyksICJnYW1lIiwgInNjcmlwdF92ZXJzaW9uLnR4dCIpDQppZiBvcy5wYXRoLmlzZmlsZShwYXRoKToNCiAgICB0cnk6DQogICAgICAgIHdpdGggb3BlbihwYXRoLCAiciIpIGFzIGY6DQogICAgICAgICAgICBjb250ZW50ID0gZi5yZWFkKCkuc3RyaXAoKQ0KDQogICAgICAgIG1ham9yID0gTm9uZQ0KICAgICAgICAjIFZlcnNpb24gPSAoOCwgMSwgMCkgb3IgKDcsIDQsIDUpDQogICAgICAgIG0gPSByZS5zZWFyY2gocidcKFxzKihcZCspXHMqLCcsIGNvbnRlbnQpDQogICAgICAgIGlmIG06DQogICAgICAgICAgICBtYWpvciA9IGludChtLmdyb3VwKDEpKQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgbSA9IHJlLm1hdGNoKHInXHMqKFxkKyknLCBjb250ZW50KQ0KICAgICAgICAgICAgaWYgbToNCiAgICAgICAgICAgICAgICBtYWpvciA9IGludChtLmdyb3VwKDEpKQ0KDQogICAgICAgIGlmIG1ham9yIGlzIG5vdCBOb25lIGFuZCA2IDw9IG1ham9yIDw9IDg6DQogICAgICAgICAgICBwcmludChtYWpvcikNCiAgICAgICAgICAgIHN5cy5leGl0KDApDQoNCiAgICBleGNlcHQgRXhjZXB0aW9uOg0KICAgICAgICBwYXNzDQoNCiMgMykgUmVuJ1B5IDYgOiByZW5weS92Y192ZXJzaW9uLnB5DQp2ZXJzaW9uX3B5ID0gb3MucGF0aC5qb2luKG9zLnBhdGguZGlybmFtZShfX2ZpbGVfXyksICJyZW5weSIsICJ2Y192ZXJzaW9uLnB5IikNCmlmIG9zLnBhdGguaXNmaWxlKHZlcnNpb25fcHkpOg0KICAgIHRyeToNCiAgICAgICAgd2l0aCBvcGVuKHZlcnNpb25fcHksICJyIikgYXMgZjoNCiAgICAgICAgICAgIGNvbnRlbnQgPSBmLnJlYWQoKQ0KDQogICAgICAgIG1ham9yID0gTm9uZQ0KICAgICAgICAjIHZlcnNpb24gPSAiNi45OS4xNCINCiAgICAgICAgbSA9IHJlLnNlYXJjaChyJ3ZlcnNpb25ccyo9XHMqdT9bXCciXShcZCspJywgY29udGVudCkNCiAgICAgICAgaWYgbToNCiAgICAgICAgICAgIG1ham9yID0gaW50KG0uZ3JvdXAoMSkpDQogICAgICAgICAgICBpZiA2IDw9IG1ham9yIDw9IDg6DQogICAgICAgICAgICAgICAgcHJpbnQobWFqb3IpDQogICAgICAgICAgICAgICAgc3lzLmV4aXQoMCkNCg0KICAgIGV4Y2VwdCBFeGNlcHRpb246DQogICAgICAgIHBhc3MNCg0KcHJpbnQoIkVycm9yOiBDb3VsZCBub3QgZGV0ZWN0IFJlbidQeSB2ZXJzaW9uIikNCnN5cy5leGl0KDEp
 )
 echo "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%detect_renpy_version_py%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%detect_renpy_version_py%.b64'))))" >> "%UNRENLOG%"
 "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%detect_renpy_version_py%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%detect_renpy_version_py%.b64'))))" %DEBUGREDIR%
@@ -773,13 +718,26 @@ if not exist "%detect_renpy_version_py%" (
 
     call :exitn 3
 ) else (
-    for /f "delims=" %%A in ('"%PYTHONHOME%\python.exe" %PYNOASSERT% %detect_renpy_version_py% .') do (
-        echo %%A | findstr /r "[0-9]" >nul
-        if !ERRORLEVEL! EQU 0 (
-            set "RENPYVERSION=%%A"
-        )
-    )
+    "%PYTHONHOME%\python.exe" %PYNOASSERT% "%detect_renpy_version_py%" > "%TEMP%\renpy_version.tmp"
+    set /p RENPYVERSION=<"%TEMP%\renpy_version.tmp"
+    del "%TEMP%\renpy_version.tmp"
     if not defined RENPYVERSION (
+        set "renpyvers3.en=Unable to detect Ren'Py version,"
+        set "renpyvers3.fr=Impossible de détecter la version de Ren'Py,"
+        set "renpyvers3.es=No se puede detectar la versión de Ren'Py,"
+        set "renpyvers3.it=Impossibile rilevare la versione di Ren'Py,"
+        set "renpyvers3.de=Unmöglich, die Ren'Py-Version zu erkennen, bitte sicherstellen,"
+        set "renpyvers3.ru=Не удалось обнаружить версию Ren'Py, пожалуйста,"
+        set "renpyvers3.zh=无法检测 Ren'Py 版本，"
+
+        set "renpyvers4.en=        please ensure the game is compatible with UnRen."
+        set "renpyvers4.fr=        es-tu sûr que le jeu est compatible avec UnRen ?"
+        set "renpyvers4.es=        asegúrese de que el juego sea compatible con UnRen."
+        set "renpyvers4.it=        assicurati che il gioco sia compatibile con UnRen."
+        set "renpyvers4.de=        dass das Spiel mit UnRen kompatibel ist."
+        set "renpyvers4.ru=        убедитесь, что игра совместима с UnRen."
+        set "renpyvers4.zh=        请确保游戏与 UnRen 兼容。"
+
         call :elog "%RED%!FAIL.%LNG%!%RES%"
         call :elog .
         call :elog "    %RED%!renpyvers3.%LNG%!%RES%"
@@ -1588,20 +1546,20 @@ if not "%OPTION%" == "m" echo.
 )
 echo "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllBytes('!unr-mcchange!.tmp', [Convert]::FromBase64String((Get-Content '!unr-mcchange!.b64' -Raw)))" >> "%UNRENLOG%"
 "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllBytes('!unr-mcchange!.tmp', [Convert]::FromBase64String((Get-Content '!unr-mcchange!.b64' -Raw)))" %DEBUGREDIR%
-if not exist "!unr-mcchange!.tmp" (
+if not exist "%unr-mcchange%.tmp" (
     echo %RED%!FAIL.%LNG%!%RES% !MISSING.%LNG%! !unr-mcchange!.tmp
     goto mcend
 ) else (
-    del /f /q "!unr-mcchange!.b64" %DEBUGREDIR%
-    echo "%PWRSHELL%" -NoProfile -Command "(Get-Content '!unr-mcchange!.tmp') -replace 'newmcname', '!newmcname!' | Set-Content '!unr-mcchange!'" >> "%UNRENLOG%"
-    "%PWRSHELL%" -NoProfile -Command "(Get-Content '!unr-mcchange!.tmp') -replace 'newmcname', '!newmcname!' | Set-Content '!unr-mcchange!'" %DEBUGREDIR%
-    echo "%PWRSHELL%" -NoProfile -Command "(Get-Content '!unr-mcchange!') -replace 'oldmcname', '!oldmcname!' | Set-Content '!unr-mcchange!'" >> "%UNRENLOG%"
-    "%PWRSHELL%" -NoProfile -Command "(Get-Content '!unr-mcchange!') -replace 'oldmcname', '!oldmcname!' | Set-Content '!unr-mcchange!'" %DEBUGREDIR%
-    if not exist "!unr-mcchange!" (
+    del /f /q "%unr-mcchange%.b64" %DEBUGREDIR%
+    echo "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-mcchange%.tmp') -replace 'newmcname', '%newmcname%' | Set-Content '%unr-mcchange%'" >> "%UNRENLOG%"
+    "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-mcchange%.tmp') -replace 'newmcname', '%newmcname%' | Set-Content '%unr-mcchange%'" %DEBUGREDIR%
+    echo "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-mcchange%') -replace 'oldmcname', '%oldmcname%' | Set-Content '%unr-mcchange%'" >> "%UNRENLOG%"
+    "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-mcchange%') -replace 'oldmcname', '%oldmcname%' | Set-Content '%unr-mcchange%'" %DEBUGREDIR%
+    if not exist "%unr-mcchange%" (
         echo %RED%!FAIL.%LNG%!%RES% !MISSING.%LNG%! !unr-mcchange!
         goto mcend
     )
-    del /f /q "!unr-mcchange!.tmp" %DEBUGREDIR%
+    del /f /q "%unr-mcchange%.tmp" %DEBUGREDIR%
     echo %GRE%!PASS.%LNG%!%RES%
 )
 
@@ -1729,7 +1687,7 @@ set "etext5.zh=请输入游戏名称（不带扩展名）："
 
 :: find the current game name by checking the presence of same name with .exe, .py and .sh extension
 call :elog .
-if not "!OPTION!" == "m" echo.
+if not "%OPTION%" == "m" echo.
 <nul set /p="!etext1.%LNG%!... "
 
 set "processed="
@@ -1742,7 +1700,7 @@ for %%e in (exe py) do (
 
         :: Check if this name has already been processed
         echo !processed! | findstr /i "\!tempfname!" >nul
-        if errorlevel 1 (
+        if ERRORLEVEL 1 (
             :: Count how many files with this name exist
             set /a count=0
             for %%x in (exe py) do (
@@ -1797,8 +1755,8 @@ if not "%OPTION%" == "m" echo.
 <nul set /p="!choicet.%LNG%!... "
 
 cd /d "%WORKDIR%"
-echo "%PYTHONHOME%python.exe" %PYNOASSERT% "%fname%.py" game translate %translation_lang% >> "%UNRENLOG%"
-"%PYTHONHOME%python.exe" %PYNOASSERT% "%fname%.py" game translate %translation_lang% %DEBUGREDIR%
+echo "%PYTHONHOME%python.exe" %PYNOASSERT% "%fname%.py" game translate "%translation_lang%" >> "%UNRENLOG%"
+"%PYTHONHOME%python.exe" %PYNOASSERT% "%fname%.py" game translate "%translation_lang%" %DEBUGREDIR%
 if %ERRORLEVEL% NEQ 0 (
 	echo %RED%!FAIL.%LNG%! !etext4.%LNG%!%RES%
 ) else (
@@ -1992,13 +1950,13 @@ set "batch_name=%~1"
 set "running_batch=%~nx0"
 
 :: If no difference do nothing
-%SYSTEMROOT%\System32\fc.exe "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%.bat" %DEBUGREDIR%
+"%SYSTEMROOT%\System32\fc.exe" "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%.bat" %DEBUGREDIR%
 if %ERRORLEVEL% EQU 0 (
     goto :eof
 )
 
 :: Check if the new batch file is different from the running one
-if "!batch_name!.bat" == "!running_batch!" goto special_upd
+if "%batch_name%.bat" == "%running_batch%" goto special_upd
 
 echo !updating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%
 move /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old" %DEBUGREDIR%
@@ -2166,7 +2124,7 @@ if not exist "%TEMP%\%upd_link%.tmp" (
     if not exist "%SCRIPTDIR%%upd_link%.txt" (
         copy nul "%SCRIPTDIR%%upd_link%.txt" %DEBUGREDIR%
     )
-    %SYSTEMROOT%\System32\fc.exe "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" %DEBUGREDIR%
+    "%SYSTEMROOT%\System32\fc.exe" "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" %DEBUGREDIR%
     if !ERRORLEVEL! GEQ 1 (
         call :elog "%YEL% !cupd3.%LNG%!%RES%"
 
@@ -2207,8 +2165,8 @@ if %new_upd% EQU 1 (
     call :elog .
     echo !cupd4.%LNG%! %YEL%%forall_url%%RES%... >> "%UNRENLOG%"
     <nul set /p="!cupd4.%LNG%! %YEL%%forall_url%%RES%... "
-    echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('!forall_url!','%TEMP%\%upd_file%.tmp')" >> "%UNRENLOG%"
-    "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('!forall_url!','%TEMP%\%upd_file%.tmp')" %DEBUGREDIR%
+    echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%forall_url%','%TEMP%\%upd_file%.tmp')" >> "%UNRENLOG%"
+    "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%forall_url%','%TEMP%\%upd_file%.tmp')" %DEBUGREDIR%
     if not exist "%TEMP%\%upd_file%.tmp" (
         call :elog "%RED%!FAIL.%LNG%! %YEL%!cupd6.%LNG%!%RES%"
         call :elog .
@@ -2296,7 +2254,7 @@ for %%F in (legacy current forall) do (
 :: Cleaning after an update
 set "BASENAMENONEW=%BASENAME:-new=%"
 if exist "%SCRIPTDIR%%BASENAMENONEW%-new.bat" (
-    if "!SCRIPTNAME!" == "%BASENAMENONEW%-new.bat" (
+    if "%SCRIPTNAME%" == "%BASENAMENONEW%-new.bat" (
         copy /y "%SCRIPTDIR%%BASENAMENONEW%-new.bat" "%SCRIPTDIR%%BASENAMENONEW%.bat" %DEBUGREDIR%
     ) else (
         del /f /q "%SCRIPTDIR%%BASENAME%-new.bat" %DEBUGREDIR%
@@ -2333,7 +2291,8 @@ goto menu
         >"%choiceEx_py%.b64" (
             echo IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQojIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLQ0KDQppbXBvcnQgc3lzDQppbXBvcnQgdGltZQ0KaW1wb3J0IG1zdmNydA0KaW1wb3J0IGNvZGVjcw0KDQppZiBzeXMudmVyc2lvbl9pbmZvWzBdIDwgMzoNCiAgICBpbXBvcnQgY3R5cGVzDQogICAgIyBGb3JjZSBsYSBjb25zb2xlIFdpbmRvd3MgZW4gVVRGLTgNCiAgICBjdHlwZXMud2luZGxsLmtlcm5lbDMyLlNldENvbnNvbGVDUCg2NTAwMSkNCiAgICBjdHlwZXMud2luZGxsLmtlcm5lbDMyLlNldENvbnNvbGVPdXRwdXRDUCg2NTAwMSkNCg0KICAgICMgQ1JVQ0lBTDogRW52ZWxvcHBlIHN0ZG91dCBhdmVjIHVuIHdyaXRlciBVVEYtOA0KICAgIHN5cy5zdGRvdXQgPSBjb2RlY3MuZ2V0d3JpdGVyKCd1dGYtOCcpKHN5cy5zdGRvdXQpDQogICAgc3lzLnN0ZGVyciA9IGNvZGVjcy5nZXR3cml0ZXIoJ3V0Zi04Jykoc3lzLnN0ZGVycikNCg0KIyBHw6hyZSBsZXMgZGV1eCBQeXRob24gMiBldCAzDQppZiBzeXMudmVyc2lvbl9pbmZvWzBdIDwgMzoNCiAgICBtc2cgPSBzeXMuYXJndlsxXS5kZWNvZGUoJ2xhdGluLTEnKSBpZiBpc2luc3RhbmNlKHN5cy5hcmd2WzFdLCBzdHIpIGVsc2Ugc3lzLmFyZ3ZbMV0NCmVsc2U6DQogICAgbXNnID0gc3lzLmFyZ3ZbMV0NCg0KY2hvaWNlcyAgICAgPSBzeXMuYXJndlsyXQ0KZGVmYXVsdCAgICAgPSBzeXMuYXJndlszXQ0KdGltZW91dCAgICAgPSBpbnQoc3lzLmFyZ3ZbNF0pDQpyYXcgICAgICAgICA9IChsZW4oc3lzLmFyZ3YpID4gNSBhbmQgc3lzLmFyZ3ZbNV0gPT0gIi1yYXdNc2ciKQ0KDQppZiByYXc6DQogICAgZGlzcGxheSA9IG1zZw0KZWxzZToNCiAgICBkaXNwID0gWyJbJXNdIiAlIGMgaWYgYyA9PSBkZWZhdWx0IGVsc2UgYyBmb3IgYyBpbiBjaG9pY2VzXQ0KICAgIGRpc3BsYXkgPSAiJXMgKCVzLCB0aW1lb3V0ICVzcykgOiAiICUgKG1zZywgJy8nLmpvaW4oZGlzcCksIHRpbWVvdXQpDQoNCnN5cy5zdGRvdXQud3JpdGUoZGlzcGxheSkNCnN5cy5zdGRvdXQuZmx1c2goKQ0KDQplbmQgPSB0aW1lLnRpbWUoKSArIHRpbWVvdXQNCnJlc3VsdCA9IGRlZmF1bHQNCg0Kd2hpbGUgdGltZS50aW1lKCkgPCBlbmQ6DQogICAgaWYgbXN2Y3J0LmtiaGl0KCk6DQogICAgICAgIGtleSA9IG1zdmNydC5nZXR3Y2goKQ0KICAgICAgICBpZiBrZXkgPT0gIlxyIjogICMgRW50ZXINCiAgICAgICAgICAgIGJyZWFrDQogICAgICAgIGtleSA9IGtleS51cHBlcigpDQogICAgICAgIGlmIGtleSBpbiBjaG9pY2VzOg0KICAgICAgICAgICAgcmVzdWx0ID0ga2V5DQogICAgICAgICAgICBicmVhaw0KICAgIHRpbWUuc2xlZXAoMC4wNSkNCg0Kc3lzLnN0ZG91dC53cml0ZShyZXN1bHQpDQpzeXMuc3Rkb3V0LndyaXRlKCJcbiIpDQpzeXMuZXhpdChjaG9pY2VzLmluZGV4KHJlc3VsdCkgKyAxKQ==
         )
-        "%PWRSHELL%" -NoProfile -Command "& { [IO.File]::WriteAllBytes('%choiceEx_py%.tmp', [Convert]::FromBase64String([IO.File]::ReadAllText('%choiceEx_py%.b64')))}"
+        echo "%PWRSHELL%" -NoProfile -Command "& { [IO.File]::WriteAllBytes('%choiceEx_py%.tmp', [Convert]::FromBase64String([IO.File]::ReadAllText('%choiceEx_py%.b64')))}" >> "%UNRENLOG%"
+        "%PWRSHELL%" -NoProfile -Command "& { [IO.File]::WriteAllBytes('%choiceEx_py%.tmp', [Convert]::FromBase64String([IO.File]::ReadAllText('%choiceEx_py%.b64')))}" %DEBUGREDIR%
         move /y "%choiceEx_py%.tmp" "%choiceEx_py%" %DEBUGREDIR%
         del /f /q "%choiceEx_py%.b64" %DEBUGREDIR%
     )
@@ -2347,17 +2306,17 @@ goto menu
 :elog
 :: Display msg (%~1) to console and "%UNRENLOG%"
 set "msg=%~1"
-if "!msg!" == "." (
+if "%msg%" == "." (
     echo.
     if defined UNRENLOG (
        echo. >> "%UNRENLOG%"
     )
 ) else (
-    echo !msg!
+    echo %msg%
 
     if defined UNRENLOG (
         :: Strip color variables for logging
-        set "cleanmsg=!msg!"
+        set "cleanmsg=%msg%"
         for %%C in (GRY RED GRE YEL MAG CYA RES) do (
             call set "cleanmsg=%%cleanmsg:!%%C!=%%"
         )
@@ -2379,11 +2338,11 @@ if %DEBUGLEVEL% GEQ 1 (
 )
 
 :: Restore modified configuration and we exit with the appropriate code
-%SYSTEMROOT%\System32\chcp.com %OLD_CP% >nul
+"%SYSTEMROOT%\System32\chcp.com" %OLD_CP% >nul
 
 :: Restore original console mode
 if %DEBUGLEVEL% EQU 0 (
-    %SYSTEMROOT%\System32\mode.com con: cols=!ORIG_COLS! lines=!ORIG_LINES!
+    "%SYSTEMROOT%\System32\mode.com" con: cols=%ORIG_COLS% lines=%ORIG_LINES%
 
     REM Remove old bug entries
     reg delete "HKCU\Console\MyScript" /f %DEBUGREDIR%
