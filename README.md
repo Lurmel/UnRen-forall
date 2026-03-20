@@ -30,9 +30,9 @@ If you want to support me, you can <a href="https://buymeacoffee.com/joelurmelf"
 
 ## 📦 Included Files
 
-- `UnRen-forall.bat` — Multilingual launcher (Version 0.50)
-- `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.7.31)
-- `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.51)
+- `UnRen-forall.bat` — Multilingual launcher (Version 0.56)
+- `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.7.39)
+- `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.59)
 - `UnRen-cfg.txt` — To configure language and batch behavior
 - `UnRen-link.txt` — Contains the download link for the full package and a changelog for updates
 
