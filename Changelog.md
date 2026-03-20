@@ -4,6 +4,19 @@ All dates are in the format MM/DD/YY.
 
 ---
 
+## 03/21/26:
+	UnRen-forall.bat 0.56, UnRen-current.bat 9.7.59 & UnRen-legacy.bat 9.7.39
+
+	Common modifications for all scripts:
+	- Optimisation code and bug fixes.
+	- Each UnRen script have now there specific log file
+	- You can now specify the 7z.exe location in UnRen-cfg.txt (Renamed from the .bat as it is no more necessary)
+
+	Common modifications for UnRen-current.bat & UnRen-legacy.bat:
+	- Added support for decompressing RPA files (format RWA-3.0) from World of Secrets.
+
+---
+
 ## 03/19/26:
 	UnRen-forall.bat 0.53, UnRen-current.bat 9.7.56 & UnRen-legacy.bat 9.7.36
 

@@ -1,0 +1,79 @@
+@echo off
+
+:: Version 1.2 03/20/2026
+
+:: Configuration file for all UnRen-*.bat scripts
+:: Fichier de configuration pour tous les scripts UnRen-*.bat
+:: Archivo de configuración para todos los scripts UnRen-*.bat
+:: File di configurazione per tutti gli script UnRen-*.bat
+:: Konfigurationsdatei für alle UnRen-*.bat Skripte
+:: Файл конфигурации для всех скриптов UnRen-*.bat
+:: 所有脚本的配置文件 UnRen-*.bat
+
+:: Language selection / Sélection de la langue / Selección de idioma / Selezione lingua / Sprachauswahl / Выбор языка / 语言选择
+:: You can force the language by setting one of: en fr es it de ru zh
+:: Vous pouvez forcer la langue avec l'une des valeurs : en fr es it de ru zh
+:: Puede forzar el idioma con uno de los siguientes: en fr es it de ru zh
+:: Puoi forzare la lingua impostando uno dei seguenti: en fr es it de ru zh
+:: Sie können die Sprache erzwingen mit: en fr es it de ru zh
+:: Вы можете принудительно установить язык: en fr es it de ru zh
+:: 您可以强制设置语言为以下之一: en fr es it de ru zh
+set "LNG="
+
+:: Default multi-choice options for UnRen-forall.bat
+:: Options multi-choix par défaut pour UnRen-forall.bat
+:: Opciones múltiples por defecto para UnRen-forall.bat
+:: Opzioni multiple predefinite per UnRen-forall.bat
+:: Standard-Mehrfachauswahl für UnRen-forall.bat
+:: Выбор по умолчанию для UnRen-forall.bat
+:: 默认的多项选择选项 UnRen-forall.bat
+:: You can reorder letters from a to k to customize the menu behavior.
+:: Letters 1 to 6, a to l, +, -, m and x are excluded from multi-choice.
+:: Vous pouvez réorganiser les lettres de a à k pour personnaliser le menu.
+:: Les lettres 1 à 6, a à l, +, -, m et x sont exclues du multi-choix.
+:: Puede reordenar las letras de la a a la k para personalizar el menú.
+:: Las letras 1 a 6, de la a la l, +, -, m y x están excluidas del multi-choix.
+:: Puoi riordinare le lettere da a a k per personalizzare il menu.
+:: Le lettere 1 a 6, da a a l, +, -, m e x sono escluse dal multi-choix.
+:: Sie können die Buchstaben von a bis k neu anordnen, um das Menü anzupassen.
+:: Die Buchstaben 1 bis 6, a bis l, +, -, m und x sind ausgeschlossen.
+:: Вы можете изменить порядок букв от a до k для настройки меню.
+:: Буквы от 1 до 6, от a до l, +, -, m и x исключены из множественного выбора.
+:: 您可以重新排列从 a 到 k 的字母来自定义菜单行为.
+:: 字母 1 到 6, a 到 l, +, -, m 和 x 被排除在多选之外.
+set "MDEFS=acefg"
+
+:: Default multi-choice options for UnRen-legacy.bat and UnRen-current.bat
+:: Options multi-choix par défaut pour UnRen-legacy.bat et UnRen-current.bat
+:: Opciones múltiples por defecto para UnRen-legacy.bat y UnRen-current.bat
+:: Opzioni multiple predefinite per UnRen-legacy.bat e UnRen-current.bat
+:: Standard-Mehrfachauswahl für UnRen-legacy.bat und UnRen-current.bat
+:: Выбор по умолчанию для UnRen-legacy.bat и UnRen-current.bat
+:: UnRen-legacy.bat 和 UnRen-current.bat 的默认多选选项
+set "MDEFS2=12acefg"
+
+:: Timeout configuration for the choice menus (in seconds). It can't be set to 0 valid range 1-99.
+:: Configuration du délai d'attente pour les menus de choix (en secondes). Ne peut pas être réglé sur 0, plage valide 1-99.
+:: Configuración de tiempo de espera para los menús de opciones (en segundos). No se puede establecer en 0, rango válido 1-99.
+:: Configurazione del timeout per i menu di scelta (in secondi). Non può essere impostato su 0, intervallo valido 1-99.
+:: Timeout-Konfiguration für die Auswahlmenüs (in Sekunden). Es kann nicht auf 0 gesetzt werden, gültiger Bereich 1-99.
+:: Конфигурация тайм-аута для меню выбора (в секундах). Не может быть установлено в 0, допустимый диапазон 1-99.
+:: 选择菜单的超时配置(以秒为单位).不能设置为 0,有效范围 1-99.
+set "CTIME=10"
+
+:: Specify the location of the 7zip.exe file.
+:: Indiquez l'emplacement du fichier 7zip.exe.
+:: Indique la ubicación del archivo 7zip.exe.
+:: Indicare il percorso del file 7zip.exe.
+:: Geben Sie den Speicherort der Datei „7zip.exe“ an.
+:: Укажите путь к файлу 7zip.exe.
+:: 请指定 7zip.exe 文件的位置 .
+::set "_7ZIPLOC=!ProgramFiles!\7-Zip\7z.exe"
+
+:: End of configuration file
+:: Fin du fichier de configuration
+:: Fin del archivo de configuración
+:: Fine del file di configurazione
+:: Ende der Konfigurationsdatei
+:: Конец файла конфигурации
+:: 配置文件结束

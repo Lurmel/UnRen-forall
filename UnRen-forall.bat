@@ -1,9 +1,9 @@
 @echo off
 
 :: Get the current code page
-for /f "tokens=2 delims=:" %%a in ('%SYSTEMROOT%\System32\chcp.com') do set "OLD_CP=%%a"
+for /f "tokens=2 delims=:" %%a in ('%SystemRoot%\System32\chcp.com') do set "OLD_CP=%%a"
 :: Switch to code page 65001 for UTF-8
-"%SYSTEMROOT%\System32\chcp.com" 65001 >nul
+"%SystemRoot%\System32\chcp.com" 65001 >nul
 setlocal EnableDelayedExpansion
 
 :: UnRen-forall.bat - UnRen Launcher Script named UnRen-forall.bat for compatibility
@@ -13,31 +13,67 @@ setlocal EnableDelayedExpansion
 :: DO NOT MODIFY BELOW THIS LINE unless you know what you're doing
 :: Define various global names
 set "NAME=forall"
-set "VERSION=(v0.53) (03/09/26)"
+set "VERSION=(v0.56) (03/20/26)"
 title UnRen-%NAME%.bat - %VERSION%
 set "URL_REF=https://f95zone.to/threads/92717/post-17110063/"
 set "SCRIPTDIR=%~dp0"
 set "UPD_TDIR=%TEMP%\UnRenUpdate"
 set "SCRIPTNAME=%~nx0"
 set "BASENAME=%SCRIPTNAME:.bat=%"
+set "UNRENLOG=%TEMP%\%BASENAME%.log"
+if exist "%UNRENLOG%" del /f /q "%UNRENLOG%" >nul 2>&1
+:: Use wmic for older system or PowerShell for newer ones to get date and time
+if exist "%SystemRoot%\System32\wbem\wmic.exe" (
+    for /f "skip=1 tokens=1" %%a in ('"%SystemRoot%\System32\wbem\wmic.exe" os get LocalDateTime') do (
+        set "datetime=%%a"
+        goto :dbreak
+    )
+) else (
+    for /f %%a in ("'%SystemRoot%\system32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -Command "(Get-CimInstance -ClassName Win32_OperatingSystem).LocalDateTime"') do (
+        set "datetime=%%a"
+        goto :dbreak
+    )
+)
+:dbreak
+:: Parse the datetime string
+set year=%datetime:~0,4%
+set month=%datetime:~4,2%
+set day=%datetime:~6,2%
+set hour=%datetime:~8,2%
+set minute=%datetime:~10,2%
+set second=%datetime:~12,2%
+set formatted_date=%month%/%day%/%year:~2,2%
+set formatted_time=%hour%:%minute%:%second%
+
+:: Start the Log
+echo. >> "%UNRENLOG%"
+echo UnRen-%NAME%.bat %VERSION%, started on %formatted_date% at %formatted_time% >> "%UNRENLOG%"
+echo. >> "%UNRENLOG%"
 
 :: Set default values
 set "MDEFS=acefg"
 set "MDEFS2=12acefg"
 set "CTIME=5"
+set "_7ZIPLOC=%ProgramFiles%\7-Zip\7z.exe"
 :: External configuration file for LNG, MDEFS, MDEFS2 and CTIME.
-set "UNREN_CFG=%SCRIPTDIR%UnRen-cfg.bat"
+set "UNREN_CFG=%SCRIPTDIR%UnRen-cfg.txt"
+set "OLD_UNREN_CFG=%SCRIPTDIR%UnRen-cfg.bat"
+if exist "%OLD_UNREN_CFG%" if not exist "%UNREN_CFG%" (
+    move /y "%OLD_UNREN_CFG%" "%UNREN_CFG%" %DEBUGREDIR%
+)
 :: Load external configuration
-for /f "usebackq tokens=1,* delims== " %%A in ("%UNREN_CFG%") do (
-    if /i "%%A"=="set" (
-        set %%B
+if exist "%UNREN_CFG%" (
+    for /f "usebackq tokens=1,* delims== " %%A in ("%UNREN_CFG%") do (
+        if /i "%%A"=="set" (
+            set %%B
+        )
     )
 )
 
 :: Set the cmd screen size with backup of old settings
 set "count=0"
 :: Read the lines of mode con
-for /f "tokens=*" %%A in ('%SYSTEMROOT%\System32\mode.com con') do (
+for /f "tokens=*" %%A in ('"%SystemRoot%\System32\mode.com" con') do (
     :: Split the line into tokens
     for %%B in (%%A) do (
         set "val=%%B"
@@ -55,19 +91,19 @@ for /f "tokens=*" %%A in ('%SYSTEMROOT%\System32\mode.com con') do (
     )
 )
 set "NEW_COLS=110"
-%SYSTEMROOT%\System32\mode.com con: cols=%NEW_COLS% lines=200 %DEBUGREDIR%
-%SYSTEMROOT%\System32\mode.com con: cols=%NEW_COLS% lines=62 %DEBUGREDIR%
+%SystemRoot%\System32\mode.com con: cols=%NEW_COLS% lines=200 %DEBUGREDIR%
+%SystemRoot%\System32\mode.com con: cols=%NEW_COLS% lines=62 %DEBUGREDIR%
 
 if defined LNG goto lngtest
 
 :: Clean retrieval of language code via WMIC or PowerShell
-if exist "%SYSTEMROOT%\System32\wbem\wmic.exe" (
-    for /f "skip=1 tokens=1" %%l in ('%SYSTEMROOT%\System32\wbem\wmic.exe os get oslanguage') do (
+if exist "%SystemRoot%\System32\wbem\wmic.exe" (
+    for /f "skip=1 tokens=1" %%l in ('%SystemRoot%\System32\wbem\wmic.exe os get oslanguage') do (
         set LNGID=%%l
         goto found_lcid
     )
 ) else (
-    for /f %%l in ('%SYSTEMROOT%\system32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -Command "Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object -ExpandProperty OSLanguage"') do (
+    for /f %%l in ('%SystemRoot%\system32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -Command "Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object -ExpandProperty OSLanguage"') do (
         set LNGID=%%l
         goto found_lcid
     )
@@ -97,7 +133,7 @@ if not "%~2" == "" (
     set "LNG=%~2"
 )
 if "%LNGID%" == "1036" if "%LNG%" == "zh" (
-    "%SYSTEMROOT%\System32\chcp.com" 936 >nul
+    "%SystemRoot%\System32\chcp.com" 936 >nul
 )
 
 :: Definition of reusable texts
@@ -296,23 +332,23 @@ echo.
 echo           %YEL%  !sscreen3.%LNG%!%RES%
 echo.
 set /a rand=%random% %%17
-if !rand! == 0 echo           %GRY%  "Hack the planet!" – Dade Murphy%RES%
-if !rand! == 1 echo           %GRY%  "Resistance is futile." – Borg%RES%
-if !rand! == 2 echo           %GRY%  "There is no spoon." – Neo%RES%
-if !rand! == 3 echo           %GRY%  "I'm in." – Mr. Robot%RES%
-if !rand! == 4 echo           %GRY%  "All your base are belong to us." – CATS%RES%
-if !rand! == 5 echo           %GRY%  "Would you like to know more?" – Various%RES%
-if !rand! == 6 echo           %GRY%  "This message will self-destruct in 5... 4... 3..."%RES%
-if !rand! == 7 echo           %GRY%  "If you're reading this, you're already better than 90%% of users..."%RES%
-if !rand! == 8 echo           %GRY%  "I'm not a hacker. I'm a code poet."%RES%
-if !rand! == 9 echo           %GRY%  "Welcome to the command line. Abandon all GUIs, ye who enter here."%RES%
-if !rand! == 10 echo          %GRY%  "rm -rf / — because chaos is an art form."%RES%
-if !rand! == 11 echo          %GRY%  "This script runs faster than your Wi-Fi on a Monday."%RES%
-if !rand! == 12 echo          %GRY%  "The cake is a lie." – Portal%RES%
-if !rand! == 13 echo          %GRY%  "I am Groot." – Groot%RES%
-if !rand! == 14 echo          %GRY%  "Do or do not. There is no try." – Yoda%RES%
-if !rand! == 15 echo          %GRY%  "I know kung fu." – Neo%RES%
-if !rand! == 16 echo          %GRY%  "You have been recruited by the Star League to defend the frontier." – The Last Starfighter%RES%
+if %rand% == 0 echo           %GRY%  "Hack the planet!" – Dade Murphy%RES%
+if %rand% == 1 echo           %GRY%  "Resistance is futile." – Borg%RES%
+if %rand% == 2 echo           %GRY%  "There is no spoon." – Neo%RES%
+if %rand% == 3 echo           %GRY%  "I'm in." – Mr. Robot%RES%
+if %rand% == 4 echo           %GRY%  "All your base are belong to us." – CATS%RES%
+if %rand% == 5 echo           %GRY%  "Would you like to know more?" – Various%RES%
+if %rand% == 6 echo           %GRY%  "This message will self-destruct in 5... 4... 3..."%RES%
+if %rand% == 7 echo           %GRY%  "If you're reading this, you're already better than 90%% of users..."%RES%
+if %rand% == 8 echo           %GRY%  "I'm not a hacker. I'm a code poet."%RES%
+if %rand% == 9 echo           %GRY%  "Welcome to the command line. Abandon all GUIs, ye who enter here."%RES%
+if %rand% == 10 echo          %GRY%  "rm -rf / — because chaos is an art form."%RES%
+if %rand% == 11 echo          %GRY%  "This script runs faster than your Wi-Fi on a Monday."%RES%
+if %rand% == 12 echo          %GRY%  "The cake is a lie." – Portal%RES%
+if %rand% == 13 echo          %GRY%  "I am Groot." – Groot%RES%
+if %rand% == 14 echo          %GRY%  "Do or do not. There is no try." – Yoda%RES%
+if %rand% == 15 echo          %GRY%  "I know kung fu." – Neo%RES%
+if %rand% == 16 echo          %GRY%  "You have been recruited by the Star League to defend the frontier." – The Last Starfighter%RES%
 echo           %YEL%  ---------------------------------------------------------------------------------%RES%
 echo.
 
@@ -320,7 +356,6 @@ if "%INITIALIZED%" == "1" goto skipInit
 
 :: Initializing debug mode
 set "DEBUGREDIR=>nul 2>&1"
-set "UNRENLOG=nul"
 set "DEBUGLEVEL=0"
 set "NOCLS=0"
 
@@ -335,8 +370,8 @@ set "pshell.zh=检查 PowerShell 是否可用... "
 
 echo !pshell.%LNG%! >> "%UNRENLOG%"
 <nul set /p=!pshell.%LNG%!
-set "PWRSHELL=%SYSTEMROOT%\system32\WindowsPowerShell\v1.0\powershell.exe"
-for /f "delims=" %%A in ('"!SYSTEMROOT!\System32\where.exe" pwsh.exe 2^>nul') do (
+set "PWRSHELL=%SystemRoot%\system32\WindowsPowerShell\v1.0\powershell.exe"
+for /f "delims=" %%A in ('"!SystemRoot!\System32\where.exe" pwsh.exe 2^>nul') do (
     if not "%%A" == "" set "PWRSHELL=%%A"
 )
 if not exist "%PWRSHELL%" (
@@ -583,6 +618,14 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 
+:: Set UNRENLOG for debugging purpose
+If exist "%TEMP%\%BASENAME%.log" (
+    :: Move the temporary log file to the working directory
+    move /y "%TEMP%\%BASENAME%.log" "%WORKDIR%\%BASENAME%.log" %DEBUGREDIR%
+)
+set "UNRENLOG=%WORKDIR%\%BASENAME%.log"
+set "UNRENLOG=%UNRENLOG:"=%"
+
 :: Check for Python
 set "python1.en=Checking if Python is available..."
 set "python1.fr=Vérification de la disponibilité de Python..."
@@ -592,6 +635,7 @@ set "python1.de=Überprüfung der Verfügbarkeit von Python..."
 set "python1.ru=Проверка наличия Python..."
 set "python1.zh=检查 Python 是否可用..."
 
+echo !python1.%LNG%! >> "%UNRENLOG%"
 <nul set /p=!python1.%LNG%!
 
 :: Doublecheck to avoid issues with Milfania games
@@ -1073,17 +1117,20 @@ if /i "%OPTION%" == "x" goto exitn
 echo.
 echo.
 <nul set /p="%RED%!uchoice.%LNG%! %OPTION%%RES%"
-timeout /t 2 >nul
+timeout /t 2 %DEBUGREDIR%
 goto menu
 
 :: Drop our console/dev mode enabler into the game folder
 :console
 set "unren-console=%WORKDIR%\game\unren-console.rpy"
-echo %YEL%!TWADD.%LNG%! %unren-console%.%RES%
-echo %YEL%!INCASEDEL.%LNG%!%RES%
-echo %YEL%%unren-console%%RES%
-echo %YEL%%unren-console%c%RES%
-echo.
+
+call :elog .
+call :elog "%YEL%!TWADD.%LNG%! %unren-console%.%RES%"
+call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "%YEL%%unren-console%%RES%"
+call :elog "%YEL%%unren-console%c%RES%"
+call :elog .
+call :elog .
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choicea.%LNG%!... "
 if exist "%unren-console%" (
@@ -1109,11 +1156,15 @@ goto finish
 :: Drop our debug mode enabler into the game folder
 :debug
 set "unren-debug=%WORKDIR%\game\unren-debug.rpy"
-echo %YEL%!TWADD.%LNG%! %unren-debug%.%RES%
-echo %YEL%!INCASEDEL.%LNG%!%RES%
-echo %YEL%%unren-debug%%RES%
-echo %YEL%%unren-debug%c%RES%
-echo.
+
+call :elog .
+call :elog "%YEL%!TWADD.%LNG%! %unren-debug%.%RES%"
+call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "%YEL%%unren-debug%%RES%"
+call :elog "%YEL%%unren-debug%c%RES%"
+call :elog .
+call :elog .
+echo !choiceb.%LNG%!...  >> "%UNRENLOG%"
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choiceb.%LNG%!... "
 if exist "%unren-console%" (
@@ -1139,11 +1190,15 @@ goto finish
 :: Drop our skip file into the game folder
 :skip
 set "unren-skip=%WORKDIR%\game\unren-skip.rpy"
-echo %YEL%!TWADD.%LNG%! %unren-skip%.%RES%
-echo %YEL%!INCASEDEL.%LNG%!%RES%
-echo %YEL%%unren-skip%%RES%
-echo %YEL%%unren-skip%c%RES%
-echo.
+
+call :elog .
+call :elog "%YEL%!TWADD.%LNG%! %unren-skip%.%RES%"
+call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "%YEL%%unren-skip%%RES%"
+call :elog "%YEL%%unren-skip%c%RES%"
+call :elog .
+call :elog .
+echo !choicec.%LNG%!... >> "%UNRENLOG%"
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choicec.%LNG%!... "
 
@@ -1170,11 +1225,15 @@ goto finish
 :: Drop our skip file into the game folder
 :skipall
 set "unren-skipall=%WORKDIR%\game\unren-skipall.rpy"
-echo %YEL%!TWADD.%LNG%! %unren-skipall%.%RES%
-echo %YEL%!INCASEDEL.%LNG%!%RES%
-echo %YEL%%unren-skipall%%RES%
-echo %YEL%%unren-skipall%c%RES%
-echo.
+
+call :elog .
+call :elog "%YEL%!TWADD.%LNG%! %unren-skipall%.%RES%"
+call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "%YEL%%unren-skipall%%RES%"
+call :elog "%YEL%%unren-skipall%c%RES%"
+call :elog .
+call :elog .
+echo !choiced.%LNG%!... >> "%UNRENLOG%"
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choiced.%LNG%!... "
 
@@ -1201,11 +1260,14 @@ goto finish
 :: Drop our rollback file into the game folder
 :rollback
 set "unren-rollback=%WORKDIR%\game\unren-rollback.rpy"
-echo %YEL%!TWADD.%LNG%! %unren-rollback%.%RES%
-echo %YEL%!INCASEDEL.%LNG%!%RES%
-echo %YEL%%unren-rollback%%RES%
-echo %YEL%%unren-rollback%c%RES%
-echo.
+
+call :elog .
+call :elog "%YEL%!TWADD.%LNG%! %unren-rollback%.%RES%"
+call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "%YEL%%unren-rollback%%RES%"
+call :elog "%YEL%%unren-rollback%c%RES%"
+call :elog .
+call :elog .
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choicee.%LNG%!... "
 
@@ -1232,11 +1294,14 @@ goto finish
 :: Drop our Quick Save/Load file into the game folder
 :quick
 set "unren-quick=%WORKDIR%\game\unren-quick.rpy"
-echo %YEL%!TWADD.%LNG%! %unren-quick%.%RES%
-echo %YEL%!INCASEDEL.%LNG%!%RES%
-echo %YEL%%unren-quick%%RES%
-echo %YEL%%unren-quick%c%RES%
-echo.
+
+call :elog .
+call :elog "%YEL%!TWADD.%LNG%! %unren-quick%.%RES%"
+call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "%YEL%%unren-quick%%RES%"
+call :elog "%YEL%%unren-quick%c%RES%"
+call :elog .
+call :elog .
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choicef.%LNG%!... "
 
@@ -1263,11 +1328,14 @@ goto finish
 :: Drop our Quick Menu file into the game folder
 :qmenu
 set "unren-qmenu=%WORKDIR%\game\unren-qmenu.rpy"
-echo %YEL%!TWADD.%LNG%! %unren-qmenu%.%RES%
-echo %YEL%!INCASEDEL.%LNG%!%RES%
-echo %YEL%%unren-qmenu%%RES%
-echo %YEL%%unren-qmenu%c%RES%
-echo.
+
+call :elog .
+call :elog "%YEL%!TWADD.%LNG%! %unren-qmenu%.%RES%"
+call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "%YEL%%unren-qmenu%%RES%"
+call :elog "%YEL%%unren-qmenu%c%RES%"
+call :elog .
+call :elog .
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choiceg.%LNG%!... "
 
@@ -1303,12 +1371,16 @@ del /f /q "%uguzip%" %DEBUGREDIR%
 del /f /q "%uguhardzip%" %DEBUGREDIR%
 del /f /q "%ugusoftzip%" %DEBUGREDIR%
 
-echo %YEL%!TWADD.%LNG%! %ugudir%.%RES%
-echo %YEL%!INCASEOF.%LNG%! %RES%
-echo %MAG%https://f95zone.to/threads/universal-gallery-unlocker-2024-01-24-zlzk.136812/%RES%
-echo %YEL%!INCASEDEL.%LNG%!%RES%
-echo %YEL%%ugudir%\ZLZK_UGU_soft%RES%
-echo.
+
+call :elog .
+call :elog "%YEL%!TWADD.%LNG%! %ugudir%.%RES%"
+call :elog "%YEL%!INCASEOF.%LNG%! %RES%"
+call :elog "%MAG%https://f95zone.to/threads/universal-gallery-unlocker-2024-01-24-zlzk.136812/%RES%"
+call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "%YEL%%ugudir%\ZLZK_UGU_soft%RES%"
+call :elog .
+call :elog .
+echo !choiceh.%LNG%!... >> "%UNRENLOG%"
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choiceh.%LNG%!... "
 
@@ -1358,12 +1430,15 @@ del /f /q "%ucdzip_part1%" %DEBUGREDIR%
 del /f /q "%ucdzip_part2%" %DEBUGREDIR%
 del /f /q "%TEMP%\Readme.txt" %DEBUGREDIR%
 
-echo %YEL%!TWADD.%LNG%! %ucddir%.%RES%
-echo %YEL%!INCASEOF.%LNG%! %RES%
-echo %MAG%https://f95zone.to/threads/universal-gallery-unlocker-2024-01-24-zlzk.136812/%RES%
-echo %YEL%!INCASEDEL.%LNG%!%RES%
-echo %YEL%%ucddir%%RES%
-echo.
+call :elog .
+call :elog "%YEL%!TWADD.%LNG%! %ucddir%.%RES%"
+call :elog "%YEL%!INCASEOF.%LNG%! %RES%"
+call :elog "%MAG%https://f95zone.to/threads/universal-gallery-unlocker-2024-01-24-zlzk.136812/%RES%"
+call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "%YEL%%ucddir%%RES%"
+call :elog .
+call :elog .
+echo !choicei.%LNG%!... >> "%UNRENLOG%"
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choicei.%LNG%!... "
 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%ucdzip%')" >> "%UNRENLOG%"
@@ -1420,22 +1495,26 @@ set "utbox_file=%WORKDIR%\game\y_outline.rpy"
 set "utbox_tdir=%TEMP%\utbox"
 
 :: Need 7z.exe for extraction
-if not exist "%ProgramFiles%\7-Zip\7z.exe" (
-    echo %RED%!FAIL.%LNG%! !MISSING.%LNG%! %YEL%%ProgramFiles%\7-Zip\7z.exe %RES%
+if not exist "%_7ZIPLOC%" (
+    call :elog .
+    call :elog "%RED%!FAIL.%LNG%! !MISSING.%LNG%! %YEL%%_7ZIPLOC% %RES%"
+    timeout /t 2 %DEBUGREDIR%
     goto skip_utbox
 )
 
-del /f /q "%utbox_file%" %DEBUGREDIR%
-
-echo %YEL%!TWADD.%LNG%! %utbox_file%.%RES%
-echo %YEL%!INCASEOF.%LNG%! %RES%
-echo %MAG%https://f95zone.to/threads/renpy-transparent-text-box-mod-v2-6-4.11925/%RES%
-echo %YEL%!INCASEDEL.%LNG%!%RES%
-echo %YEL%%utbox_file%%RES%
-echo.
+call :elog .
+call :elog "%YEL%!TWADD.%LNG%! %utbox_file%.%RES%"
+call :elog "%YEL%!INCASEOF.%LNG%! %RES%"
+call :elog "%MAG%https://f95zone.to/threads/renpy-transparent-text-box-mod-v2-6-4.11925/%RES%"
+call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "%YEL%%utbox_file%%RES%"
+call :elog .
+call :elog .
+echo !choicej.%LNG%!... >> "%UNRENLOG%"
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choicej.%LNG%!..."
 
+del /f /q "%utbox_file%" %DEBUGREDIR%
 del /f /q "%utboxzip%" %DEBUGREDIR%
 rd /s /q "%utbox_tdir%" %DEBUGREDIR%
 
@@ -1445,8 +1524,8 @@ if not exist "%utboxzip%" (
     echo %RED% !FAIL.%LNG%! !UNDWNLD.%LNG%! %url% %RES%
     goto skip_utbox
 ) else (
-    echo "%ProgramFiles%\7-Zip\7z.exe" x -y -o"%utbox_tdir%" "%utboxzip%" >> "%UNRENLOG%"
-    "%ProgramFiles%\7-Zip\7z.exe" x -y -o"%utbox_tdir%" "%utboxzip%" %DEBUGREDIR%
+    echo "%_7ZIPLOC%" x -y -o"%utbox_tdir%" "%utboxzip%" >> "%UNRENLOG%"
+    "%_7ZIPLOC%" x -y -o"%utbox_tdir%" "%utboxzip%" %DEBUGREDIR%
     if not exist "%utbox_tdir%\game\y_outline.rpy" (
         echo %RED% !FAIL.%LNG%! !UNEXTRACT.%LNG%! "%utboxzip%" %RES%
         goto skip_utbox
@@ -1474,13 +1553,15 @@ set "urm_zip=%TEMP%\0x52_URM.zip"
 set "urm_rpa=%WORKDIR%\game\0x52_URM.rpa"
 del /f /q "%urm_zip%" %DEBUGREDIR%
 
-echo %YEL%!TWADD.%LNG%! %urm_rpa%.%RES%
-echo %YEL%!INCASEOF.%LNG%! %RES%
-echo %MAG%https://f95zone.to/threads/universal-renpy-mod-urm-2-6-2-mod-any-renpy-game-yourself.48025/%RES%
-echo %YEL%!INCASEDEL.%LNG%!%RES%
-echo %YEL%%urm_rpa%%RES%
-
-echo.
+call :elog .
+call :elog "%YEL%!TWADD.%LNG%! %urm_rpa%.%RES%"
+call :elog "%YEL%!INCASEOF.%LNG%! %RES%"
+call :elog "%MAG%https://f95zone.to/threads/universal-renpy-mod-urm-2-6-2-mod-any-renpy-game-yourself.48025/%RES%"
+call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "%YEL%%urm_rpa%%RES%"
+call :elog .
+call :elog .
+echo !choicek.%LNG%!... >> "%UNRENLOG%"
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choicek.%LNG%!... "
 
@@ -1775,6 +1856,8 @@ if not exist "%WORKDIR%\game\tl\" (
 )
 
 call :elog .
+call :elog .
+echo !choicet.%LNG%!.. >> "%UNRENLOG%"
 if not "%OPTION%" == "m" echo.
 <nul set /p="!choicet.%LNG%!... "
 
@@ -1836,16 +1919,17 @@ set "areg4.zh=运行 %SCRIPTNAME% 脚本"
 call :check_admin
 
 call :elog .
-echo %YEL%!areg1.%LNG%!%RES%
-echo %YEL%!areg2.%LNG%!%RES%
-echo %YEL%!areg2a.%LNG%!%RES%
+call :elog "%YEL%!areg1.%LNG%!%RES%"
+call :elog "%YEL%!areg2.%LNG%!%RES%"
+call :elog "%YEL%!areg2a.%LNG%!%RES%"
 call :elog .
+echo !areg3.%LNG%! >> "%UNRENLOG%"
 <nul set /p="!areg3.%LNG%!"
 
 :: Add registry key
 reg add "HKCR\Directory\shell\Run%SCRIPTNAME%" /ve /d "!areg4.%LNG%!" /f %DEBUGREDIR%
-reg add "HKCR\Directory\shell\Run%SCRIPTNAME%" /v "Icon" /d "%SYSTEMROOT%\System32\shell32.dll,-154" /f %DEBUGREDIR%
-reg add "HKCR\Directory\shell\Run%SCRIPTNAME%\command" /ve /d "%SYSTEMROOT%\System32\cmd.exe /c cd /d \"%%V\" && \"%SCRIPTDIR%%SCRIPTNAME%\" \"%%V\"" /f %DEBUGREDIR%
+reg add "HKCR\Directory\shell\Run%SCRIPTNAME%" /v "Icon" /d "%SystemRoot%\System32\shell32.dll,-154" /f %DEBUGREDIR%
+reg add "HKCR\Directory\shell\Run%SCRIPTNAME%\command" /ve /d "%SystemRoot%\System32\cmd.exe /c cd /d \"%%V\" && \"%SCRIPTDIR%%SCRIPTNAME%\" \"%%V\"" /f %DEBUGREDIR%
 if %ERRORLEVEL% EQU 0 (
 	echo %GRE%!PASS.%LNG%!%RES%
 ) else (
@@ -1882,8 +1966,9 @@ set "rreg2.zh=正在从注册表中移除右键菜单项... "
 call :check_admin
 
 call :elog .
-echo %YEL%!rreg1.%LNG%!%RES%
+call :elog "%YEL%!rreg1.%LNG%!%RES%"
 call :elog .
+echo !rreg2.%LNG%! >> "%UNRENLOG%"
 <nul set /p="!rreg2.%LNG%!"
 :: Remove registry key
 reg delete "HKCR\Directory\shell\RunUnrenForAll" /f %DEBUGREDIR%
@@ -1930,7 +2015,8 @@ set "admright3.ru=Перезапустите скрипт с правами ад
 set "admright3.zh=请以管理员权限重新启动脚本。"
 
 call :elog .
-if not "%OPTION%" == "m" echo.
+call :elog .
+echo !admright.%LNG%!... >> "%UNRENLOG%"
 <nul set /p="!admright.%LNG%!... "
 
 net session %DEBUGREDIR%
@@ -1942,7 +2028,7 @@ if %ERRORLEVEL% EQU 0 (
     echo !admright2.%LNG%!
     echo !admright3.%LNG%!
     call :elog .
-    timeout /t 2 >nul
+    timeout /t 2 %DEBUGREDIR%
     echo "%PWRSHELL%" -NoProfile -Command "Start-Process '%~f0' -ArgumentList '%WORKDIR%' -Verb RunAs" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "Start-Process '%~f0' -ArgumentList '%WORKDIR%' -Verb RunAs"
 
@@ -1974,7 +2060,7 @@ set "batch_name=%~1"
 set "running_batch=%~nx0"
 
 :: If no difference do nothing
-"%SYSTEMROOT%\System32\fc.exe" "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%.bat" %DEBUGREDIR%
+"%SystemRoot%\System32\fc.exe" "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%.bat" %DEBUGREDIR%
 if %ERRORLEVEL% EQU 0 (
     goto :eof
 )
@@ -2056,7 +2142,7 @@ call :elog .
 echo !unavailable.%LNG%! >> "%UNRENLOG%"
 <nul set /p="%YEL%!unavailable.%LNG%!%RES%"
 
-timeout /t 2 >nul
+timeout /t 2 %DEBUGREDIR%
 
 goto :menu
 
@@ -2137,7 +2223,8 @@ set "cupd8.de=Kein Download-Update-Link gefunden."
 set "cupd8.ru=Ссылка для загрузки обновления не найдена."
 set "cupd8.zh=未找到下载更新链接。"
 
-echo.
+call :elog .
+echo !cupd1.%LNG%!... >> "%UNRENLOG%"
 <nul set /p="!cupd1.%LNG%!..."
 del /f /q "%TEMP%\%upd_link%.tmp" %DEBUGREDIR%
 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%upd_url%', '%TEMP%\%upd_link%.tmp')" >> "%UNRENLOG%"
@@ -2150,7 +2237,7 @@ if not exist "%TEMP%\%upd_link%.tmp" (
     if not exist "%SCRIPTDIR%%upd_link%.txt" (
         copy nul "%SCRIPTDIR%%upd_link%.txt" %DEBUGREDIR%
     )
-    "%SYSTEMROOT%\System32\fc.exe" "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" %DEBUGREDIR%
+    "%SystemRoot%\System32\fc.exe" "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" %DEBUGREDIR%
     if !ERRORLEVEL! GEQ 1 (
         call :elog "%YEL% !cupd3.%LNG%!%RES%"
 
@@ -2162,7 +2249,7 @@ if not exist "%TEMP%\%upd_link%.tmp" (
         if not defined forall_url (
             call :elog "%RED% !FAIL.%LNG%! %YEL%!cupd8.%LNG%!%RES%"
             call :elog .
-            timeout /t 2 >nul
+            timeout /t 2 %DEBUGREDIR%
             goto :eof
         )
         move /y "%SCRIPTDIR%%upd_clog%.txt" "%SCRIPTDIR%%upd_clog%.b64" %DEBUGREDIR%
@@ -2262,6 +2349,7 @@ set "cdwnld.de=Fehlende Datei herunterladen von:"
 set "cdwnld.ru=Скачать недостающий файл с:"
 set "cdwnld.zh=从以下位置下载缺失的文件："
 
+echo !cfile.%LNG%!... >> "%UNRENLOG%"
 <nul set /p="!cfile.%LNG%!..."
 for %%F in (legacy current forall) do (
     if not exist "%SCRIPTDIR%UnRen-%%~F.bat" (
@@ -2328,6 +2416,26 @@ goto menu
     exit /b %ERRORLEVEL%
 
 
+:: For debugging help
+:DisplayVars
+set "emsg=%~1"
+echo. >> "%UNRENLOG%"
+echo "%emsg%" >> "%UNRENLOG%"
+echo SCRIPTDIR		 = %SCRIPTDIR% >> "%UNRENLOG%"
+echo WORKDIR 		 = %WORKDIR% >> "%UNRENLOG%"
+echo PYTHONHOME		 = %PYTHONHOME% >> "%UNRENLOG%"
+echo PYNOASSERT		 = [%PYNOASSERT%] >> "%UNRENLOG%"
+echo PYTHONHOME		 = %PYTHONHOME% >> "%UNRENLOG%"
+echo PYTHONPATH		 = %PYTHONPATH% >> "%UNRENLOG%"
+echo PYTHONVERS		 = [%PYTHONVERS%] >> "%UNRENLOG%"
+echo RPATOOL-NEW 	 = %RPATOOL-NEW% >> "%UNRENLOG%"
+echo RENPYVERSION 	 = [%RENPYVERSION%] >> "%UNRENLOG%"
+echo OFFSET			 = [%OFFSET%] >> "%UNRENLOG%"
+echo. >> "%UNRENLOG%"
+
+exit /b
+
+
 :: Define a function to log messages
 :elog
 :: Display msg (%~1) to console and "%UNRENLOG%"
@@ -2364,11 +2472,11 @@ if %DEBUGLEVEL% GEQ 1 (
 )
 
 :: Restore modified configuration and we exit with the appropriate code
-"%SYSTEMROOT%\System32\chcp.com" %OLD_CP% >nul
+"%SystemRoot%\System32\chcp.com" %OLD_CP% >nul
 
 :: Restore original console mode
 if %DEBUGLEVEL% EQU 0 (
-    "%SYSTEMROOT%\System32\mode.com" con: cols=%ORIG_COLS% lines=%ORIG_LINES%
+    "%SystemRoot%\System32\mode.com" con: cols=%ORIG_COLS% lines=%ORIG_LINES%
 
     REM Remove old bug entries
     reg delete "HKCU\Console\MyScript" /f %DEBUGREDIR%
