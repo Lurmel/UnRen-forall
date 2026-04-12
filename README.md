@@ -24,7 +24,7 @@ I've made these scripts with ❤️ to simplify the management of your favorite 
 
 What started as a simple launcher evolved into a multilingual toolkit with customizable options, version-aware execution, and update support. I hope it makes your experience smoother and more enjoyable.
 
-If you want to support me, you can <a href="https://buymeacoffee.com/joelurmelf" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-yellow.png" alt="Buy Me A Coffee" height="20" width="100"></a>
+<a href='https://ko-fi.com/Y8Y21X6CZD' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi6.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
 ---
 
