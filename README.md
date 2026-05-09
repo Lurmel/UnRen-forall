@@ -30,7 +30,7 @@ What started as a simple launcher evolved into a multilingual toolkit with custo
 
 - `UnRen-forall.bat` — Multilingual launcher (Version 0.70)
 - `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.7.53)
-- `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.573)
+- `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.73)
 - `UnRen-cfg.zip` — Contains `UnRen-cfg.bat` to configure language and batch behavior
 - `UnRen-link.txt` — Contains the download link for the full package and a changelog for updates
 
