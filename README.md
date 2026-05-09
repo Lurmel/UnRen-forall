@@ -4,7 +4,7 @@
 ![UnRen-legacy](https://img.shields.io/badge/UnRen--legacy-9.7.53-green)
 ![UnRen-current](https://img.shields.io/badge/UnRen--current-9.7.73-purple)
 ![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
-![Downloads](https://img.shields.io/github/downloads/Lurmel/UnRen-forall/total)
+![Downloads](https://img.shields.io/github/downloads/Lurmel/UnRen-forall/total?v=2)
 
 
 ## 📑 Table of Contents
