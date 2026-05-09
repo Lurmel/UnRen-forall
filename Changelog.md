@@ -5,6 +5,41 @@ All dates are in the format MM/DD/YY.
 ---
 
 ## 03/21/26:
+	UnRen-forall.bat 0.70, UnRen-current.bat 9.7.73 & UnRen-legacy.bat 9.7.53
+
+	Common modifications for all scripts:
+	- Optimisation code, relooking and bug fixes.
+	- You can now replace any character name with a new name.
+	- Added the r option to restore .org files.
+	- Added the s option for deleting .org files.
+	- Rewriting sentences for greater clarity.
+	- Added support for Python system. Ideally Python 2.7 and Python >= 3.9 is preferred.
+	- Base64 are now decrypted with Python instead of PowerShell to improve speed.
+	- A one shot surprise 8-).
+	- For your privacy, entry added to the registry are now in the HKCU section instead of HKCR.
+	  Check the message above + - option in the menu to know if admin right are required.
+
+	  You have to delete with Admin rights the old entry, quit the script and relaunch into your account
+	  to add each script you need in the proper registry section.
+
+	  YOU DON'T NEED ADMIN RIGHTS FOR EACH SCRIPT ANYMORE.
+
+
+	Modification for UnRen-forall.bat only:
+	- If the program is launched with a valid game directory,
+	  it automatically runs the appropriate legacy/current script.
+
+
+	Common modifications for UnRen-current.bat & UnRen-legacy.bat:
+	- RPA files are no longer moved to rpa directory, but are renamed with .org extension.
+	- Improved processing speed for RPA files.
+	- Added support for Windows Terminal screen, use Ctrl + - to adjust the Police.
+	- Added RPYC format version detection RPC2/RPC3 to warn before decompilation.
+	- Rewrite the WOS decrypt to have a status of what is decrypted.
+
+---
+
+## 03/21/26:
 	UnRen-forall.bat 0.56, UnRen-current.bat 9.7.59 & UnRen-legacy.bat 9.7.39
 
 	Common modifications for all scripts:

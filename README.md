@@ -1,8 +1,8 @@
 ### 🔖 Versions
 
-![UnRen-forall](https://img.shields.io/badge/UnRen--forall-0.56-blue)
-![UnRen-legacy](https://img.shields.io/badge/UnRen--legacy-9.7.39-green)
-![UnRen-current](https://img.shields.io/badge/UnRen--current-9.7.59-purple)
+![UnRen-forall](https://img.shields.io/badge/UnRen--forall-0.70-blue)
+![UnRen-legacy](https://img.shields.io/badge/UnRen--legacy-9.7.53-green)
+![UnRen-current](https://img.shields.io/badge/UnRen--current-9.7.73-purple)
 ![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
 ![Downloads](https://img.shields.io/github/downloads/Lurmel/UnRen-forall/total)
 
@@ -24,23 +24,21 @@ I've made these scripts with ❤️ to simplify the management of your favorite 
 
 What started as a simple launcher evolved into a multilingual toolkit with customizable options, version-aware execution, and update support. I hope it makes your experience smoother and more enjoyable.
 
-<a href='https://ko-fi.com/Y8Y21X6CZD' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi6.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
-
 ---
 
 ## 📦 Included Files
 
-- `UnRen-forall.bat` — Multilingual launcher (Version 0.56)
-- `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.7.39)
-- `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.59)
-- `UnRen-cfg.txt` — To configure language and batch behavior
+- `UnRen-forall.bat` — Multilingual launcher (Version 0.70)
+- `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.7.53)
+- `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.573)
+- `UnRen-cfg.zip` — Contains `UnRen-cfg.bat` to configure language and batch behavior
 - `UnRen-link.txt` — Contains the download link for the full package and a changelog for updates
 
 ---
 
 ## 📥 Download
 
-[⬇️ Download latest release](https://github.com/Lurmel/UnRen-forall/releases/download/main/UnRen-forall-la_0.56-le_9.7.39-cu_9.7.59.zip))
+[⬇️ Download latest release](https://github.com/Lurmel/UnRen-forall/releases/download/main/UnRen-forall-la_0.70-le_9.7.53-cu_9.7.70.zip)
 
 ---
 
@@ -61,13 +59,13 @@ What started as a simple launcher evolved into a multilingual toolkit with custo
 1. Place the batch files in your Ren'Py game directory or a directory of your choice (preferably)
 2. Run `UnRen-forall.bat`
 3. Follow the prompts in your preferred language
-4. (Optional) Use `UnRen-cfg.txt` to customize default options and language
+4. (Optional) Use `UnRen-cfg.bat` to customize default options and language
 
 ---
 
 ## 📡 Updates
 
-The launcher checks `UnRen-link.txt` for updates and displays a changelog if a new version is available. This allows you to keep your toolkit up to date without manual tracking.
+The launcher checks `UnRen-link.txt` for updates and displays a changelog if a new version is available. This allows you to keep your toolkit up to date with manual tracking.
 
 ---
 
@@ -103,9 +101,6 @@ This project is licensed under the GNU General Public License v3.0.
 You are free to use, modify, and distribute it under the same terms.
 Commercial use is not permitted unless the source remains open and licensed under GPL.
 See the [LICENSE](LICENSE) file for full details.
-
-
-
 
 
 

@@ -4,6 +4,13 @@
 for /f "tokens=2 delims=:" %%a in ('%SystemRoot%\System32\chcp.com') do set "OLD_CP=%%a"
 :: Switch to code page 65001 for UTF-8
 "%SystemRoot%\System32\chcp.com" 65001 >nul
+
+
+:: In case it contains spaces, we need to use a temporary variable to avoid issues with delayed expansion
+set "TEMPDIR=%~1"
+if "%~1" == "--norestart" set "TEMPDIR=%~2"
+if "%~1" == "--norelaunch" set "TEMPDIR=%~2"
+
 setlocal EnableDelayedExpansion
 
 :: UnRen-forall.bat - UnRen Launcher Script named UnRen-forall.bat for compatibility
@@ -13,7 +20,7 @@ setlocal EnableDelayedExpansion
 :: DO NOT MODIFY BELOW THIS LINE unless you know what you're doing
 :: Define various global names
 set "NAME=forall"
-set "VERSION=(v0.56) (03/20/26)"
+set "VERSION=v0.70 - 04/28/26"
 title UnRen-%NAME%.bat - %VERSION%
 set "URL_REF=https://f95zone.to/threads/92717/post-17110063/"
 set "SCRIPTDIR=%~dp0"
@@ -21,17 +28,22 @@ set "UPD_TDIR=%TEMP%\UnRenUpdate"
 set "SCRIPTNAME=%~nx0"
 set "BASENAME=%SCRIPTNAME:.bat=%"
 set "UNRENLOG=%TEMP%\%BASENAME%.log"
+set "PWRSHELL=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 if exist "%UNRENLOG%" del /f /q "%UNRENLOG%" >nul 2>&1
+
+
 :: Use wmic for older system or PowerShell for newer ones to get date and time
-if exist "%SystemRoot%\System32\wbem\wmic.exe" (
-    for /f "skip=1 tokens=1" %%a in ('"%SystemRoot%\System32\wbem\wmic.exe" os get LocalDateTime') do (
+set "datetime="
+set "WMICEXE=%SystemRoot%\System32\wbem\wmic.exe"
+if exist "%WMICEXE%" (
+    for /f "skip=1 tokens=1" %%a in ('%WMICEXE% os get LocalDateTime') do (
         set "datetime=%%a"
         goto :dbreak
     )
 ) else (
-    for /f %%a in ("'%SystemRoot%\system32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -Command "(Get-CimInstance -ClassName Win32_OperatingSystem).LocalDateTime"') do (
-        set "datetime=%%a"
-        goto :dbreak
+    for /f "delims=" %%a in ('"%PWRSHELL%" -NoProfile -Command "(Get-CimInstance Win32_OperatingSystem).LocalDateTime.ToString(\"yyyyMMddHHmmss\")"') do (
+         set "datetime=%%a"
+         goto :dbreak
     )
 )
 :dbreak
@@ -45,10 +57,12 @@ set second=%datetime:~12,2%
 set formatted_date=%month%/%day%/%year:~2,2%
 set formatted_time=%hour%:%minute%:%second%
 
+
 :: Start the Log
-echo. >> "%UNRENLOG%"
+>> "%UNRENLOG%" echo.
 echo UnRen-%NAME%.bat %VERSION%, started on %formatted_date% at %formatted_time% >> "%UNRENLOG%"
-echo. >> "%UNRENLOG%"
+>> "%UNRENLOG%" echo.
+
 
 :: Set default values
 set "MDEFS=acefg"
@@ -70,47 +84,24 @@ if exist "%UNREN_CFG%" (
     )
 )
 
-:: Set the cmd screen size with backup of old settings
-set "count=0"
-:: Read the lines of mode con
-for /f "tokens=*" %%A in ('"%SystemRoot%\System32\mode.com" con') do (
-    :: Split the line into tokens
-    for %%B in (%%A) do (
-        set "val=%%B"
-        :: Check if it's a number
-        echo !val! | findstr /r "[0-9][0-9]" >nul
-        if !ERRORLEVEL! EQU 0 (
-            set /a count+=1
-            if !count! EQU 1 (
-                set "ORIG_LINES=!val!"
-            )
-            if !count! EQU 2 (
-                set "ORIG_COLS=!val!"
-            )
-        )
-    )
-)
-set "NEW_COLS=110"
-%SystemRoot%\System32\mode.com con: cols=%NEW_COLS% lines=200 %DEBUGREDIR%
-%SystemRoot%\System32\mode.com con: cols=%NEW_COLS% lines=62 %DEBUGREDIR%
-
-if defined LNG goto lngtest
+:: Defined from external configuration file
+if defined LNG goto :lngtest
 
 :: Clean retrieval of language code via WMIC or PowerShell
-if exist "%SystemRoot%\System32\wbem\wmic.exe" (
-    for /f "skip=1 tokens=1" %%l in ('%SystemRoot%\System32\wbem\wmic.exe os get oslanguage') do (
+if exist "%WMICEXE%" (
+    for /f "skip=1 tokens=1" %%l in ('%WMICEXE% os get oslanguage') do (
         set LNGID=%%l
-        goto found_lcid
+        goto :found_lcid
     )
 ) else (
-    for /f %%l in ('%SystemRoot%\system32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -Command "Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object -ExpandProperty OSLanguage"') do (
+    for /f %%l in ('"%PWRSHELL%" -NoProfile -Command "Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object -ExpandProperty OSLanguage"') do (
         set LNGID=%%l
-        goto found_lcid
+        goto :found_lcid
     )
 )
 
-:found_lcid
 :: LCID correspondence
+:found_lcid
 if "%LNGID%" == "1033" set "LNG=en"
 if "%LNGID%" == "1036" set "LNG=fr"
 if "%LNGID%" == "3082" set "LNG=es"
@@ -118,32 +109,62 @@ if "%LNGID%" == "1040" set "LNG=it"
 if "%LNGID%" == "1031" set "LNG=de"
 if "%LNGID%" == "1049" set "LNG=ru"
 if "%LNGID%" == "2052" set "LNG=zh"
-
 if not defined LNG set "LNG=en"
 
-:lngtest
 :: Language support test
+:lngtest
 set "SUPPORTED= de es en fr it ru zh "
 set "FIND= %LNG% "
-echo %SUPPORTED% | find /i "%FIND%" >nul
-if %ERRORLEVEL% NEQ 0 set "LNG=en"
+echo "%SUPPORTED%" | "%SystemRoot%\System32\findstr.exe" /i "%FIND%" >nul 2>&1
+if %errorlevel% NEQ 0 set "LNG=en"
 
 :: To be able to take screenshots for F95zone
-if not "%~2" == "" (
-    set "LNG=%~2"
+if defined "%~2" (
+    echo "%SUPPORTED%" | "%SystemRoot%\System32\findstr.exe" /i "%~2" >nul 2>&1
+    if !errorlevel! EQU 0 set "LNG=%~2"
 )
+
 if "%LNGID%" == "1036" if "%LNG%" == "zh" (
     "%SystemRoot%\System32\chcp.com" 936 >nul
 )
 
+
+:: Definition of reusable texts not language dependent
+set "GRY=[90m"
+set "RED=[91m"
+set "GRE=[92m"
+set "YEL=[93m"
+set "MAG=[95m"
+set "CYA=[96m"
+set "RES=[0m"
+for /f "tokens=4-5 delims=. " %%i in ('ver') do set OSVERS=%%i.%%j
+if "%OSVERS%" == "6.1" (
+    set "GRY="
+    set "RED="
+    set "GRE="
+    set "YEL="
+    set "MAG="
+    set "CYA="
+    set "RES="
+)
+
+
 :: Definition of reusable texts
-set "ANYKEY.en=Press any key to exit..."
-set "ANYKEY.fr=Appuyez sur une touche pour quitter..."
-set "ANYKEY.es=Presione cualquier tecla para salir..."
-set "ANYKEY.it=Premere un tasto per uscire..."
-set "ANYKEY.de=Drücken Sie eine beliebige Taste, um zu beenden..."
-set "ANYKEY.ru=Нажмите любую клавишу для выхода..."
-set "ANYKEY.zh=按任意键退出..."
+set "EMPTY=[      ]"
+set "NOK=[  %RED%NOK%RES% ]"
+set "OK=[  %GRE%OK%RES%  ]"
+set "SKIP=[ %CYA%SKIP%RES% ]"
+set "WARN=[ %YEL%WARN%RES% ]"
+
+:: language dependent here, defined for each supported language.
+:: The script will use the appropriate one based on the detected or selected language.
+set "ANYKEY.en=Press any key to exit"
+set "ANYKEY.fr=Appuyez sur une touche pour quitter"
+set "ANYKEY.es=Presione cualquier tecla para salir"
+set "ANYKEY.it=Premere un tasto per uscire"
+set "ANYKEY.de=Drücken Sie eine beliebige Taste, um zu beenden"
+set "ANYKEY.ru=Нажмите любую клавишу для выхода"
+set "ANYKEY.zh=按任意键退出"
 
 set "ARIGHT.en=Please run this script as an administrator to add the entry."
 set "ARIGHT.fr=Veuillez exécuter ce script en tant qu'administrateur pour ajouter l'entrée."
@@ -153,29 +174,45 @@ set "ARIGHT.de=Bitte führen Sie dieses Skript als Administrator aus, um den Ein
 set "ARIGHT.ru=Пожалуйста, запустите этот скрипт от имени администратора, чтобы добавить элемент."
 set "ARIGHT.zh=请以管理员身份运行此脚本以添加条目。"
 
-set "PASS.en=Pass"
-set "PASS.fr=Réussi"
-set "PASS.es=Paso"
-set "PASS.it=Passato"
-set "PASS.de=Bestanden"
-set "PASS.ru=Успех"
-set "PASS.zh=通过"
+set "FDELETE.en=Failed to delete:"
+set "FDELETE.fr=Échec de la suppression :"
+set "FDELETE.es=No se pudo eliminar:"
+set "FDELETE.it=Impossibile eliminare:"
+set "FDELETE.de=Fehler beim Löschen von:"
+set "FDELETE.ru=Не удалось удалить:"
+set "FDELETE.zh=无法删除："
 
-set "FAIL.en=Fail"
-set "FAIL.fr=Échoué"
-set "FAIL.es=Fallo"
-set "FAIL.it=Fallito"
-set "FAIL.de=Fehlgeschlagen"
-set "FAIL.ru=Ошибка"
-set "FAIL.zh=失败"
+set "FCREATE.en=Failed to create:"
+set "FCREATE.fr=Impossible de créer :"
+set "FCREATE.es=No se pudo crear:"
+set "FCREATE.it=Impossibile creare:"
+set "FCREATE.de=Die Erstellung von ist fehlgeschlagen:"
+set "FCREATE.ru=Не удалось создать:"
+set "FCREATE.zh=创建失败："
 
-set "APRESENT.en=Option already presented."
-set "APRESENT.fr=Option déjà présentée."
-set "APRESENT.it=Opzione già presentata."
-set "APRESENT.es=Opción ya presentada."
-set "APRESENT.de=Option bereits präsentiert."
-set "APRESENT.ru=Опция уже представлена."
-set "APRESENT.zh=选项已存在。"
+set "FMOVE.en=Failed to move:"
+set "FMOVE.fr=Impossible de déplacer :"
+set "FMOVE.es=No se pudo mover:"
+set "FMOVE.it=Impossibile spostare:"
+set "FMOVE.de=Fehler beim Verschieben von:"
+set "FMOVE.ru=Не удалось переместить:"
+set "FMOVE.zh=移动失败："
+
+set "APRESENT.en=Option already installed."
+set "APRESENT.fr=Option déjà installée."
+set "APRESENT.it=Opzione già installata."
+set "APRESENT.es=Opci&oacute;n ya instalada."
+set "APRESENT.de=Option bereits installiert."
+set "APRESENT.ru=Опция уже установлена."
+set "APRESENT.zh=选项已安装。"
+
+set "TWRM.en=This will remove:"
+set "TWRM.fr=Cela supprimera :"
+set "TWRM.it=Questo rimuoverà:"
+set "TWRM.es=Esto eliminará:"
+set "TWRM.de=Dies wird entfernen:"
+set "TWRM.ru=Это удалит:"
+set "TWRM.zh=这将移除："
 
 set "TWADD.en=This will add:"
 set "TWADD.fr=Cela ajoutera:"
@@ -194,7 +231,7 @@ set "INCASEOF.ru=В случае проблемы обратитесь к:"
 set "INCASEOF.zh=如果出现问题，请参考："
 
 set "INCASEDEL.en=In case of problem, delete the following files/dirs:"
-set "INCASEDEL.fr=En cas de problème, supprimez le.s fichier.s/répertoire.s suivants :"
+set "INCASEDEL.fr=En cas de problème, supprimez le(s) fichier(s)/répertoire(s) suivants :"
 set "INCASEDEL.it=In caso di problemi, eliminare i seguenti file/directory:"
 set "INCASEDEL.es=En caso de problemas, elimine los siguientes archivos/directorios:"
 set "INCASEDEL.de=Im Falle von Problemen löschen Sie die folgenden Dateien/Verzeichnisse:"
@@ -225,14 +262,29 @@ set "UNEXTRACT.de=Fehler beim Herunterladen von:"
 set "UNEXTRACT.ru=Не удалось извлечь:"
 set "UNEXTRACT.zh=无法提取："
 
-set "MISSING.en=File not found:"
-set "MISSING.fr=Fichier introuvable :"
-set "MISSING.es=Archivo no encontrado:"
-set "MISSING.it=File non trovato:"
-set "MISSING.de=Datei nicht gefunden:"
-set "MISSING.ru=Файл не найден:"
-set "MISSING.zh=找不到文件："
+set "FNOTFOUND.en=File not found:"
+set "FNOTFOUND.fr=Fichier introuvable :"
+set "FNOTFOUND.es=Archivo no encontrado:"
+set "FNOTFOUND.it=File non trovato:"
+set "FNOTFOUND.de=Datei nicht gefunden:"
+set "FNOTFOUND.ru=Файл не найден:"
+set "FNOTFOUND.zh=找不到文件："
 
+set "ENTERYN.en=Enter [Y/N] (default N):"
+set "ENTERYN.fr=Entrez [O/N] (par défaut N) :"
+set "ENTERYN.es=Ingrese [S/N] (predeterminado N):"
+set "ENTERYN.it=Inserisci [S/N] (predefinito N):"
+set "ENTERYN.de=Geben Sie [J/N] ein (Standard N):"
+set "ENTERYN.ru=Введите [Y/N] (по умолчанию N):"
+set "ENTERYN.zh=输入 [Y/N]（默认 N）："
+
+set "CLEANUP.en=Cleaning up temporary files"
+set "CLEANUP.fr=Nettoyage des fichiers temporaires"
+set "CLEANUP.es=Limpiando archivos temporales"
+set "CLEANUP.it=Pulizia dei file temporanei"
+set "CLEANUP.de=Bereinigen temporärer Dateien"
+set "CLEANUP.ru=Очистка временных файлов"
+set "CLEANUP.zh=清理临时文件"
 
 set "UNACONT.en=Unable to continue."
 set "UNACONT.fr=Impossible de continuer."
@@ -242,6 +294,14 @@ set "UNACONT.de=Kann nicht fortgesetzt werden."
 set "UNACONT.ru=Не удалось продолжить."
 set "UNACONT.zh=无法继续。"
 
+set "NOTFOUND.en=No file(s) found"
+set "NOTFOUND.fr=Pas de fichier(s) trouvé(s)"
+set "NOTFOUND.es=No se han encontrado archivos(s)"
+set "NOTFOUND.it=Nessun file trovato"
+set "NOTFOUND.de=Keine Datei(en) gefunden"
+set "NOTFOUND.ru=Файл(ы) не найден(ы)"
+set "NOTFOUND.zh=找不到檔案"
+
 set "LOGCHK.en=Please check the "%UNRENLOG%" for details."
 set "LOGCHK.fr=Veuillez consulter le "%UNRENLOG%" pour plus de détails."
 set "LOGCHK.es=Por favor, consulte el "%UNRENLOG%" para más detalles."
@@ -250,14 +310,6 @@ set "LOGCHK.de=Bitte überprüfen Sie das "%UNRENLOG%" auf Einzelheiten."
 set "LOGCHK.ru=Пожалуйста, проверьте "%UNRENLOG%" для получения дополнительных сведений."
 set "LOGCHK.zh=请查看 "%UNRENLOG%" 以了解详情。"
 
-set "DONE.en=Operation completed."
-set "DONE.fr=Opération terminée."
-set "DONE.es=Operación completada."
-set "DONE.it=Operazione completata."
-set "DONE.de=Vorgang abgeschlossen."
-set "DONE.ru=Операция завершена."
-set "DONE.zh=操作完成。"
-
 set "UNIT.en=bytes"
 set "UNIT.fr=octets"
 set "UNIT.es=bytes"
@@ -265,113 +317,201 @@ set "UNIT.it=byte"
 set "UNIT.de=Bytes"
 set "UNIT.ru=байт"
 set "UNIT.zh=字节"
-
-set "GRY=[90m"
-set "RED=[91m"
-set "GRE=[92m"
-set "YEL=[93m"
-set "MAG=[95m"
-set "CYA=[96m"
-set "RES=[0m"
-for /f "tokens=4-5 delims=. " %%i in ('ver') do set OSVERS=%%i.%%j
-if "%OSVERS%" == "6.1" (
-    set "GRY="
-    set "RED="
-    set "GRE="
-    set "YEL="
-    set "MAG="
-    set "CYA="
-    set "RES="
-)
 :: End of reusable texts
 
-
-set "INITIALIZED=0"
-set "NOCLS=0"
-:menu
-set "sscreen1.en=is no longer a script for processing RPYC and RPA but a launcher,"
-set "sscreen1.fr=n'est plus un script pour les traitements des RPYC et RPA mais un lanceur,"
-set "sscreen1.es=ya no es un script para procesar RPYC y RPA, sino un lanzador."
-set "sscreen1.it=Non è più uno script per elaborare RPYC e RPA, ma un launcher,"
-set "sscreen1.de=ist kein Skript mehr zur Verarbeitung von RPYC und RPA, sondern ein Launcher,"
-set "sscreen1.ru=больше не является скриптом для обработки RPYC и RPA, а является программой запуска,"
-set "sscreen1.zh=不再是一个用于处理 RPYC 和 RPA 的脚本，而是一个启动器，"
-
-set "sscreen2.en=to launch UnRen-legacy.bat or UnRen-current.bat."
-set "sscreen2.fr=pour exécuter UnRen-legacy.bat ou UnRen-current.bat."
-set "sscreen2.es=para lanzar UnRen-legacy.bat o UnRen-current.bat."
-set "sscreen2.it=per lanciare UnRen-legacy.bat o UnRen-current.bat."
-set "sscreen2.de=um UnRen-legacy.bat oder UnRen-current.bat zu starten."
-set "sscreen2.ru=для запуска UnRen-legacy.bat или UnRen-current.bat."
-set "sscreen2.zh=用于启动 UnRen-legacy.bat 或 UnRen-current.bat。"
-
-set "sscreen3.en=Made with <3 for the fans - by JoeLurmel @ f95zone.to"
-set "sscreen3.fr=Fait avec <3 pour les fans - par JoeLurmel @ f95zone.to"
-set "sscreen3.es=Hecho con <3 para los fans - por JoeLurmel @ f95zone.to"
-set "sscreen3.it=Fatto con <3 per i fan - di JoeLurmel @ f95zone.to"
-set "sscreen3.de=Hergestellt mit <3 für die Fans - von JoeLurmel @ f95zone.to"
-set "sscreen3.ru=Сделано с <3 для фанатов - JoeLurmel @ f95zone.to"
-set "sscreen3.zh=为粉丝倾情制作 - 作者 JoeLurmel @ f95zone.to"
-
-:: Splash screen
-if "%NOCLS%" == "0" cls
-echo.
-echo           %YEL%  ---------------------------------------------------------------------------------%RES%
-echo           %YEL%     __  __      ____                  __          __%RES%
-echo           %YEL%    / / / /___  / __ \___  ____       / /_  ____ _/ /_%RES%
-echo           %YEL%   / / / / __ \/ /_/ / _ \/ __ \     / __ \/ __ ^`/ __/%RES%
-echo           %YEL%  / /_/ / / / / _   /  __/ / / / _  / /_/ / /_/ / /_%RES%
-echo           %YEL%  \____/_/ /_/_/ \_\\___/_/ /_/ (_) \_.__/\__^,_/\__/ - %NAME% %VERSION%%RES%
-echo.
-echo           %YEL%  !sscreen1.%LNG%!%RES%
-echo           %YEL%  !sscreen2.%LNG%!%RES%
-echo.
-echo           %YEL%  !INCASEOF.%LNG%!%RES%
-echo           %MAG%  %URL_REF%%RES%
-echo.
-echo           %YEL%  !sscreen3.%LNG%!%RES%
-echo.
-set /a rand=%random% %%17
-if %rand% == 0 echo           %GRY%  "Hack the planet!" – Dade Murphy%RES%
-if %rand% == 1 echo           %GRY%  "Resistance is futile." – Borg%RES%
-if %rand% == 2 echo           %GRY%  "There is no spoon." – Neo%RES%
-if %rand% == 3 echo           %GRY%  "I'm in." – Mr. Robot%RES%
-if %rand% == 4 echo           %GRY%  "All your base are belong to us." – CATS%RES%
-if %rand% == 5 echo           %GRY%  "Would you like to know more?" – Various%RES%
-if %rand% == 6 echo           %GRY%  "This message will self-destruct in 5... 4... 3..."%RES%
-if %rand% == 7 echo           %GRY%  "If you're reading this, you're already better than 90%% of users..."%RES%
-if %rand% == 8 echo           %GRY%  "I'm not a hacker. I'm a code poet."%RES%
-if %rand% == 9 echo           %GRY%  "Welcome to the command line. Abandon all GUIs, ye who enter here."%RES%
-if %rand% == 10 echo          %GRY%  "rm -rf / — because chaos is an art form."%RES%
-if %rand% == 11 echo          %GRY%  "This script runs faster than your Wi-Fi on a Monday."%RES%
-if %rand% == 12 echo          %GRY%  "The cake is a lie." – Portal%RES%
-if %rand% == 13 echo          %GRY%  "I am Groot." – Groot%RES%
-if %rand% == 14 echo          %GRY%  "Do or do not. There is no try." – Yoda%RES%
-if %rand% == 15 echo          %GRY%  "I know kung fu." – Neo%RES%
-if %rand% == 16 echo          %GRY%  "You have been recruited by the Star League to defend the frontier." – The Last Starfighter%RES%
-echo           %YEL%  ---------------------------------------------------------------------------------%RES%
-echo.
-
-if "%INITIALIZED%" == "1" goto skipInit
 
 :: Initializing debug mode
 set "DEBUGREDIR=>nul 2>&1"
 set "DEBUGLEVEL=0"
 set "NOCLS=0"
 
-:: We need PowerShell for later, make sure it exists
-set "pshell.en=Checking for availability of PowerShell... "
-set "pshell.fr=Vérification de la disponibilité de PowerShell... "
-set "pshell.es=Comprobando la disponibilidad de PowerShell... "
-set "pshell.it=Verifica della disponibilità di PowerShell... "
-set "pshell.de=Überprüfung der Verfügbarkeit von PowerShell... "
-set "pshell.ru=Проверка доступности PowerShell... "
-set "pshell.zh=检查 PowerShell 是否可用... "
 
-echo !pshell.%LNG%! >> "%UNRENLOG%"
-<nul set /p=!pshell.%LNG%!
-set "PWRSHELL=%SystemRoot%\system32\WindowsPowerShell\v1.0\powershell.exe"
-for /f "delims=" %%A in ('"!SystemRoot!\System32\where.exe" pwsh.exe 2^>nul') do (
+:: Check if it's launched with Windows Terminal, and relaunch with correct size if not
+set "NEW_COLS=110"
+set "NEW_LINES=60"
+set /a "NEW_LINES_UP=%NEW_LINES%+5"
+if defined WT_SESSION if not "%~1" == "--norelaunch" (
+    REM To avoid infinite loop in case of wrong relaunch argument, we check if the second argument is --norelaunch and skip the relaunch if it's the case.
+    for /f "delims=" %%A in ('%SYSTEMROOT%\System32\where wt.exe') do set WT_PATH=%%A
+    wt.exe --size %NEW_COLS%,%NEW_LINES% "%SystemRoot%\System32\cmd.exe" /c "%~f0" --norelaunch
+    REM start "%SCRIPTNAME%" "%SystemRoot%\System32\cmd.exe" /c ""%~0" --norelaunch""
+    exit /b
+)
+
+if not defined WT_SESSION (
+    REM Set the cmd screen size with backup of old settings
+    set "count=0"
+    for /f "tokens=*" %%A in ('"%SystemRoot%\System32\mode.com" con') do (
+        REM Split the line into tokens
+        for %%B in (%%A) do (
+            set "val=%%B"
+            REM Check if it's a number
+            echo !val! |  "%SystemRoot%\System32\findstr.exe"  /r "[0-9][0-9]" >nul
+            if !errorlevel! EQU 0 (
+                set /a count+=1
+                if !count! EQU 1 (
+                    set "ORIG_LINES=!val!"
+                )
+                if !count! EQU 2 (
+                    set "ORIG_COLS=!val!"
+                )
+            )
+        )
+    )
+    %SystemRoot%\System32\mode.com con: cols=%NEW_COLS% lines=%NEW_LINES_UP% %DEBUGREDIR%
+    %SystemRoot%\System32\mode.com con: cols=%NEW_COLS% lines=%NEW_LINES% %DEBUGREDIR%
+)
+
+:: Run only one time
+:thanks
+set "regexe=%SystemRoot%\System32\reg.exe"
+
+::"%regexe%" delete "HKCU\Software\UnRen" /va /f >nul 2>&1
+"%regexe%" query "HKCU\Software\UnRen" /v Thanks >nul 2>&1
+if %errorlevel% EQU 0 (
+    goto :nothanks
+)
+
+:: Check if already restarted
+if "%~1" == "--norestart" (
+    shift
+    goto :already_restarted
+)
+
+:: Save cmd.exe parameters for later use
+for /f "tokens=2*" %%A in ('%regexe% query "HKCU\Console" /v FaceName 2^>nul') do set "OLD_FACE=%%B"
+for /f "tokens=2*" %%A in ('%regexe% query "HKCU\Console" /v FontSize 2^>nul') do set "OLD_SIZE=%%B"
+for /f "tokens=2*" %%A in ('%regexe% query "HKCU\Console" /v FontFamily 2^>nul') do set "OLD_FAMILY=%%B"
+for /f "tokens=2*" %%A in ('%regexe% query "HKCU\Console" /v FontWeight 2^>nul') do set "OLD_WEIGHT=%%B"
+
+:: Set Consolas font for better display of the message, and save old settings to restore them later.
+:: This is done by adding registry entries. The script will be relaunched with the new settings,
+:: and the old settings will be restored at the end of the script.
+"%regexe%" add "HKCU\Console" /v FaceName /t REG_SZ /d "Consolas" /f >nul
+"%regexe%" add "HKCU\Console" /v FontSize /t REG_DWORD /d 0x000E0010 /f >nul
+"%regexe%" add "HKCU\Console" /v FontFamily /t REG_DWORD /d 0x00000040 /f >nul
+"%regexe%" add "HKCU\Console" /v FontWeight /t REG_DWORD /d 0x00000190 /f >nul
+
+:: Not relaunched yet → relaunch
+setlocal disabledelayedexpansion
+start "%SCRIPTNAME%" "%SystemRoot%\System32\cmd.exe" /c ""%~0" --norestart "%TEMPDIR%" "%LNG%""
+exit /b
+
+:already_restarted
+set "thanks1.en=May the Force be with those who support me:"
+set "thanks1.fr=Que la Force soit avec celles et ceux qui me soutiennent :"
+set "thanks1.es=Que la Fuerza esté con quienes me apoyan:"
+set "thanks1.it=Che la Forza sia con chi mi supporta:"
+set "thanks1.de=Möge die Macht mit denen sein, die mich unterstützen:"
+set "thanks1.ru=Пусть Сила будет с теми, кто поддерживает меня:"
+set "thanks1.zh=愿原力与你们这些支持我的人同在："
+
+set "thanks2.en=Like the Force, I'm grateful to all who support me on f95zone. Thank you"
+set "thanks2.fr=Comme la Force, je remercie tous ceux qui me soutiennent sur f95zone. Merci"
+set "thanks2.es=Como la Fuerza, estoy agradecido a todos los que me apoyan en f95zone. Gracias"
+set "thanks2.it=Come la Forza, sono grato a tutti quelli che mi supportano su f95zone. Grazie"
+set "thanks2.de=Wie die Macht, bin ich dankbar zu allen, die mich auf f95zone unterstutzen. Danke"
+set "thanks2.ru=Как Сила, я благодарен всем, кто поддерживает меня на f95zone. Спасибо"
+set "thanks2.zh=就如原力,我深感所有支持我的人。 谢谢"
+
+color 0f
+echo.
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠟⣛⣉⣉⣁⣀⡨⣭⣙⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⢛⣡⣴⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣜⢿⡿⠿⠿⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡟⠋⣁⣈⣉⡙⠛⠋⠉⠉⠉⣉⣩⣭⣭⣭⣭⣿⣿⣿⣿⣿⣿⣶⣶⣬⣭⣭⣛⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢋⡴⠿⣻⣿⣷⣶⣶⣶⣾⣿⣿⣿⣿⣿⣛⣻⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣝⢻⣿⣿⣿⣿⣿⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠟⠁⢀⣤⠾⠟⠛⠛⠛⠛⠻⠿⢿⣿⣟⠿⠿⠿⠿⠷⠀⠈⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢿⣿⣷⢻⣿⣿⣿⣿⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡏⣠⡾⠋⠀⠠⠶⠶⣶⣶⣶⣶⣿⣿⣿⣿⣷⣤⣤⣤⣤⡤⠄⠀⠙⠿⠿⠿⠿⣿⣿⣿⣿⣿⣷⡻⣿⣆⢿⣿⣿⣿⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡟⣵⣿⣴⠶⠛⠁⣀⣀⣀⣉⠛⠿⠿⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣄⣤⣦⡘⢿⣶⣿⣿⣿⣿⣿⣿⣮⢻⡘⣿⣿⣿⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡟⣼⠟⢋⣤⣶⠾⠿⠿⠿⠿⠿⡿⠦⠀⠀⠀⠀⠠⠴⠒⠲⠿⣿⡀⠀⠁⠀⠀⣙⢿⣿⣿⠻⣷⣍⡛⠿⠻⣷⣷⡘⣿⣿⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡏⣼⠃⣴⣿⣯⠔⣀⣤⣤⡤⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠷⠀⠀⠀⠤⣌⠻⣿⣿⡶⣶⣍⡻⣷⣄⠈⢿⣧⠸⣿⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠏⣼⠃⣼⣿⣿⡿⣾⡿⠛⠁⣠⣴⣾⣿⠿⠛⠁⠀⣀⣀⣠⣤⣤⣤⣤⣤⣀⠀⣠⣄⠈⢧⠘⣏⠇⢻⣏⠻⣿⣿⣆⠀⢿⣇⢻⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⡟⢠⠃⠠⠟⣩⡟⠀⠟⢀⣴⣿⣿⣿⢏⣡⡄⢀⣴⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡈⠃⠀⠀⠀⠙⢷⡀⠙⠿⠀⠸⣿⢸⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⡟⠀⠈⠀⢀⣼⣿⠇⡰⢀⣾⣿⣿⣿⣿⣿⣿⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⠀⢰⡀⠀⠀⠀⠃⠀⠀⠀⠀⢿⢸⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⡿⢰⠀⠀⠀⠾⠟⢻⣿⠃⣼⣿⣿⣿⣿⣿⣿⣿⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡆⣿⣷⡀⠀⠀⠀⠀⠀⠀⠀⢸⢀⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⢡⡇⢠⠀⠀⠀⢀⡟⠁⢰⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣿⣿⡇⠀⠀⠀⠀⠀⠀⠀⠸⢸⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⢃⣿⡓⠛⠀⠀⠀⠀⡄⠀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⣸⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⢸⠛⠋⠀⠀⠀⠀⢰⠁⢠⣿⣿⣯⣴⣶⣤⡉⠙⠛⠛⠛⠿⣿⣿⣿⡿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⡸⣆⠀⠀⠀⠀⠀⢸⠀⣾⣿⣿⣿⣿⣉⣴⡖⠐⠀⣤⡘⢷⣿⣿⣿⣷⣿⠿⠿⠛⠉⠉⠁⠀⠀⠈⠛⢿⡿⠉⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⢱⡯⠴⠒⠀⢀⣇⠀⢰⣿⣿⣿⣿⣿⣿⣿⣝⣷⣿⣿⣭⣿⣿⣿⣿⣿⡟⠀⣠⠠⢤⣄⠢⢀⣄⡀⠀⠀⣀⣤⡄⠀⠀⠀⠀⠀⠀⠀⣸⣿⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⡄⣀⡀⠀⠀⣿⣿⣆⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⣿⣿⣿⣧⣿⣿⣿⣿⣟⡿⠿⢟⣡⣶⣾⣿⣿⡇⠀⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⣿⣿
+echo                          ⣿⣿⣿⠿⣋⣵⠞⠉⠀⠀⠀⠘⢿⡟⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⠀⠀⠀⠀⠀⣤⢄⣿⣿⣿⣿⣿⣿
+echo                          ⡿⢛⣵⠾⠋⠀⠀⠀⠀⠀⢠⡞⠀⣰⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⣿⣿⣿⣿⣿⣿⣧⣿⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⠀⢀⣀⢀⣾⡟⣼⣿⣿⣿⣿⣿⣿
+echo                          ⡴⠟⠁⠀⠀⠀⠀⠀⠀⣰⡟⠀⢠⣿⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⢟⣵⣿⣿⣿⣿⣿⣿⣿⣦⡌⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⢠⡿⠿⡿⢋⣼⣿⣿⣿⣿⣿⣿⣿
+echo                          ⠀⠀⠀⠀⠀⠀⠀⠀⢀⣿⡇⠀⣼⣿⢸⣿⣿⣿⣿⣿⣿⣿⣿⣡⣾⣿⡛⣻⣿⣿⣿⠿⢿⣿⣷⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠁⠀⢠⣴⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿
+echo                          ⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⡇⢀⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣦⣀⣠⣴⣦⣴⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠏⣠⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+echo                          ⠀⠀⠀⠀⠀⠀⠀⠀⣾⣿⡇⢸⣿⣿⣿⡻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡏⢻⣿⣿⣿⣿⣿⣿⣧⢻⣿⣿⣿⣿⣿⣿⠏⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+echo                          ⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⣧⠘⣿⣿⣿⣷⠹⣿⣿⣿⣿⣟⣥⣬⣍⣉⣉⡙⠛⠿⠛⠿⢿⣿⣿⣿⣿⣷⣿⣿⣿⣿⡿⢫⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+echo                          ⠀⠀⠀⠀⠀⠀⠀⠀⢹⣿⣿⡄⢻⣿⣿⣿⣧⡹⣿⣿⣿⣿⣿⣿⣿⣻⢿⣿⣷⣶⣶⣶⣶⣴⢶⣬⡟⣿⣿⣿⡿⢋⢴⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+echo                          ⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣷⡈⢿⣿⣿⣿⣷⡘⢿⣿⣿⣿⣿⣿⣿⣷⣶⣭⣭⣭⣭⣭⣶⣿⣿⣷⣿⣿⠟⠁⠹⣷⡙⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+echo                          ⠀⠀⠀⠀⠀⠀⠀⡄⠀⢿⣿⣿⣷⡈⢿⣿⣿⣿⣷⣄⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣿⣿⣿⡿⠟⠁⠀⠢⡱⠌⠻⣮⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+echo                          ⠀⠀⠀⠀⠀⠀⢸⡇⠀⠈⢿⣿⣿⣿⡌⢿⣿⣿⣿⣿⣧⡈⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠋⢰⡆⢧⠀⠀⠀⠀⢰⣝⢷⣜⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+echo                          ⠀⠀⠀⠀⠀⣰⠟⠁⠀⠀⠈⣿⡟⣿⣿⣆⠻⣿⣿⣿⣿⣷⡀⣭⣛⡛⠛⠛⠙⠛⠛⠛⠛⠋⠀⠀⢸⣿⠸⠀⠀⠀⠀⠀⢻⣦⡹⣦⡻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+echo                          ⠀⠀⢀⣤⣾⣥⣶⠀⠀⠀⠀⠘⢿⣞⣿⣿⣦⠙⣿⣿⣿⣿⣿⣿⣿⣿⣦⡀⠀⣀⡀⠀⠀⠀⠀⠀⢸⡏⠀⡇⢀⣀⣀⣀⣠⣿⣿⣌⢳⡙⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+echo                          ⢸⣷⣿⣿⣿⣿⣿⠀⣾⡆⠀⠀⠈⢻⣎⢿⣿⣷⡌⢿⣿⣿⣿⣿⣿⣿⣿⡿⠿⢟⡁⠀⠀⠀⢀⣴⡟⢀⡀⠁⢸⣿⣿⣿⣿⣿⣿⣿⣷⡙⣄⢪⣝⡻⢿⣿⣿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⠀⣿⣿⠀⠀⠀⠀⠙⣷⣿⣿⣿⣦⠙⣿⣿⣿⣿⣿⣶⣾⣿⣿⠟⠁⢀⣴⣿⡟⢠⣿⣿⡄⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⡌⣦⠹⣿⣷⡝⢿⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⠀⣿⣿⡄⠀⠀⠀⠀⠈⠻⣿⣿⣿⣷⣌⠻⣿⣿⣿⣿⣿⠟⠁⠀⢠⣿⡿⠋⠀⣾⣿⣿⣷⠀⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⠟⣰⣿⣿⣿⡌⣿⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣦⣿⣿⣇⠀⠀⠀⠀⠀⠀⠀⠙⠻⢿⡿⢃⣿⣿⣿⠟⣠⣾⣿⠂⣼⡿⠁⠀⢸⣿⣿⣿⣿⣷⣿⣿⣿⣿⣿⣿⣿⡿⢟⣥⣾⣿⣿⣿⣿⣿⡘⣿⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⣿⣿⣿⣿⣿⣿⡟⢀⣿⡇⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⢋⣴⣿⣿⣿⣿⣿⣿⡟⢻⣷⢹⣿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⣿⣿⢃⣾⣿⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⡿⢋⣴⣿⣿⣿⣿⣿⣿⣿⣿⡇⢤⣿⡇⢿
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⣿⢃⣾⣿⣿⣆⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣷⣄⡻⢿⣿⣿⣿⣿⣿⣿⣿⣿⠠⣤⣹⣿⢸
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⢃⣾⣿⣿⣿⣿⣆⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣍⡛⢿⣿⣿⣿⣿⣿⢠⣈⢿⣿⡾
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⣿⢃⣾⣿⣿⣿⣿⣿⣿⣧⡈⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣌⣻⣿⣿⣿⠀⣿⣷⢹⡇
+echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡆⠀⠀⠀⠀⠀⠀⠀⠀⣸⣿⣿⢃⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣽⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠇⣿⣿⣿⣿⠀⣿⣇⣾⡇
+echo.
+echo.
+call :center "%YEL%!thanks1.%LNG%!%RES%"
+echo.
+call :center "%MAG%https://ko-fi.com/Y8Y21X6CZD%RES%"
+echo.
+call :center "!thanks2.%LNG%!"
+echo.
+call :center "%CYA%Gen Urobuchi%RES%."
+
+timeout /T 5 %DEBUGREDIR%
+color
+
+:: Restore cmd.exe parameters
+if defined OLD_FACE (
+   "%regexe%" add "HKCU\Console" /v FaceName /t REG_SZ /d "%OLD_FACE%" /f >nul
+) else (
+   "%regexe%" delete "HKCU\Console" /v FaceName /f >nul 2>&1
+)
+
+if defined OLD_SIZE (
+   "%regexe%" add "HKCU\Console" /v FontSize /t REG_DWORD /d %OLD_SIZE% /f >nul
+) else (
+   "%regexe%" delete "HKCU\Console" /v FontSize /f >nul 2>&1
+)
+
+if defined OLD_FAMILY (
+   "%regexe%" add "HKCU\Console" /v FontFamily /t REG_DWORD /d %OLD_FAMILY% /f >nul
+) else (
+   "%regexe%" delete "HKCU\Console" /v FontFamily /f >nul 2>&1
+)
+
+if defined OLD_WEIGHT (
+   "%regexe%" add "HKCU\Console" /v FontWeight /t REG_DWORD /d %OLD_WEIGHT% /f >nul
+) else (
+   "%regexe%" delete "HKCU\Console" /v FontWeight /f >nul 2>&1
+)
+
+"%regexe%" add "HKCU\Software\UnRen" /v Thanks /t REG_DWORD /d 1 /f >nul
+
+:nothanks
+cls
+
+:: We need PowerShell for later, make sure it exists
+set "pshell.en=Checking for availability of PowerShell"
+set "pshell.fr=Vérification de la disponibilité de PowerShell"
+set "pshell.es=Comprobando la disponibilidad de PowerShell"
+set "pshell.it=Verifica della disponibilità di PowerShell"
+set "pshell.de=Überprüfung der Verfügbarkeit von PowerShell"
+set "pshell.ru=Проверка доступности PowerShell"
+set "pshell.zh=检查 PowerShell 是否可用"
+
+call :elog -n "%EMPTY%" "!pshell.%LNG%!..."
+for /f "delims=" %%A in ('"%SystemRoot%\System32\where.exe" pwsh.exe 2^>nul') do (
     if not "%%A" == "" set "PWRSHELL=%%A"
 )
 if not exist "%PWRSHELL%" (
@@ -399,40 +539,32 @@ if not exist "%PWRSHELL%" (
     set "pshell3.ru=скачать его здесь: %MAG%https://learn.microsoft.com/ru-ru/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
     set "pshell3.zh=在此下载：%MAG%https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
 
-    call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog "%NOK%"
     call :elog .
-    call :elog "    !pshell1.%LNG%! !UNACONT.%LNG%!"
+    call :elog "    !pshell1.%LNG%!. !UNACONT.%LNG%!"
     call :elog "    !pshell2.%LNG%!"
     call :elog "    !pshell3.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    pause>nul|set/p=.      !ANYKEY.%LNG%!...
 
     call :exitn 3
 ) else (
-    call :elog "%GRE%!PASS.%LNG%!%RES%"
+    call :elog "%OK%"
 )
 
-:: Analysis of debug arguments
-if /i "%~3" == "-d" (
-    set "DEBUGREDIR="
-    set "DEBUGLEVEL=1"
-    set "NOCLS=1"
-    "%PWRSHELL%" -NoProfile -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(!NEW_COLS!,5000)"
-)
-if /i "%~3" == "-dd" (
-    echo on
-    set "DEBUGREDIR="
-    set "DEBUGLEVEL=2"
-    set "NOCLS=1"
-    "%PWRSHELL%" -NoProfile -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(!NEW_COLS!,9000)"
-)
+
+:: Check for required files
+call :check_all_files
 
 
 :: Set the working directory
 :: Check if game path is provided and set it
+set "LAUNCHED_WDIR=0"
 set "WORKDIR="
 setlocal disabledelayedexpansion
-if "%~1" == "" (
+:: Remove surrounding quotes if any
+if not "%TEMPDIR%" == "" set "TEMPDIR=%TEMPDIR:"=%"
+if "%TEMPDIR%" == "" (
     set "setpath1.en=Enter the path to the game, drag'n'drop it here,"
     set "setpath1.fr=Entrez le chemin vers le jeu, faites-le glisser ici,"
     set "setpath1.es=Introduzca la ruta al juego, arrástrelo aquí,"
@@ -458,21 +590,25 @@ if "%~1" == "" (
     set "setpath3.zh=如果拖放不起作用，请复制/粘贴路径："
 
     setlocal enabledelayedexpansion
-    call :elog .
-    call :elog "!setpath1.%LNG%!"
-    call :elog "!setpath2.%LNG%!"
-    call :elog .
+    echo.
+    echo !setpath1.%LNG%!
+    echo !setpath2.%LNG%!
+    echo.
     set /p "WORKDIR=!setpath3.%LNG%!"
     setlocal disabledelayedexpansion
     if not defined WORKDIR (
         set "WORKDIR=%cd%"
     )
 ) else (
-    set "WORKDIR=%~1"
+    setlocal disabledelayedexpansion
+    set "WORKDIR=%TEMPDIR%"
     if "%WORKDIR%" == "." (
         set "WORKDIR=%cd%"
     )
+    set "LAUNCHED_WDIR=1"
 )
+
+setlocal disabledelayedexpansion
 :: Remove surrounding quotes if any
 set "WORKDIR=%WORKDIR:"=%"
 
@@ -482,7 +618,7 @@ for %%A in ("%WORKDIR%") do set "WORKDIR=%%~fA"
 set "HAS_BAD="
 :: Characters that CAN appear in a valid Windows path but WILL break batch logic:
 for %%C in ("&" "!" "(" ")" "=" ";" "'" "`" "[" "]" "{" "}" "+" "~") do (
-    echo "%WORKDIR%" | find "%%~C" >nul && (
+    echo "%WORKDIR%" | "%SystemRoot%\System32\findstr.exe" "%%~C" >nul && (
         if not defined HAS_BAD (
             call set "HAS_BAD=%%~C"
         ) else (
@@ -493,23 +629,29 @@ for %%C in ("&" "!" "(" ")" "=" ";" "'" "`" "[" "]" "{" "}" "+" "~") do (
 
 setlocal enabledelayedexpansion
 if defined HAS_BAD (
-    set "invchars.en=Invalid character detected in the path..."
-    set "invchars.fr=Caractère invalide détecté dans le chemin..."
-    set "invchars.es=Se ha detectado un carácter no válido en la ruta de acceso..."
-    set "invchars.it=Carattere non valido rilevato nel percorso di accesso..."
-    set "invchars.de=Ungültiges Zeichen im Pfad gefunden..."
-    set "invchars.ru=Обнаружен недействительный символ в пути доступа..."
-    set "invchars.zh=路径中检测到无效字符..."
+    set "invchars.en=Invalid character detected in the path"
+    set "invchars.fr=Caractère invalide détecté dans le chemin"
+    set "invchars.es=Se ha detectado un carácter no válido en la ruta de acceso"
+    set "invchars.it=Carattere non valido rilevato nel percorso di accesso"
+    set "invchars.de=Ungültiges Zeichen im Pfad gefunden"
+    set "invchars.ru=Обнаружен недействительный символ в пути доступа"
+    set "invchars.zh=路径中检测到无效字符"
 
-    echo.
-    echo !invchars.%LNG%! '%RED%!HAS_BAD!%RES%' !UNACONT.%LNG%!
-    echo.
-    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    call :elog .
+    echo %NOK% !invchars.%LNG%! '%RED%!HAS_BAD!%RES%'. !UNACONT.%LNG%!
+    call :elog .
+    pause>nul|set/p=.      !ANYKEY.%LNG%!...
 
     call :exitn 3
 )
 
-:: set "wdir1.xx=" are set later
+set "wdir1.en=Error The specified directory does not exist."
+set "wdir1.fr=Erreur Le répertoire spécifié n'existe pas."
+set "wdir1.es=Error El directorio especificado no existe."
+set "wdir1.it=Errore la directory specificata non esiste."
+set "wdir1.de=Fehler Das angegebene Verzeichnis existiert nicht."
+set "wdir1.ru=Ошибка Указанный каталог не существует."
+set "wdir1.zh=错误：指定的目录不存在。"
 
 set "wdir2.en=Are you sure we're in the game's root directory?"
 set "wdir2.fr=Êtes-vous sûr que nous sommes dans le répertoire racine du jeu ?"
@@ -527,116 +669,272 @@ set "wdir3.de=Testen des Schreibzugriffs auf das Spieledirectory"
 set "wdir3.ru=Проверка доступа на запись в каталог игры"
 set "wdir3.zh=测试对游戏目录的写入权限"
 
+setlocal disabledelayedexpansion
 cd /d "%WORKDIR%"
-if %ERRORLEVEL% NEQ 0 (
-    set "wdir1.en=Error The specified directory does not exist."
-    set "wdir1.fr=Erreur Le répertoire spécifié n'existe pas."
-    set "wdir1.es=Error El directorio especificado no existe."
-    set "wdir1.it=Errore la directory specificata non esiste."
-    set "wdir1.de=Fehler Das angegebene Verzeichnis existiert nicht."
-    set "wdir1.ru=Ошибка Указанный каталог не существует."
-    set "wdir1.zh=错误：指定的目录不存在。"
-
+if %errorlevel% NEQ 0 (
+    setlocal enabledelayedexpansion
+    call :elog "%NOK%" "!wdir1.%LNG%!%RES%"
     call :elog .
-    call :elog "    %RED%!wdir1.%LNG%!%RES%"
     call :elog "    !wdir2.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    pause>nul|set/p=.      !ANYKEY.%LNG%!...
 
     call :exitn 3
 )
+endlocal
 
-:: Check for required files
-call :check_all_files
+:: Analysis of debug arguments
+if /i "%~3" == "-d" (
+    set "DEBUGREDIR=>> %UNRENLOG% 2>&1"
+    set "DEBUGLEVEL=1"
+    set "NOCLS=1"
+    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(!NEW_COLS!,5000)" >> "%UNRENLOG%"
+    "%PWRSHELL%" -NoProfile -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(!NEW_COLS!,5000)" %DEBUGREDIR%
+)
+if /i "%~3" == "-dd" (
+    echo on
+    set "DEBUGREDIR="
+    set "DEBUGLEVEL=2"
+    set "NOCLS=1"
+    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(!NEW_COLS!,9000)" >> "%UNRENLOG%"
+    "%PWRSHELL%" -NoProfile -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(!NEW_COLS!,9000)" %DEBUGREDIR%
+)
 
-
-set "reqdir1.en=Checking if game, lib, renpy directories exist..."
-set "reqdir1.fr=Vérification de l'existence des répertoires game, lib et renpy..."
-set "reqdir1.es=Comprobando si existen los directorios game, lib, renpy..."
-set "reqdir1.it=Controllo dell'esistenza delle directory game, lib, renpy..."
-set "reqdir1.de=Überprüfung der Existenz der Verzeichnisse game, lib, renpy..."
-set "reqdir1.ru=Проверка наличия каталогов game, lib, renpy..."
-set "reqdir1.zh=检查 game、lib、renpy 目录是否存在..."
-
-set "reqdir2.en=Cannot locate game, lib or renpy directories."
-set "reqdir2.fr=Erreur Impossible de localiser les répertoires game, lib ou renpy."
-set "reqdir2.es=Error No se pueden localizar los directorios game, lib o renpy."
-set "reqdir2.it=Errore Impossibile localizzare le directory game, lib o renpy."
-set "reqdir2.de=Fehler Unmöglich, die Verzeichnisse game, lib oder renpy zu finden."
-set "reqdir2.ru=Ошибка Не удалось найти каталоги game, lib или renpy."
-set "reqdir2.zh=找不到 game、lib 或 renpy 目录。"
 
 :: Check that you are in the root directory of the game.
+set "reqdir1.en=Checking if game, lib, renpy directories exist"
+set "reqdir1.fr=Vérification de l'existence des répertoires game, lib et renpy"
+set "reqdir1.es=Comprobando si existen los directorios game, lib, renpy"
+set "reqdir1.it=Controllo dell'esistenza delle directory game, lib, renpy"
+set "reqdir1.de=Überprüfung der Existenz der Verzeichnisse game, lib, renpy"
+set "reqdir1.ru=Проверка наличия каталогов game, lib, renpy"
+set "reqdir1.zh=检查 game、lib、renpy 目录是否存在"
+
+setlocal disabledelayedexpansion
 cd /d "%WORKDIR%"
-echo !reqdir1.%LNG%! >> "%UNRENLOG%"
-<nul set /p=!reqdir1.%LNG%!
-set missing=0
+endlocal
+set "missing="
+call :elog -n "%EMPTY%" "!reqdir1.%LNG%!..."
+set "missing="
 if not exist ".\game" (
-    set missing=1
+    set "missing=%YEL%.\game%RES%"
 )
 if not exist ".\lib" (
-    set missing=1
+    if defined missing (
+        set "missing=!missing!, %YEL%.\lib%RES%"
+    ) else (
+        set "missing=%YEL%.\lib%RES%"
+    )
 )
 if not exist ".\renpy" (
-    set missing=1
+    if defined missing (
+        set "missing=!missing!, %YEL%.\renpy%RES%"
+    ) else (
+        set "missing=%YEL%.\renpy%RES%"
+    )
 )
-if %missing% EQU 1 (
-    call :elog " %RED%!FAIL.%LNG%!%RES%"
-    call :elog "    !reqdir2.%LNG%! !UNACONT.%LNG%!"
+
+set "reqdir2.en=Cannot locate %missing% directories."
+set "reqdir2.fr=Erreur Impossible de localiser les répertoires %missing%."
+set "reqdir2.es=Error No se pueden localizar los directorios %missing%."
+set "reqdir2.it=Errore Impossibile localizzare le directory %missing%."
+set "reqdir2.de=Fehler Unmöglich, die Verzeichnisse %missing% zu finden."
+set "reqdir2.ru=Ошибка Не удалось найти каталоги %missing%."
+set "reqdir2.zh=找不到 %missing% 目录。"
+if defined missing (
+    call :elog "%NOK%"
+    call :elog .
+    call :elog "    !reqdir2.%LNG%!. !UNACONT.%LNG%!"
     call :elog "    !wdir2.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    pause>nul|set/p=.      !ANYKEY.%LNG%!...
 
     call :exitn 3
 ) else (
-    call :elog " %GRE%!PASS.%LNG%!%RES%"
+    call :elog "%OK%"
 )
 
 :: Check if %WORKDIR%\game is writable
-echo !wdir3.%LNG%!... >> "%UNRENLOG%"
-<nul set /p="!wdir3.%LNG%!... "
+call :elog -n "%EMPTY%" "!wdir3.%LNG%!..."
+setlocal disabledelayedexpansion
+if %DEBUGLEVEL% GEQ 1 echo copy nul "%WORKDIR%\game\test.txt" >> "%UNRENLOG%"
 copy nul "%WORKDIR%\game\test.txt" %DEBUGREDIR%
-if %ERRORLEVEL% NEQ 0 (
-    set "wdir4.en=You can't write in game directory."
-    set "wdir4.fr=Vous ne pouvez pas écrire dans le répertoire du jeu."
-    set "wdir4.es=No puedes escribir en el directorio del juego."
-    set "wdir4.it=Non puoi scrivere nella directory di gioco."
-    set "wdir4.de=Sie können nicht im Spieledirectory schreiben."
-    set "wdir4.ru=Вы не можете писать в каталоге игры."
-    set "wdir4.zh=无法写入游戏目录。"
-
-    call :elog "%RED%!FAIL.%LNG%! %YEL%!wdir4.%LNG%!%RES%"
+endlocal
+if %errorlevel% NEQ 0 (
+    call :elog "%NOK%"
     call :elog .
     call :elog "    !wdir2.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    pause>nul|set/p=.      !ANYKEY.%LNG%!...
 
     call :exitn 3
 ) else (
+    setlocal disabledelayedexpansion
+    if %DEBUGLEVEL% GEQ 1 echo del /f /q "%WORKDIR%\game\test.txt" >> "%UNRENLOG%"
     del /f /q "%WORKDIR%\game\test.txt" %DEBUGREDIR%
-    call :elog "%GRE%!PASS.%LNG%!%RES%"
+    endlocal
+    call :elog "%OK%"
 )
 
 
 :: Set UNRENLOG for debugging purpose
 If exist "%TEMP%\%BASENAME%.log" (
-    :: Move the temporary log file to the working directory
+    if %DEBUGLEVEL% GEQ 1 echo move /y "%TEMP%\%BASENAME%.log" "%WORKDIR%\%BASENAME%.log" >> "%UNRENLOG%"
     move /y "%TEMP%\%BASENAME%.log" "%WORKDIR%\%BASENAME%.log" %DEBUGREDIR%
 )
 set "UNRENLOG=%WORKDIR%\%BASENAME%.log"
 set "UNRENLOG=%UNRENLOG:"=%"
 
-:: Check for Python
-set "python1.en=Checking if Python is available..."
-set "python1.fr=Vérification de la disponibilité de Python..."
-set "python1.es=Comprobando si Python está disponible..."
-set "python1.it=Controllo della disponibilità di Python..."
-set "python1.de=Überprüfung der Verfügbarkeit von Python..."
-set "python1.ru=Проверка наличия Python..."
-set "python1.zh=检查 Python 是否可用..."
 
-echo !python1.%LNG%! >> "%UNRENLOG%"
-<nul set /p=!python1.%LNG%!
+:: Check for Python System
+set "PYTHONEXE="
+set "PYVERSION2="
+set "PYVERSION3="
+set "PYTHONSYSTEM="
+
+setlocal enabledelayedexpansion
+set "pysystem1.en=Checking for Python installation on the system"
+set "pysystem1.fr=Vérification de l'installation de Python sur le système"
+set "pysystem1.es=Comprobando la instalación de Python en el sistema"
+set "pysystem1.it=Controllo dell'installazione di Python sul sistema"
+set "pysystem1.de=Überprüfung der Python-Installation auf dem System"
+set "pysystem1.ru=Проверка установки Python на системе"
+set "pysystem1.zh=检查系统是否安装 Python"
+
+set "pysystem2.en=Python 2 and 3 are available on the system."
+set "pysystem2.fr=Python 2 et 3 sont disponibles sur le système."
+set "pysystem2.es=Python 2 y 3 están disponibles en el sistema."
+set "pysystem2.it=Python 2 e 3 sono disponibili sul sistema."
+set "pysystem2.de=Python 2 und 3 sind auf dem System verfügbar."
+set "pysystem2.ru=Python 2 и 3 доступны на системе."
+set "pysystem2.zh=系统上可用 Python 2 和 3。"
+
+set "pysystem3.en=Only Python 2 is available on the system."
+set "pysystem3.fr=Seul Python 2 est disponible sur le système."
+set "pysystem3.es=Solo Python 2 disponible en el sistema."
+set "pysystem3.it=Solo Python 2 è disponibile sul sistema."
+set "pysystem3.de=Nur Python 2 ist auf dem System verfügbar."
+set "pysystem3.ru=Только Python 2 доступен на системе."
+set "pysystem3.zh=只有 Python 2 可用于系统。"
+
+set "pysystem4.en=Only Python 3 is available on the system."
+set "pysystem4.fr=Seul Python 3 est disponible sur le système."
+set "pysystem4.es=Solo Python 3 disponible en el sistema."
+set "pysystem4.it=Solo Python 3 è disponibile sul sistema."
+set "pysystem4.de=Nur Python 3 ist auf dem System verfugbar."
+set "pysystem4.ru=Только Python 3 доступен на системе."
+set "pysystem4.zh=只有 Python 3 可用于系统。"
+
+set "pysystem5.en=Python is not available on the system."
+set "pysystem5.fr=Python n'est pas disponible sur le système."
+set "pysystem5.es=Python no disponible en el sistema."
+set "pysystem5.it=Python non disponibile sul sistema."
+set "pysystem5.de=Python ist auf dem System nicht verfugbar."
+set "pysystem5.ru=Python не доступен на системе."
+set "pysystem5.zh=系统上不可用 Python。"
+
+set "pythonv2="
+set "pythonv3="
+set "pythonexe="
+set "pythonsystem="
+call :elog -n "%EMPTY%" "!pysystem1.%LNG%!..."
+if exist "%SystemRoot%\py.exe" (
+    "%SystemRoot%\py.exe" --list >"%TEMP%\pylist.txt" 2>&1
+    for /f "tokens=1,2 delims=:" %%A in ('findstr /i "V:" "%TEMP%\pylist.txt"') do (
+        :: %%B contains major.minor eg: "3.14", "3.9 *", "2.7"
+        for /f "tokens=1,2 delims=." %%M in ("%%B") do (
+            :: %%M = major (eg: "3"), %%N = minor with optional " *" (eg: "14", "9 *")
+            for /f "tokens=1 delims= " %%V in ("%%N") do (
+                :: %%V = minor clean (eg: "14", "9", "7")
+                if "%%M" == "2" (
+                    if "%%V" == "7" (
+                        set "pythonexe=%SystemRoot%\py.exe"
+                        set "pythonv2=-V:%%M.%%V"
+                        set "pythonsystem=-E"
+                    )
+                ) else if "%%M" == "3" (
+                    if %%V GEQ 9 (
+                        set "pythonexe=%SystemRoot%\py.exe"
+                        set "pythonv3=-V:%%M.%%V"
+                        set "pythonsystem=-E"
+                    )
+                )
+            )
+        )
+    )
+)
+del /f /q "%TEMP%\pylist.txt" %DEBUGREDIR%
+
+set "PATH=%SystemDrive%\Python27:%PATH%"
+for /f "delims=" %%A in ('"%SystemRoot%\System32\where.exe" python.exe 2^>nul') do (
+    if not "%%A" == "" (
+        echo "%%A" | findstr /i "WindowsApps" >nul
+        if errorlevel 1 (
+            if exist "%%A" (
+                for /f "tokens=2 delims= " %%B in ('"%%A" -V 2^>^&1') do (
+                    for /f "tokens=1,2 delims=." %%M in ("%%B") do (
+                        if "%%M" == "2" (
+                            if not defined pythonexe (
+                                set "pythonexe=%%A"
+                                set "pythonsystem=-E"
+                            )
+                        ) else if "%%M" == "3" (
+                            if %%N GEQ 9 (
+                                if not defined pythonv3 (
+                                    set "pythonexe=%%A"
+                                    set "pythonsystem=-E"
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+
+if defined pythonv2 if defined pythonv3 (
+    call :elog "%OK%"
+    call :elog "         !pysystem2.%LNG%!"
+) else if defined pythonv2 if not defined pythonv3 (
+    call :elog "%OK%"
+    call :elog "         !pysystem3.%LNG%!"
+) else if not defined pythonv2 if defined pythonv3 (
+    call :elog "%OK%"
+    call :elog "         !pysystem4.%LNG%!"
+) else (
+    call :elog "%SKIP%"
+    call :elog "         !pysystem5.%LNG%!"
+)
+endlocal & set "PYTHONEXE=%pythonexe%" & set "PYVERSION2=%pythonv2%" & set "PYVERSION3=%pythonv3%" & set "PYTHONSYSTEM=%pythonsystem%"
+
+
+:: Check for Python Game
+set "python1.en=Checking if Python Game is available"
+set "python1.fr=Vérification de la disponibilité de Python Jeu"
+set "python1.es=Comprobando la disponibilidad de Python Juego"
+set "python1.it=Controllo della disponibilità di Python Gioco"
+set "python1.de=Python-Spiel verfugen"
+set "python1.ru=Проверка доступности Python-игры"
+set "python1.zh=检查 Python 游戏是否可用"
+
+set "python2.en=Python version:"
+set "python2.fr=Version de Python :"
+set "python2.es=Versión de Python :"
+set "python2.it=Versione di Python :"
+set "python2.de=Python-Version :"
+set "python2.ru=Версия Python :"
+set "python2.zh=Python 版本："
+
+set "python3.en=Cannot locate python directory."
+set "python3.fr=Impossible de localiser le répertoire python."
+set "python3.es=No se puede localizar el directorio de Python."
+set "python3.it=Impossibile localizzare la directory di Python."
+set "python3.de=Python-Verzeichnis kann nicht gefunden werden."
+set "python3.ru=Не удалось найти каталог Python."
+set "python3.zh=找不到 python 目录。"
+
+call :elog -n "%EMPTY%" "!python1.%LNG%!..."
 
 :: Doublecheck to avoid issues with Milfania games
 set "PYTHONHOME="
@@ -677,144 +975,142 @@ if exist "%WORKDIR%\lib\windows-x86_64\python.exe" (
     <nul set /p=.
     set "PYTHONHOME=%WORKDIR%\lib\windows-i686\"
 )
-
 set "PYTHONPATH=%PYTHONHOME%"
 
-:: Set the PYNOASSERT according to “%PYTHONHOME%Lib”.
+:: Set the PYNOASSERT according to "%PYTHONHOME%Lib".
 if exist "%PYTHONHOME%Lib" (
     set "PYNOASSERT=-O"
 ) else (
     set "PYNOASSERT="
 )
 
-for /f "tokens=2 delims= " %%a in ('"%PYTHONHOME%\python.exe" -V 2^>^&1') do set PYTHONVERS=%%a
+for /f "tokens=2 delims= " %%a in ('"%PYTHONHOME%python.exe" -V 2^>^&1') do set PYTHONVERS=%%a
 :: Extraction of major and minor versions
 for /f "tokens=1,2 delims=." %%b in ("%PYTHONVERS%") do (
     set PYTHONMAJOR=%%b
     set PYTHONMINOR=%%c
 )
 
-set "RPATOOL-NEW="
+set "RPATOOL_NEW="
+set "UNRPYC_NEW="
 :: Priority to Python 3.x if present
 if %PYTHONMAJOR% GEQ 3 if exist "%WORKDIR%\lib\python%PYTHONMAJOR%.%PYTHONMINOR%" (
     <nul set /p=.
     set "PYTHONPATH=%WORKDIR%\lib\python%PYTHONMAJOR%.%PYTHONMINOR%"
-    set "RPATOOL-NEW=y"
-    goto pyend
+    set "RPATOOL_NEW=y"
+    set "UNRPYC_NEW=y"
+    goto :pyend
 )
 
-:: Searching for the latest version of Python 3.x
+:: Searching for the latest version of Python 2.x
 if exist "%WORKDIR%\lib\pythonlib%PYTHONMAJOR%.%PYTHONMINOR%" (
     <nul set /p=.
     set "PYTHONPATH=%WORKDIR%\lib\pythonlib%PYTHONMAJOR%.%PYTHONMINOR%"
-    set "RPATOOL-NEW=n"
+    set "RPATOOL_NEW=n"
+    set "UNRPYC_NEW=n"
 ) else if exist "%WORKDIR%\lib\python%PYTHONMAJOR%.%PYTHONMINOR%" (
     <nul set /p=.
     set "PYTHONPATH=%WORKDIR%\lib\python%PYTHONMAJOR%.%PYTHONMINOR%"
-    set "RPATOOL-NEW=n"
+    set "RPATOOL_NEW=n"
+    set "UNRPYC_NEW=n"
 )
 
 :pyend
 if not exist "%PYTHONPATH%" (
-    set "python2.en=Cannot locate python directory."
-    set "python2.fr=Impossible de localiser le répertoire python."
-    set "python2.es=No se puede localizar el directorio de Python."
-    set "python2.it=Impossibile localizzare la directory di Python."
-    set "python2.de=Python-Verzeichnis kann nicht gefunden werden."
-    set "python2.ru=Не удалось найти каталог Python."
-    set "python2.zh=找不到 python 目录。"
-
-    call :elog " %RED%!FAIL.%LNG%!%RES%"
+    call :elog "%NOK%"
     call :elog .
-    call :elog "    %RED%!python2.%LNG%!%RES% !UNACONT.%LNG%!"
+    call :elog "    %RED%!python3.%LNG%!%RES%. !UNACONT.%LNG%!"
     call :elog "    !wdir2.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    pause>nul|set/p=.      !ANYKEY.%LNG%!...
 
     call :exitn 3
 ) else (
-    call :elog " %GRE%!PASS.%LNG%!%RES% Python %YEL%%PYTHONVERS%%RES%"
+    call :elog "%OK%" "!python2.%LNG%! %YEL%%PYTHONVERS%%RES%"
+)
+
+:: Used later for base64 decoding
+>"%TEMP%\b64decode.py" (
+    echo import base64, sys, os
+    echo src, dst = sys.argv[1], sys.argv[2]
+    echo try:
+    echo     with open^(src,'rb'^) as f: data=base64.b64decode^(f.read^(^).replace^(b'\r',b''^).replace^(b'\n',b''^)^)
+    echo     with open^(dst,'wb'^) as f: f.write^(data^)
+    echo except Exception:
+    echo     if os.path.exists^(dst^): os.remove^(dst^)
 )
 
 :: Check for Ren'Py version
-set "renpyvers1.en=Ren'Py version found: "
-set "renpyvers1.fr=Version Ren'Py trouvée : "
-set "renpyvers1.es=Versión de Ren'Py encontrada: "
-set "renpyvers1.it=Versione Ren'Py rilevata: "
-set "renpyvers1.de=Ren'Py-Version gefunden: "
-set "renpyvers1.ru=Найдена версия Ren'Py: "
-set "renpyvers1.zh=检测到的 Ren'Py 版本："
+set "renpyvers1.en=Ren'Py version found:"
+set "renpyvers1.fr=Version Ren'Py trouvée :"
+set "renpyvers1.es=Versión de Ren'Py encontrada:"
+set "renpyvers1.it=Versione Ren'Py rilevata:"
+set "renpyvers1.de=Ren'Py-Version gefunden:"
+set "renpyvers1.ru=Найдена версия Ren'Py:"
+set "renpyvers1.zh=检测到的 Ren'Py 版本 :"
 
-set "renpyvers2.en=Failed to create detect_renpy_version.py."
-set "renpyvers2.fr=Erreur Impossible de créer detect_renpy_version.py."
-set "renpyvers2.es=Error No se pudo crear detect_renpy_version.py."
-set "renpyvers2.it=Errore Impossibile creare detect_renpy_version.py."
-set "renpyvers2.de=Fehler Die Erstellung von detect_renpy_version.py ist fehlgeschlagen."
-set "renpyvers2.ru=Ошибка Не удалось создать detect_renpy_version.py."
-set "renpyvers2.zh=无法创建 detect_renpy_version.py。"
+set "renpyvers2.en=Checking Ren'Py version"
+set "renpyvers2.fr=Vérification de la version de Ren'Py"
+set "renpyvers2.es=Comprobando la versión de Ren'Py"
+set "renpyvers2.it=Controllo della versione di Ren'Py"
+set "renpyvers2.de=Überprüfung der Ren'Py-Version"
+set "renpyvers2.ru=Проверка версии Ren'Py"
+set "renpyvers2.zh=检查 Ren'Py 版本"
 
-echo !renpyvers1.%LNG%! >> "%UNRENLOG%"
-<nul set /p=!renpyvers1.%LNG%!
+set "renpyvers3.en=Unable to detect Ren'Py version,"
+set "renpyvers3.fr=Impossible de détecter la version de Ren'Py,"
+set "renpyvers3.es=No se puede detectar la versión de Ren'Py,"
+set "renpyvers3.it=Impossibile rilevare la versione di Ren'Py,"
+set "renpyvers3.de=Unmöglich, die Ren'Py-Version zu erkennen, bitte sicherstellen,"
+set "renpyvers3.ru=Не удалось обнаружить версию Ren'Py, пожалуйста,"
+set "renpyvers3.zh=无法检测 Ren'Py 版本，"
 
+set "renpyvers4.en=please ensure the game is compatible with UnRen."
+set "renpyvers4.fr=es-tu sûr que le jeu est compatible avec UnRen ?"
+set "renpyvers4.es=asegúrese de que el juego sea compatible con UnRen."
+set "renpyvers4.it=assicurati che il gioco sia compatibile con UnRen."
+set "renpyvers4.de=dass das Spiel mit UnRen kompatibel ist."
+set "renpyvers4.ru=убедитесь, что игра совместима с UnRen."
+set "renpyvers4.zh=请确保游戏与 UnRen 兼容。"
+
+setlocal disabledelayedexpansion
 cd /d "%WORKDIR%"
-set "detect_renpy_version_py=%WORKDIR%\detect_renpy_version.py"
-del /f /q "%detect_renpy_version_py%" %DEBUGREDIR%
->"%detect_renpy_version_py%.b64" (
+endlocal
+
+set "detect_renpy_version=%WORKDIR%\detect_renpy_version.py"
+>"%detect_renpy_version%.b64" (
     echo IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQojIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLQ0KDQppbXBvcnQgb3MNCmltcG9ydCBzeXMNCmltcG9ydCByZQ0KDQojIDEpIFN0YW5kYXJkIG1ldGhvZDogaW1wb3J0IHJlbnB5IC0tLQ0KdHJ5Og0KICAgIGltcG9ydCByZW5weQ0KICAgIG1ham9yID0gcmVucHkudmVyc2lvbl90dXBsZVswXQ0KICAgIGlmIGlzaW5zdGFuY2UobWFqb3IsIGludCkgYW5kIDYgPD0gbWFqb3IgPD0gODoNCiAgICAgICAgcHJpbnQobWFqb3IpDQogICAgICAgIHN5cy5leGl0KDApDQpleGNlcHQgRXhjZXB0aW9uOg0KICAgIHBhc3MNCg0KIyAyKSBSZW4nUHkgNy84IDogc2NyaXB0X3ZlcnNpb24udHh0DQpwYXRoID0gb3MucGF0aC5qb2luKG9zLnBhdGguZGlybmFtZShfX2ZpbGVfXyksICJnYW1lIiwgInNjcmlwdF92ZXJzaW9uLnR4dCIpDQppZiBvcy5wYXRoLmlzZmlsZShwYXRoKToNCiAgICB0cnk6DQogICAgICAgIHdpdGggb3BlbihwYXRoLCAiciIpIGFzIGY6DQogICAgICAgICAgICBjb250ZW50ID0gZi5yZWFkKCkuc3RyaXAoKQ0KDQogICAgICAgIG1ham9yID0gTm9uZQ0KICAgICAgICAjIFZlcnNpb24gPSAoOCwgMSwgMCkgb3IgKDcsIDQsIDUpDQogICAgICAgIG0gPSByZS5zZWFyY2gocidcKFxzKihcZCspXHMqLCcsIGNvbnRlbnQpDQogICAgICAgIGlmIG06DQogICAgICAgICAgICBtYWpvciA9IGludChtLmdyb3VwKDEpKQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgbSA9IHJlLm1hdGNoKHInXHMqKFxkKyknLCBjb250ZW50KQ0KICAgICAgICAgICAgaWYgbToNCiAgICAgICAgICAgICAgICBtYWpvciA9IGludChtLmdyb3VwKDEpKQ0KDQogICAgICAgIGlmIG1ham9yIGlzIG5vdCBOb25lIGFuZCA2IDw9IG1ham9yIDw9IDg6DQogICAgICAgICAgICBwcmludChtYWpvcikNCiAgICAgICAgICAgIHN5cy5leGl0KDApDQoNCiAgICBleGNlcHQgRXhjZXB0aW9uOg0KICAgICAgICBwYXNzDQoNCiMgMykgUmVuJ1B5IDYgOiByZW5weS92Y192ZXJzaW9uLnB5DQp2ZXJzaW9uX3B5ID0gb3MucGF0aC5qb2luKG9zLnBhdGguZGlybmFtZShfX2ZpbGVfXyksICJyZW5weSIsICJ2Y192ZXJzaW9uLnB5IikNCmlmIG9zLnBhdGguaXNmaWxlKHZlcnNpb25fcHkpOg0KICAgIHRyeToNCiAgICAgICAgd2l0aCBvcGVuKHZlcnNpb25fcHksICJyIikgYXMgZjoNCiAgICAgICAgICAgIGNvbnRlbnQgPSBmLnJlYWQoKQ0KDQogICAgICAgIG1ham9yID0gTm9uZQ0KICAgICAgICAjIHZlcnNpb24gPSAiNi45OS4xNCINCiAgICAgICAgbSA9IHJlLnNlYXJjaChyJ3ZlcnNpb25ccyo9XHMqdT9bXCciXShcZCspJywgY29udGVudCkNCiAgICAgICAgaWYgbToNCiAgICAgICAgICAgIG1ham9yID0gaW50KG0uZ3JvdXAoMSkpDQogICAgICAgICAgICBpZiA2IDw9IG1ham9yIDw9IDg6DQogICAgICAgICAgICAgICAgcHJpbnQobWFqb3IpDQogICAgICAgICAgICAgICAgc3lzLmV4aXQoMCkNCg0KICAgIGV4Y2VwdCBFeGNlcHRpb246DQogICAgICAgIHBhc3MNCg0KcHJpbnQoIkVycm9yOiBDb3VsZCBub3QgZGV0ZWN0IFJlbidQeSB2ZXJzaW9uIikNCnN5cy5leGl0KDEp
 )
-echo "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%detect_renpy_version_py%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%detect_renpy_version_py%.b64'))))" >> "%UNRENLOG%"
-"%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%detect_renpy_version_py%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%detect_renpy_version_py%.b64'))))" %DEBUGREDIR%
-if exist "%detect_renpy_version_py%.tmp" (
-    del /f /q "%detect_renpy_version_py%.b64" %DEBUGREDIR%
-    move /y "%detect_renpy_version_py%.tmp" "%detect_renpy_version_py%" %DEBUGREDIR%
-) else (
-    call :elog "%RED%!FAIL.%LNG%!%RES%"
-    call :elog .
-    call :elog "!renpyvers2.%LNG%! !UNACONT.%LNG%!"
-    call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!
 
-    call :exitn 3
-)
-
-if not exist "%detect_renpy_version_py%" (
-    call :elog "%RED%!FAIL.%LNG%!%RES%"
+call :pwsh_exp "!renpyvers2.%LNG%!..." "%detect_renpy_version%"
+if not exist "%detect_renpy_version%" (
+    call :elog "%NOK%"
     call :elog .
-    call :elog "!renpyvers2.%LNG%! !UNACONT.%LNG%!"
+    call :elog "!FCREATE.%LNG%! %YEL%%detect_renpy_version%%RES%. !UNACONT.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    pause>nul|set/p=.      !ANYKEY.%LNG%!...
 
     call :exitn 3
 ) else (
-    "%PYTHONHOME%\python.exe" %PYNOASSERT% "%detect_renpy_version_py%" > "%TEMP%\renpy_version.tmp"
+    if %DEBUGLEVEL% GEQ 1 echo "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "%detect_renpy_version%" >> "%UNRENLOG%"
+    "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "%detect_renpy_version%" > "%TEMP%\renpy_version.tmp"
     set /p RENPYVERSION=<"%TEMP%\renpy_version.tmp"
     del "%TEMP%\renpy_version.tmp"
     if not defined RENPYVERSION (
-        set "renpyvers3.en=Unable to detect Ren'Py version,"
-        set "renpyvers3.fr=Impossible de détecter la version de Ren'Py,"
-        set "renpyvers3.es=No se puede detectar la versión de Ren'Py,"
-        set "renpyvers3.it=Impossibile rilevare la versione di Ren'Py,"
-        set "renpyvers3.de=Unmöglich, die Ren'Py-Version zu erkennen, bitte sicherstellen,"
-        set "renpyvers3.ru=Не удалось обнаружить версию Ren'Py, пожалуйста,"
-        set "renpyvers3.zh=无法检测 Ren'Py 版本，"
-
-        set "renpyvers4.en=        please ensure the game is compatible with UnRen."
-        set "renpyvers4.fr=        es-tu sûr que le jeu est compatible avec UnRen ?"
-        set "renpyvers4.es=        asegúrese de que el juego sea compatible con UnRen."
-        set "renpyvers4.it=        assicurati che il gioco sia compatibile con UnRen."
-        set "renpyvers4.de=        dass das Spiel mit UnRen kompatibel ist."
-        set "renpyvers4.ru=        убедитесь, что игра совместима с UnRen."
-        set "renpyvers4.zh=        请确保游戏与 UnRen 兼容。"
-
-        call :elog "%RED%!FAIL.%LNG%!%RES%"
+        call :elog "%NOK%"
         call :elog .
-        call :elog "    %RED%!renpyvers3.%LNG%!%RES%"
-        call :elog "    %RED%!renpyvers4.%LNG%!%RES%"
+        call :elog "    !renpyvers3.%LNG%!"
+        call :elog "    !renpyvers4.%LNG%!. !UNACONT.%LNG%!"
+        call :elog .
+        pause>nul|set/p=.      !ANYKEY.%LNG%!...
+
+        call :exitn 3
     ) else (
-        call :elog "%YEL%!RENPYVERSION!%RES%"
+        call :elog "%OK%" "!renpyvers1.%LNG%! %YEL%!RENPYVERSION!%RES%"
     )
 )
-del /f /q "%detect_renpy_version_py%" %DEBUGREDIR%
+if %DEBUGLEVEL% GEQ 1 echo del /f /q "%detect_renpy_version%" >> "%UNRENLOG%"
+del /f /q "%detect_renpy_version%" %DEBUGREDIR%
 
 :: Set the colors and default choice
 if %RENPYVERSION% GEQ 8 (
@@ -831,16 +1127,102 @@ if %RENPYVERSION% GEQ 8 (
     set "def=x"
 )
 
-set "INITIALIZED=1"
+:: Auto-launch if it's started with a WORKDIR argument
+if "%LAUNCHED_WDIR%" == "1" (
+    :: Handle single choices
+    if "!def!" == "1" (
+        call "%SCRIPTDIR%UnRen-legacy.bat" "!WORKDIR!"
+        goto exitn
+    ) else if "!def!" == "2" (
+        call "%SCRIPTDIR%UnRen-current.bat" "!WORKDIR!"
+        goto exitn
+    )
+)
 
-:SkipInit
-set "mtitle.en=Working directory: "
-set "mtitle.fr=Répertoire de travail : "
-set "mtitle.es=Directorio de trabajo: "
-set "mtitle.it=Directory di lavoro: "
-set "mtitle.de=Aktuelles Verzeichnis: "
-set "mtitle.ru=Рабочий каталог: "
-set "mtitle.zh=工作目录："
+:: Set the proper argument for py.exe according to the Ren'Py version detected
+set "PYVERSION="
+if %RENPYVERSION% GEQ 8 if defined PYVERSION3 (
+    set "PYVERSION=%PYVERSION3%"
+)
+if %RENPYVERSION% LEQ 7 if defined PYVERSION2 (
+    set "PYVERSION=%PYVERSION2%"
+)
+
+:: Display all the variables in the log for debugging purpose
+call :DisplayVars "Init phase"
+
+
+:: Splash screen
+:menu
+set "sscreen1.en=is no longer a script for processing RPYC and RPA but a launcher,"
+set "sscreen1.fr=n'est plus un script pour les traitements des RPYC et RPA mais un lanceur,"
+set "sscreen1.es=ya no es un script para procesar RPYC y RPA, sino un lanzador."
+set "sscreen1.it=Non è più uno script per elaborare RPYC e RPA, ma un launcher,"
+set "sscreen1.de=ist kein Skript mehr zur Verarbeitung von RPYC und RPA, sondern ein Launcher,"
+set "sscreen1.ru=больше не является скриптом для обработки RPYC и RPA, а является программой запуска,"
+set "sscreen1.zh=不再是一个用于处理 RPYC 和 RPA 的脚本，而是一个启动器，"
+
+set "sscreen2.en=to launch UnRen-legacy.bat or UnRen-current.bat."
+set "sscreen2.fr=pour exécuter UnRen-legacy.bat ou UnRen-current.bat."
+set "sscreen2.es=para lanzar UnRen-legacy.bat o UnRen-current.bat."
+set "sscreen2.it=per lanciare UnRen-legacy.bat o UnRen-current.bat."
+set "sscreen2.de=um UnRen-legacy.bat oder UnRen-current.bat zu starten."
+set "sscreen2.ru=для запуска UnRen-legacy.bat или UnRen-current.bat."
+set "sscreen2.zh=用于启动 UnRen-legacy.bat 或 UnRen-current.bat。"
+
+set "sscreen3.en=Made with %RED%<3%YEL% for the fans - by JoeLurmel @ f95zone.to"
+set "sscreen3.fr=Fait avec %RED%<3%YEL% pour les fans - par JoeLurmel @ f95zone.to"
+set "sscreen3.es=Hecho con %RED%<3%YEL% para los fans - por JoeLurmel @ f95zone.to"
+set "sscreen3.it=Fatto con %RED%<3%YEL% per i fan - di JoeLurmel @ f95zone.to"
+set "sscreen3.de=Hergestellt mit %RED%<3%YEL% für die Fans - von JoeLurmel @ f95zone.to"
+set "sscreen3.ru=Сделано с %RED%<3%YEL% для фанатов - JoeLurmel @ f95zone.to"
+set "sscreen3.zh=由 JoeLurmel @ f95zone.to 为粉丝制作 - %RED%<3%YEL%"
+
+if "%NOCLS%" == "0" cls
+REM call :center "%YEL%__________________________________________________________________________________%RES%"
+call :center "%YEL%╔═══════════════════════════════════════════════════════════════════════════════════╗%RES%"
+echo               %YEL%    __  __      ____                  __          __%RES%
+echo               %YEL%   / / / /___  / __ \___  ____       / /_  ____ _/ /_%RES%
+echo               %YEL%  / / / / __ \/ /_/ / _ \/ __ \     / __ \/ __ ^`/ __/%RES%
+echo               %YEL% / /_/ / / / / __  /  __/ / / / _  / /_/ / /_/ / /_%RES%
+echo               %YEL% \____/_/ /_/_/  \_\___/_/ /_/ (_) \_.__/\__^,_/\__/ - %NAME% %CYA%%VERSION%%RES%
+echo.
+echo                 !sscreen1.%LNG%!
+echo                 !sscreen2.%LNG%!
+echo.
+call :center "%YEL%!INCASEOF.%LNG%!%RES%"
+call :center "%MAG%%URL_REF%%RES%"
+echo.
+call :center "%YEL%!sscreen3.%LNG%!%RES%"
+echo.
+set /a rand=%random% %%17
+if %rand% == 0 call :center "“ Hack the planet! ” – Dade Murphy"
+if %rand% == 1 call :center "“ Resistance is futile. ” – Borg"
+if %rand% == 2 call :center "“ There is no spoon. ” – Neo"
+if %rand% == 3 call :center "“ I'm in. ” – Mr. Robot"
+if %rand% == 4 call :center "“ All your base are belong to us. ” – CATS"
+if %rand% == 5 call :center "“ Would you like to know more? ” – Various"
+if %rand% == 6 call :center "“ This message will self-destruct in 5... 4... 3... ” – Impossible Mission"
+if %rand% == 7 call :center "“ If you're reading this, you're already better than 90% of users... ”"
+if %rand% == 8 call :center "“ I'm not a hacker. I'm a code poet. ” – Various"
+if %rand% == 9 call :center "“ Welcome to the command line. Abandon all GUIs, ye who enter here. ”"
+if %rand% == 10 call :center "“ rm -rf / — because chaos is an art form. ”"
+if %rand% == 11 call :center "“ This script runs faster than your Wi-Fi on a Monday. ”"
+if %rand% == 12 call :center "“ The cake is a lie. ” – Portal"
+if %rand% == 13 call :center "“ I am Groot. ” – Groot"
+if %rand% == 14 call :center "“ Do or do not. There is no try. ” – Yoda"
+if %rand% == 15 call :center "“ I know kung fu. ” – Neo"
+if %rand% == 16 call :center "“ You have been recruited by the Star League to defend the frontier. ” – The Last Starfighter"
+REM call :center "%YEL%__________________________________________________________________________________%RES%"
+call :center "%YEL%╚═══════════════════════════════════════════════════════════════════════════════════╝%RES%"
+
+set "MTITLE.en=Working directory: "
+set "MTITLE.fr=Répertoire de travail : "
+set "MTITLE.es=Directorio de trabajo: "
+set "MTITLE.it=Directory di lavoro: "
+set "MTITLE.de=Aktuelles Verzeichnis: "
+set "MTITLE.ru=Рабочий каталог: "
+set "MTITLE.zh=工作目录："
 
 set "choice1.en=Launch UnRen-legacy.bat."
 set "choice1.fr=Lancer UnRen-legacy.bat."
@@ -874,13 +1256,13 @@ set "choicea.de=Aktiviert die Konsole (Umschalt+O) und das Entwicklermenü (Umsc
 set "choicea.ru=Активируйте консоль (Shift+O) и меню «Разработчик» (Shift+D)."
 set "choicea.zh=启用控制台（Shift+O）和开发者菜单（Shift+D）"
 
-set "choiceb.en=Enable debug mode %RED%(Can break your game)."
-set "choiceb.fr=Activer le mode debug %RED%(peut casser le jeu)."
-set "choiceb.es=Activar el modo debug %RED%(puede romper el juego)."
-set "choiceb.it=Attiva la modalità debug %RED%(può rompere il gioco)."
-set "choiceb.de=Aktiviert Sie den Debug-Modus %RED%(kann Ihr Spiel beschädigen)."
-set "choiceb.ru=Включить режим отладки %RED%(может сломать игру)."
-set "choiceb.zh=启用调试模式 %RED%（可能破坏游戏）"
+set "choiceb.en=Enable debug mode %RED%(Can break your game)%RES%."
+set "choiceb.fr=Activer le mode debug %RED%(peut casser le jeu)%RES%."
+set "choiceb.es=Activar el modo debug %RED%(puede romper el juego)%RES%."
+set "choiceb.it=Attiva la modalità debug %RED%(può rompere il gioco)%RES%."
+set "choiceb.de=Aktiviert Sie den Debug-Modus %RED%(kann Ihr Spiel beschädigen)%RES%."
+set "choiceb.ru=Включить режим отладки %RED%(может сломать игру)%RES%."
+set "choiceb.zh=启用调试模式 %RED%（可能会破坏游戏）%RES%"
 
 set "choicec.en=Force Skip (Unseen Text, After Choices)."
 set "choicec.fr=Forcer Skip (Unseen Text, After Choices)."
@@ -904,63 +1286,63 @@ set "choicee.es=Forzar la activación del "Rollback" (rueda de desplazamiento)."
 set "choicee.it=Forza l'attivazione del "Rollback" (rotella di scorrimento)."
 set "choicee.de=Aktivieren Sie "Rollback" (Scrollrad)."
 set "choicee.ru=Принудить активацию "Rollback" (колесо прокрутки)."
-set "choicee.zh=强制启用回滚（鼠标滚轮）"
+set "choicee.zh=强制启用 "Rollback"（滚轮）"
 
-set "choicef.en=Enable Quick Save and Quick Load (Shift+S F5, Shift+L F9)."
-set "choicef.fr=Activer "Quick Save" et "Quick Load" (Maj+S F5, Maj+L F9)."
-set "choicef.es=Activar "Quick Save" y "Quick Load" (Mayús+S F5, Mayús+L F9)."
-set "choicef.it=Attiva "Quick Save" e "Quick Load" (Maiusc+S F5, Maiusc+L F9)."
-set "choicef.de=Aktivieren Sie "Quick Save" und "Quick Load" (Umschalt+S F5, Umschalt+L F9)."
-set "choicef.ru=Включить "Quick Save" и "Quick Load" (Shift+S F5, Shift+L F9)."
-set "choicef.zh=启用快速保存和快速加载（Shift+S F5、Shift+L F9）"
+set "choicef.en=Enable "Quick Save" (Shift+S, F5) and "Quick Load" (Shift+L, F9)."
+set "choicef.fr=Activer "Quick Save" (Shift+S, F5) et "Quick Load" (Shift+L, F9)."
+set "choicef.es=Activar "Quick Save" (Shift+S, F5) y "Quick Load" (Shift+L, F9)."
+set "choicef.it=Attiva "Quick Save" (Shift+S, F5) e "Quick Load" (Shift+L, F9)."
+set "choicef.de=Aktivieren Sie "Quick Save" (Shift+S, F5) und "Quick Load" (Shift+L, F9)."
+set "choicef.ru=Включить "Quick Save" (Shift+S, F5) и "Quick Load" (Shift+L, F9)."
+set "choicef.zh=启用 "Quick Save" (Shift+S, F5) 和 "Quick Load" (Shift+L, F9)。"
 
-set "choiceg.en=Try forcing the Quick Menu to display.."
+set "choiceg.en=Try forcing the "Quick Menu" to display."
 set "choiceg.fr=Essayer de forcer l'affichage du "Quick Menu"."
 set "choiceg.es=Intenta forzar la visualización del "Quick Menu"."
 set "choiceg.it=Prova a forzare la visualizzazione del "Quick Menu"."
 set "choiceg.de=Versuche, die Anzeige des "Quick Menu" zu erzwingen."
 set "choiceg.ru=Попробуй заставить отобразиться "Quick Menu"."
-set "choiceg.zh=尝试强制显示快速菜单。"
+set "choiceg.zh=尝试强制显示 "Quick Menu"。"
 
 set "choiceh.en=Download and add Universal Gallery Unlocker ZLZK."
-set "choiceh.fr=Télécharger et ajouter le "Universal Gallery Unlocker ZLZK"."
-set "choiceh.es=Descargar y agregar el "Universal Gallery Unlocker ZLZK"."
-set "choiceh.it=Scarica e aggiungi il "Universal Gallery Unlocker ZLZK"."
-set "choiceh.de="Universal Gallery Unlocker ZLZK" herunterladen und hinzufügen."
-set "choiceh.ru=Скачать и добавить "Universal Gallery Unlocker ZLZK"."
+set "choiceh.fr=Télécharger et ajouter le Universal Gallery Unlocker ZLZK."
+set "choiceh.es=Descargar y agregar el Universal Gallery Unlocker ZLZK."
+set "choiceh.it=Scarica e aggiungi il Universal Gallery Unlocker ZLZK."
+set "choiceh.de=Universal Gallery Unlocker ZLZK herunterladen und hinzufügen."
+set "choiceh.ru=Скачать и добавить Universal Gallery Unlocker ZLZK."
 set "choiceh.zh=下载并添加 ZLZK 的通用画廊解锁器"
 
 set "choicei.en=Download and add Universal Choice Descriptor ZLZK."
-set "choicei.fr=Télécharger et ajouter le "Universal Choice Descriptor ZLZK"."
-set "choicei.es=Descargar y agregar el "Universal Choice Descriptor ZLZK"."
-set "choicei.it=Scarica e aggiungi il "Universal Choice Descriptor ZLZK"."
-set "choicei.de="Universal Choice Descriptor ZLZK" herunterladen und hinzufügen."
-set "choicei.ru=Скачать и добавить "Universal Choice Descriptor" ZLZK."
+set "choicei.fr=Télécharger et ajouter le Universal Choice Descriptor ZLZK."
+set "choicei.es=Descargar y agregar el Universal Choice Descriptor ZLZK."
+set "choicei.it=Scarica e aggiungi il Universal Choice Descriptor ZLZK."
+set "choicei.de=Universal Choice Descriptor ZLZK herunterladen und hinzufügen."
+set "choicei.ru=Скачать и добавить Universal Choice Descriptor ZLZK."
 set "choicei.zh=下载并添加 ZLZK 的通用选择描述器"
 
 set "choicej.en=Download and add Universal Transparent Text Box Mod by Penfold Mole."
-set "choicej.fr=Télécharger et ajouter le "Universal Transparent Text Box Mod" par Penfold Mole."
-set "choicej.es=Descargar y agregar el "Universal Transparent Text Box Mod" de Penfold Mole."
-set "choicej.it=Scarica e aggiungi il "Universal Transparent Text Box Mod" di Penfold Mole."
-set "choicej.de="Universal Transparent Text Box Mod" von Penfold Mole herunterladen und hinzufügen."
-set "choicej.ru=Скачать и добавить "Universal Transparent Text Box Mod" от Penfold Mole."
+set "choicej.fr=Télécharger et ajouter le Universal Transparent Text Box Mod par Penfold Mole."
+set "choicej.es=Descargar y agregar el Universal Transparent Text Box Mod de Penfold Mole."
+set "choicej.it=Scarica e aggiungi il Universal Transparent Text Box Mod di Penfold Mole."
+set "choicej.de=Universal Transparent Text Box Mod von Penfold Mole herunterladen und hinzufügen."
+set "choicej.ru=Скачать и добавить Universal Transparent Text Box Mod от Penfold Mole."
 set "choicej.zh=下载并添加 Penfold Mole 的通用透明文本框 Mod"
 
-set "choicek.en=Download and add "0x52_URM by 0x52"."
-set "choicek.fr=Télécharger et ajouter "0x52_URM by 0x52"."
-set "choicek.es=Descargar y agregar "0x52_URM by 0x52"."
-set "choicek.it=Scarica e aggiungi "0x52_URM by 0x52"."
-set "choicek.de="0x52_URM by 0x52" herunterladen und hinzufügen."
-set "choicek.ru=Скачать и добавить "0x52_URM by 0x52"."
-set "choicek.zh=下载并添加“0x52_URM by 0x52”"
+set "choicek.en=Download and add 0x52_URM by 0x52."
+set "choicek.fr=Télécharger et ajouter 0x52_URM de 0x52."
+set "choicek.es=Descargar y agregar 0x52_URM de 0x52."
+set "choicek.it=Scarica e aggiungi 0x52_URM di 0x52."
+set "choicek.de=Lade 0x52_URM von 0x52 herunterladen und hinzufügen."
+set "choicek.ru=Скачать и добавить 0x52_URM от 0x52."
+set "choicek.zh=下載並加入 0x52_URM by 0x52。"
 
-set "choicel.en=Rename MC name with a new name."
-set "choicel.fr=Renommer le MC name avec un nouveau nom."
-set "choicel.es=Renombrar el nombre de MC con un nuevo nombre."
-set "choicel.it=Rinomina il nome di MC con un nuovo nome."
-set "choicel.de=Den MC-Namen mit einem neuen Namen umbenennen."
-set "choicel.ru=Переименовать имя MC с новым именем."
-set "choicel.zh=用新名称重命名 MC 名称"
+set "choicel.en=Replace the name of any character name."
+set "choicel.fr=Remplacer le nom de n'importe quel personnage."
+set "choicel.es=Reemplazar el nombre de cualquier personaje."
+set "choicel.it=Sostituire il nome di qualsiasi personaggio."
+set "choicel.de=Ersetze den Namen eines beliebigen Charakters."
+set "choicel.ru=Заменить имя любого персонажа."
+set "choicel.zh=替换任何角色的名字。"
 
 set "choicem.en=Multiple choice in one shot"
 set "choicem.fr=Choix multiples en une seule fois"
@@ -970,12 +1352,36 @@ set "choicem.de=Mehrfachauswahl auf einmal"
 set "choicem.ru=Множественный выбор за один раз"
 set "choicem.zh=一次性应用多个选项"
 
-set "choicet.en=Extract text for translation purposes."
-set "choicet.fr=Extraire le texte à des fins de traduction."
-set "choicet.es=Extraer texto con fines de traducción."
-set "choicet.it=Estrai il testo a scopo di traduzione."
-set "choicet.de=Text zum Übersetzen extrahieren."
-set "choicet.ru=Извлечь текст для перевода."
+set "choicep.en=Add a custom add-on."
+set "choicep.fr=Ajouter un add-on personnalisé."
+set "choicep.es=Agregar un add-on personalizado."
+set "choicep.it=Aggiungi un add-on personalizzato."
+set "choicep.de=Eigenes Add-on hinzufügen."
+set "choicep.ru=Добавить пользовательский аддон."
+set "choicep.zh=添加自定义插件。"
+
+set "choicer.en=Restoration of the original files."
+set "choicer.fr=Restauration des fichiers originaux."
+set "choicer.es=Recuperación de los archivos originales."
+set "choicer.it=Ripristino dei file originali."
+set "choicer.de=Wiederherstellung der Originaldateien."
+set "choicer.ru=Восстановление исходных файлов."
+set "choicer.zh=還原原始檔案。"
+
+set "choices.en=Deleting backups."
+set "choices.fr=Suppresion des sauvegardes."
+set "choices.es=Eliminación de las copias de seguridad."
+set "choices.it=Eliminazione dei backup."
+set "choices.de=Löschen der Sicherungskopien."
+set "choices.ru=Удаление резервных копий."
+set "choices.zh=刪除備份。"
+
+set "choicet.en=Extract text for translation purposes"
+set "choicet.fr=Extraire le texte à des fins de traduction"
+set "choicet.es=Extraer texto con fines de traducción"
+set "choicet.it=Estrai il testo a scopo di traduzione"
+set "choicet.de=Text zum Übersetzen extrahieren"
+set "choicet.ru=Извлечь текст для перевода"
 set "choicet.zh=提取文本用于翻译目的"
 
 set "choiceu.en=Start update check for UnRen and its components."
@@ -994,13 +1400,21 @@ set "minfo2.de=Die folgenden Optionen erfordern administrative Berechtigungen."
 set "minfo2.ru=Следующие варианты требуют административных прав."
 set "minfo2.zh=以下选项需要管理员权限。"
 
-set "choice+.en=Add a right-click menu entry for folders to run the script."
-set "choice+.fr=Ajouter une entrée de menu contextuel pour les dossiers afin d'exécuter le script."
-set "choice+.es=Agregar una entrada de menú contextual para las carpetas para ejecutar el script."
-set "choice+.it=Aggiungere una voce al menu contestuale delle cartelle per eseguire lo script."
-set "choice+.de=Einträge im Kontextmenü für Ordner hinzufügen, um das Skript auszuführen."
-set "choice+.ru=Добавить элемент контекстного меню для папок для запуска скрипта."
-set "choice+.zh=为文件夹添加右键菜单项以运行脚本。"
+set "minfo2a.en=The following choices no longer require administrative privileges."
+set "minfo2a.fr=Les choix suivants ne nécessitent plus de privilèges administrateurs."
+set "minfo2a.es=Las siguientes opciones ya no requieren privilegios administrativos."
+set "minfo2a.it=Le seguenti opzioni non richiedono più privilegi amministrativi."
+set "minfo2a.de=Die folgenden Optionen erfordern keine administrativen Berechtigungen mehr."
+set "minfo2a.ru=Следующие варианты больше не требуют административных прав."
+set "minfo2a.zh=以下选项不再需要管理员权限。"
+
+set "choice+.en=Add a right-click menu entry to run the script."
+set "choice+.fr=Ajouter une entrée de menu contextuel pour exécuter le script."
+set "choice+.es=Agregar una entrada de menú contextual para ejecutar el script."
+set "choice+.it=Aggiungi una voce al menu contestuale per eseguire lo script."
+set "choice+.de=Fügen Sie einen Eintrag im Kontextmenü hinzu, um das Skript auszuführen."
+set "choice+.ru=Добавить элемент контекстного меню для запуска скрипта."
+set "choice+.zh=添加右键菜单项以运行脚本。"
 
 set "choice-.en=Remove the right-click menu entry from the registry."
 set "choice-.fr=Supprimer l'entrée de menu contextuel du registre."
@@ -1010,13 +1424,13 @@ set "choice-.de=Einträge im Kontextmenü aus der Registrierung entfernen."
 set "choice-.ru=Удалить элемент контекстного меню из реестра."
 set "choice-.zh=从注册表中移除右键菜单项。"
 
-set "mquest.en=Your choice (1,2,a-m,t,u,+,-,x by default "
-set "mquest.fr=Votre choix (1,2,a-m,t,u,+,-,x par défaut "
-set "mquest.es=Su elección (1,2,a-m,t,u,+,-,x por defecto "
-set "mquest.it=La tua scelta (1,2,a-m,t,u,+,-,x predefinito "
-set "mquest.de=Ihre Wahl (1,2,a-m,t,u,+,-,x für Standard "
-set "mquest.ru=Ваш выбор (1,2,a-m,t,u,+,-,x по умолчанию "
-set "mquest.zh=你的选择 (1,2,a-m,t,u,+,-, 默认为 x): "
+set "mquest.en=Your choice (1,2,a-m,p,r,s,t,u,+,-,x by default "
+set "mquest.fr=Votre choix (1, 2, a-m, p, r, s, t, u, +, -, x par défaut "
+set "mquest.es=Su elección (1,2,a-m,p,r,s,t,u,+,-,x por defecto "
+set "mquest.it=La tua scelta (1,2,a-m,p,r,s,t,u,+,-,x predefinito "
+set "mquest.de=Ihre Wahl (1,2,a-m,p,r,s,t,u,+,-,x für Standard "
+set "mquest.ru=Ваш выбор (1,2,a-m,p,r,s,t,u,+,-,x по умолчанию "
+set "mquest.zh=你的选择 (1, 2, a-m, p, r, s, t, u, +, -, 默认为 x): "
 
 set "choicex.en=Exit"
 set "choicex.fr=Quitter"
@@ -1036,8 +1450,7 @@ set "uchoice.zh=未知选择："
 
 :: Menu display
 echo.
-echo.
-echo !mtitle.%LNG%!%YEL%%WORKDIR% %RES%
+call :center "!MTITLE.%LNG%!%YEL%%WORKDIR%%RES%"
 echo.
 echo        1) %ESC1%!choice1.%LNG%!%RES%
 echo        2) %ESC2%!choice2.%LNG%!%RES%
@@ -1056,22 +1469,31 @@ echo        j) %CYA%!choicej.%LNG%!%RES%
 echo        k) %CYA%!choicek.%LNG%!%RES%
 echo        l) %CYA%!choicel.%LNG%!%RES%
 echo        m) %CYA%!choicem.%LNG%!%RES%
+echo        p) %CYA%!choicep.%LNG%!%RES%
+echo        r) %YEL%!choicer.%LNG%!%RES%
+echo        s) %YEL%!choices.%LNG%!%RES%
 echo        t) %CYA%!choicet.%LNG%!%RES%
 echo        u) %CYA%!choiceu.%LNG%!%RES%
 echo.
-echo        %YEL%!minfo2.%LNG%!%RES%
+set OLDREG=0
+call :check_old_reg
+if %OLDREG% EQU 1 (
+    echo        %YEL%!minfo2.%LNG%!%RES%
+) else (
+    echo        %YEL%!minfo2a.%LNG%!%RES%
+)
 echo        +) %CYA%!choice+.%LNG%!%RES%
 echo        -) %CYA%!choice-.%LNG%!%RES%
 echo.
 echo        x) %YEL%!choicex.%LNG%!%RES%
 
-set "def.en=[%def%]: "
-set "def.fr=[%def%] : "
-set "def.es=[%def%]: "
-set "def.it=[%def%]: "
-set "def.de=[%def%]: "
-set "def.ru=[%def%]: "
-set "def.zh=[%def%]: "
+set "def.en=[%YEL%%def%%RES%]: "
+set "def.fr=[%YEL%%def%%RES%] : "
+set "def.es=[%YEL%%def%%RES%]: "
+set "def.it=[%YEL%%def%%RES%]: "
+set "def.de=[%YEL%%def%%RES%]: "
+set "def.ru=[%YEL%%def%%RES%]: "
+set "def.zh=[%YEL%%def%%RES%] : "
 
 :: Reading the selection
 echo.
@@ -1083,12 +1505,10 @@ if not defined OPTION set "OPTION=%def%"
 set "OPTION=%OPTION: =%"
 :: Handle single choices
 if "%OPTION%" == "1" (
-    call :exitn
     call "%SCRIPTDIR%UnRen-legacy.bat" "!WORKDIR!"
     goto exitn
 )
 if "%OPTION%" == "2" (
-    call :exitn
     call "%SCRIPTDIR%UnRen-current.bat" "!WORKDIR!"
     goto exitn
 )
@@ -1103,8 +1523,11 @@ if /i "%OPTION%" == "h" call :add_ugu
 if /i "%OPTION%" == "i" call :add_ucd
 if /i "%OPTION%" == "j" call :add_utbox
 if /i "%OPTION%" == "k" call :add_urm
-if /i "%OPTION%" == "l" call :replace_mcname
+if /i "%OPTION%" == "l" call :replace_anyname
 if /i "%OPTION%" == "m" call :multiChoice
+if /i "%OPTION%" == "p" call :add_custom_addon
+if /i "%OPTION%" == "r" call :restore_files
+if /i "%OPTION%" == "s" call :delete_backups
 if /i "%OPTION%" == "t" call :extract_text
 if /i "%OPTION%" == "u" call :check_update
 
@@ -1115,42 +1538,41 @@ if "%OPTION%" == "-" call :remove_reg
 if /i "%OPTION%" == "x" goto exitn
 
 echo.
+<nul set /p="%RED%!uchoice.%LNG%! %YEL%%OPTION%%RES%"
 echo.
-<nul set /p="%RED%!uchoice.%LNG%! %OPTION%%RES%"
 timeout /t 2 %DEBUGREDIR%
-goto menu
+goto :menu
 
 :: Drop our console/dev mode enabler into the game folder
 :console
 set "unren-console=%WORKDIR%\game\unren-console.rpy"
 
 call :elog .
-call :elog "%YEL%!TWADD.%LNG%! %unren-console%.%RES%"
-call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "!TWADD.%LNG%! %YEL%%unren-console%.%RES%"
+call :elog .
+call :elog "!INCASEDEL.%LNG%!"
 call :elog "%YEL%%unren-console%%RES%"
 call :elog "%YEL%%unren-console%c%RES%"
-call :elog .
-call :elog .
-if not "%OPTION%" == "m" echo.
-<nul set /p="!choicea.%LNG%!... "
+
 if exist "%unren-console%" (
-    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
+    call :elog .
+    call :elog "%SKIP%" "!APRESENT.%LNG%!"
+    call :elog .
 ) else (
     >"%unren-console%.b64" (
         echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KZGVmaW5lIDk5OSBjb25maWcuY29uc29sZSA9IFRydWUNCmRlZmluZSA5OTkgY29uZmlnLmRldmVsb3BlciA9IFRydWUNCg==
     )
-    echo "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%unren-console%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-console%.b64'))))" >> "%UNRENLOG%"
-    "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%unren-console%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-console%.b64'))))" %DEBUGREDIR%
-    if not exist "%unren-console%.tmp" (
-        call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog .
+    call :pwsh_exp "!choicea.%LNG%!.." "%unren-console%"
+    if not exist "!unren-console!" (
+        call :elog "%NOK%" "!FCREATE.%LNG%! %YEL%%unren-console%%RES%"
+        call :elog .
     ) else (
-        move /y "%unren-console%.tmp" "%unren-console%" %DEBUGREDIR%
-        del /f /q "%unren-console%.b64" %DEBUGREDIR%
-        call :elog "%GRE%!PASS.%LNG%!%RES%"
+        call :elog "%OK%"
     )
 )
-
-goto finish
+timeout /T 1 %DEBUGREDIR%
+goto :finish
 
 
 :: Drop our debug mode enabler into the game folder
@@ -1158,33 +1580,31 @@ goto finish
 set "unren-debug=%WORKDIR%\game\unren-debug.rpy"
 
 call :elog .
-call :elog "%YEL%!TWADD.%LNG%! %unren-debug%.%RES%"
-call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "!TWADD.%LNG%! %YEL%%unren-debug%.%RES%"
+call :elog .
+call :elog "!INCASEDEL.%LNG%!%RES%"
 call :elog "%YEL%%unren-debug%%RES%"
 call :elog "%YEL%%unren-debug%c%RES%"
-call :elog .
-call :elog .
-echo !choiceb.%LNG%!...  >> "%UNRENLOG%"
-if not "%OPTION%" == "m" echo.
-<nul set /p="!choiceb.%LNG%!... "
-if exist "%unren-console%" (
-    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
+
+if exist "%unren-debug%" (
+    call :elog .
+    call :elog "%SKIP%" "!APRESENT.%LNG%!%RES%"
+    call :elog .
 ) else (
     >"%unren-debug%.b64" (
         echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KZGVmaW5lIDk5OSBjb25maWcuZGVidWcgPSBUcnVlDQo=
     )
-    echo "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%unren-debug%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-debug%.b64'))))" >> "%UNRENLOG%"
-    "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%unren-debug%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-debug%.b64'))))" %DEBUGREDIR%
-    if not exist "%unren-debug%.tmp" (
-        call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog .
+    call :pwsh_exp "!choiceb.%LNG%!.." "%unren-debug%"
+    if not exist "%unren-debug%" (
+        call :elog "%NOK%" "!FCREATE.%LNG%! %YEL%%unren-debug%%RES%"
+        call :elog .
     ) else (
-        move /y "%unren-debug%.tmp" "%unren-debug%" %DEBUGREDIR%
-        del /f /q "%unren-debug%.b64" %DEBUGREDIR%
-        call :elog "%GRE%!PASS.%LNG%!%RES%"
+        call :elog "%OK%"
     )
 )
-
-goto finish
+timeout /T 1 %DEBUGREDIR%
+goto :finish
 
 
 :: Drop our skip file into the game folder
@@ -1192,34 +1612,31 @@ goto finish
 set "unren-skip=%WORKDIR%\game\unren-skip.rpy"
 
 call :elog .
-call :elog "%YEL%!TWADD.%LNG%! %unren-skip%.%RES%"
-call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "!TWADD.%LNG%! %YEL%%unren-skip%.%RES%"
+call :elog .
+call :elog "!INCASEDEL.%LNG%!%RES%"
 call :elog "%YEL%%unren-skip%%RES%"
 call :elog "%YEL%%unren-skip%c%RES%"
-call :elog .
-call :elog .
-echo !choicec.%LNG%!... >> "%UNRENLOG%"
-if not "%OPTION%" == "m" echo.
-<nul set /p="!choicec.%LNG%!... "
 
 if exist "%unren-skip%" (
-    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
+    call :elog .
+    call :elog "%SKIP%" "!APRESENT.%LNG%!%RES%"
+    call :elog .
 ) else (
     >"%unren-skip%.b64" (
-        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIF9wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCiAgICBjb25maWcuYWxsb3dfc2tpcHBpbmcgPSBUcnVlDQogICAgcmVucHkuZ2FtZS5wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCiAgICByZW5weS5nYW1lLnByZWZlcmVuY2VzLnNraXBfYWZ0ZXJfY2hvaWNlcyA9IFRydWUNCiAgICByZW5weS5jb25maWcuZmFzdF9za2lwcGluZyA9IFRydWUNCiAgICB0cnk6DQogICAgICAgIGNvbmZpZy5rZXltYXBbJ3NraXAnXSA9IFsgJ0tfTENUUkwnLCAnS19SQ1RSTCcgXQ0KICAgIGV4Y2VwdDoNCiAgICAgICAgcGFzcw0K
+        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIF9wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCiAgICBfcHJlZmVyZW5jZXMuc2tpcF9hZnRlcl9jaG9pY2VzID0gVHJ1ZQ0KICAgIF9wcmVmZXJlbmNlcy5mYXN0X3NraXBwaW5nID0gVHJ1ZQ0KICAgIF9wcmVmZXJlbmNlcy5za2lwID0gWyAnS19MQ1RSTCcsICdLX1JDVFJMJyBdDQogICAgY29uZmlnLmFsbG93X3NraXBwaW5nID0gVHJ1ZQ0KICAgIHJlbnB5LmdhbWUucHJlZmVyZW5jZXMuc2tpcF91bnNlZW4gPSBUcnVlDQogICAgcmVucHkuZ2FtZS5wcmVmZXJlbmNlcy5za2lwX2FmdGVyX2Nob2ljZXMgPSBUcnVlDQogICAgcmVucHkuY29uZmlnLmZhc3Rfc2tpcHBpbmcgPSBUcnVlDQogICAgcGVyc2lzdGVudC5nYW1lX2NvbXBsZXRlZCA9IFRydWUgIyBGcm9tIEphc29uOiBDb21pbmcgb2YgYWdlDQogICAgdHJ5Og0KICAgICAgICBjb25maWcua2V5bWFwWydza2lwJ10gPSBbICdLX0xDVFJMJywgJ0tfUkNUUkwnIF0NCiAgICBleGNlcHQ6DQogICAgICAgIHBhc3MNCg==
     )
-    echo "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%unren-skip%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-skip%.b64'))))" >> "%UNRENLOG%"
-    "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%unren-skip%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-skip%.b64'))))" %DEBUGREDIR%
-    if not exist "%unren-skip%.tmp" (
-        call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog .
+    call :pwsh_exp "!choicec.%LNG%!.."  "%unren-skip%"
+    if not exist "%unren-skip%" (
+        call :elog "%NOK%" "!FCREATE.%LNG%! %YEL%%unren-skip%%RES%"
+        call :elog .
     ) else (
-        move /y "%unren-skip%.tmp" "%unren-skip%" %DEBUGREDIR%
-        del /f /q "%unren-skip%.b64" %DEBUGREDIR%
-        call :elog "%GRE%!PASS.%LNG%!%RES%"
+        call :elog "%OK%"
     )
 )
-
-goto finish
+timeout /T 1 %DEBUGREDIR%
+goto :finish
 
 
 :: Drop our skip file into the game folder
@@ -1227,34 +1644,31 @@ goto finish
 set "unren-skipall=%WORKDIR%\game\unren-skipall.rpy"
 
 call :elog .
-call :elog "%YEL%!TWADD.%LNG%! %unren-skipall%.%RES%"
-call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "!TWADD.%LNG%! %YEL%%unren-skipall%.%RES%"
+call :elog .
+call :elog "!INCASEDEL.%LNG%!%RES%"
 call :elog "%YEL%%unren-skipall%%RES%"
 call :elog "%YEL%%unren-skipall%c%RES%"
-call :elog .
-call :elog .
-echo !choiced.%LNG%!... >> "%UNRENLOG%"
-if not "%OPTION%" == "m" echo.
-<nul set /p="!choiced.%LNG%!... "
 
 if exist "%unren-skipall%" (
-    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
+    call :elog .
+    call :elog "%SKIP%" "!APRESENT.%LNG%!%RES%"
+    call :elog .
 ) else (
     >"%unren-skipall%.b64" (
         echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIF9wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCiAgICBjb25maWcuYWxsb3dfc2tpcHBpbmcgPSBUcnVlDQogICAgcmVucHkuZ2FtZS5wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCiAgICByZW5weS5nYW1lLnByZWZlcmVuY2VzLnNraXBfYWZ0ZXJfY2hvaWNlcyA9IFRydWUNCiAgICByZW5weS5jb25maWcuZmFzdF9za2lwcGluZyA9IFRydWUNCiAgICBwcmVmZXJlbmNlcy50cmFuc2l0aW9ucyA9IDANCiAgICB0cnk6DQogICAgICAgIGNvbmZpZy5rZXltYXBbJ3NraXAnXSA9IFsgJ0tfTENUUkwnLCAnS19SQ1RSTCcgXQ0KICAgIGV4Y2VwdDoNCiAgICAgICAgcGFzcw0K
     )
-    echo "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%unren-skipall%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-skipall%.b64'))))" >> "%UNRENLOG%"
-    "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%unren-skipall%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-skipall%.b64'))))" %DEBUGREDIR%
-    if not exist "%unren-skipall%.tmp" (
-        call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog .
+    call :pwsh_exp "!choiced.%LNG%!.." "%unren-skipall%"
+    if not exist "%unren-skipall%" (
+        call :elog "%NOK%" "!FCREATE.%LNG%! %YEL%%unren-skipall%%RES%"
+        call :elog .
     ) else (
-        move /y "%unren-skipall%.tmp" "%unren-skipall%" %DEBUGREDIR%
-        del /f /q "%unren-skipall%.b64" %DEBUGREDIR%
-        call :elog "%GRE%!PASS.%LNG%!%RES%"
+        call :elog "%OK%"
     )
 )
-
-goto finish
+timeout /T 1 %DEBUGREDIR%
+goto :finish
 
 
 :: Drop our rollback file into the game folder
@@ -1262,33 +1676,31 @@ goto finish
 set "unren-rollback=%WORKDIR%\game\unren-rollback.rpy"
 
 call :elog .
-call :elog "%YEL%!TWADD.%LNG%! %unren-rollback%.%RES%"
-call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "!TWADD.%LNG%! %YEL%%unren-rollback%.%RES%"
+call :elog .
+call :elog "!INCASEDEL.%LNG%!%RES%"
 call :elog "%YEL%%unren-rollback%%RES%"
 call :elog "%YEL%%unren-rollback%c%RES%"
-call :elog .
-call :elog .
-if not "%OPTION%" == "m" echo.
-<nul set /p="!choicee.%LNG%!... "
 
 if exist "%unren-rollback%" (
-    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
+    call :elog .
+    call :elog "%SKIP%" "!APRESENT.%LNG%!%RES%"
+    call :elog .
 ) else (
     > "%unren-rollback%.b64" (
         echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIHJlbnB5LmNvbmZpZy5yb2xsYmFja19lbmFibGVkID0gVHJ1ZQ0KICAgIHJlbnB5LmNvbmZpZy5oYXJkX3JvbGxiYWNrX2xpbWl0ID0gMjU2DQogICAgcmVucHkuY29uZmlnLnJvbGxiYWNrX2xlbmd0aCA9IDI1Ng0KICAgIGRlZiB1bnJlbl9ub2Jsb2NrKCphcmdzLCAqKmt3YXJncyk6DQogICAgICAgIHJldHVybg0KICAgIHJlbnB5LmJsb2NrX3JvbGxiYWNrID0gdW5yZW5fbm9ibG9jaw0KICAgIHRyeToNCiAgICAgICAgY29uZmlnLmtleW1hcFsncm9sbGJhY2snXSA9IFsgJ0tfUEFHRVVQJywgJ3JlcGVhdF9LX1BBR0VVUCcsICdLX0FDX0JBQ0snLCAnbW91c2Vkb3duXzQnIF0NCiAgICBleGNlcHQ6DQogICAgICAgIHBhc3MNCg==
     )
-    echo "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%unren-rollback%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-rollback%.b64'))))" >> "%UNRENLOG%"
-    "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%unren-rollback%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-rollback%.b64'))))" %DEBUGREDIR%
-    if not exist "%unren-rollback%.tmp" (
-        call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog .
+    call :pwsh_exp "!choicee.%LNG%!.." "%unren-rollback%"
+    if not exist "%unren-rollback%" (
+        call :elog "%NOK%" "!FCREATE.%LNG%! %YEL%%unren-rollback%%RES%"
+        call :elog .
     ) else (
-        move /y "%unren-rollback%.tmp" "%unren-rollback%" %DEBUGREDIR%
-        del /f /q "%unren-rollback%.b64" %DEBUGREDIR%
-        call :elog "%GRE%!PASS.%LNG%!%RES%"
+        call :elog "%OK%"
     )
 )
-
-goto finish
+timeout /T 1 %DEBUGREDIR%
+goto :finish
 
 
 :: Drop our Quick Save/Load file into the game folder
@@ -1296,33 +1708,31 @@ goto finish
 set "unren-quick=%WORKDIR%\game\unren-quick.rpy"
 
 call :elog .
-call :elog "%YEL%!TWADD.%LNG%! %unren-quick%.%RES%"
-call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "!TWADD.%LNG%! %YEL%%unren-quick%.%RES%"
+call :elog .
+call :elog "!INCASEDEL.%LNG%!%RES%"
 call :elog "%YEL%%unren-quick%%RES%"
 call :elog "%YEL%%unren-quick%c%RES%"
-call :elog .
-call :elog .
-if not "%OPTION%" == "m" echo.
-<nul set /p="!choicef.%LNG%!... "
 
 if exist "%unren-quick%" (
-    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
+    call :elog .
+    call :elog "%SKIP%" "!APRESENT.%LNG%!%RES%"
+    call :elog .
 ) else (
     >"%unren-quick%.b64" (
         echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIHRyeToNCiAgICAgICAgY29uZmlnLnVuZGVybGF5WzBdLmtleW1hcFsncXVpY2tTYXZlJ10gPSBRdWlja1NhdmUoKQ0KICAgICAgICBjb25maWcua2V5bWFwWydxdWlja1NhdmUnXSA9ICdLX0Y1Jw0KICAgICAgICBjb25maWcudW5kZXJsYXlbMF0ua2V5bWFwWydxdWlja0xvYWQnXSA9IFF1aWNrTG9hZCgpDQogICAgICAgIGNvbmZpZy5rZXltYXBbJ3F1aWNrTG9hZCddID0gJ0tfRjknDQogICAgZXhjZXB0Og0KICAgICAgICBwYXNzDQo=
     )
-    echo "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%unren-quick%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-quick%.b64'))))" >> "%UNRENLOG%"
-    "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%unren-quick%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-quick%.b64'))))" %DEBUGREDIR%
-    if not exist "%unren-quick%.tmp" (
-        call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog .
+    call :pwsh_exp "!choicef.%LNG%!.." "%unren-quick%"
+    if not exist "%unren-quick%" (
+        call :elog "%NOK%" "!FCREATE.%LNG%! %YEL%%unren-quick%%RES%"
+        call :elog .
     ) else (
-        move /y "%unren-quick%.tmp" "%unren-quick%" %DEBUGREDIR%
-        del /f /q "%unren-quick%.b64" %DEBUGREDIR%
-        call :elog "%GRE%!PASS.%LNG%!%RES%"
+        call :elog "%OK%"
     )
 )
-
-goto finish
+timeout /T 1 %DEBUGREDIR%
+goto :finish
 
 
 :: Drop our Quick Menu file into the game folder
@@ -1330,33 +1740,31 @@ goto finish
 set "unren-qmenu=%WORKDIR%\game\unren-qmenu.rpy"
 
 call :elog .
-call :elog "%YEL%!TWADD.%LNG%! %unren-qmenu%.%RES%"
-call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog "!TWADD.%LNG%! %YEL%%unren-qmenu%.%RES%"
+call :elog .
+call :elog "!INCASEDEL.%LNG%!%RES%"
 call :elog "%YEL%%unren-qmenu%%RES%"
 call :elog "%YEL%%unren-qmenu%c%RES%"
-call :elog .
-call :elog .
-if not "%OPTION%" == "m" echo.
-<nul set /p="!choiceg.%LNG%!... "
 
 if exist "%unren-qmenu%" (
-    call :elog "%YEL%!APRESENT.%LNG%!%RES%"
+    call :elog .
+    call :elog "%SKIP%" "!APRESENT.%LNG%!%RES%"
+    call :elog .
 ) else (
     >"%unren-qmenu%.b64" (
         echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCBweXRob246DQogICAgZGVmIGFsd2F5c19lbmFibGVfcXVpY2tfbWVudSgpOg0KICAgICAgICBzdG9yZS5xdWlja19tZW51ID0gVHJ1ZQ0KICAgICAgICByZW5weS5zaG93X3NjcmVlbigicXVpY2tfbWVudSIpDQogICAgY29uZmlnLm92ZXJsYXlfZnVuY3Rpb25zLmFwcGVuZChhbHdheXNfZW5hYmxlX3F1aWNrX21lbnUpDQoNCiAgICBkZWYgZm9yY2VfcXVpY2tfbWVudV9vbl9pbnRlcmFjdCgpOg0KICAgICAgICBzdG9yZS5xdWlja19tZW51ID0gVHJ1ZQ0KICAgIGNvbmZpZy5pbnRlcmFjdF9jYWxsYmFja3MuYXBwZW5kKGZvcmNlX3F1aWNrX21lbnVfb25faW50ZXJhY3Qp
     )
-    echo "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%unren-qmenu%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-qmenu%.b64'))))" >> "%UNRENLOG%"
-    "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllText('%unren-qmenu%.tmp', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content '%unren-qmenu%.b64'))))" %DEBUGREDIR%
-    if not exist "%unren-qmenu%.tmp" (
-        call :elog "%RED%!FAIL.%LNG%!%RES%"
+    call :elog .
+    call :pwsh_exp "!choiceg.%LNG%!.." "%unren-qmenu%"
+    if not exist "%unren-qmenu%" (
+        call :elog "%NOK%" "!FCREATE.%LNG%! %YEL%%unren-qmenu%%RES%"
+        call :elog .
     ) else (
-        move /y "%unren-qmenu%.tmp" "%unren-qmenu%" %DEBUGREDIR%
-        del /f /q "%unren-qmenu%.b64" %DEBUGREDIR%
-        call :elog "%GRE%!PASS.%LNG%!%RES%"
+        call :elog "%OK%"
     )
 )
-
-goto finish
+timeout /T 1 %DEBUGREDIR%
+goto :finish
 
 
 :: Add the Universal Gallery Unlocker to the game folder
@@ -1367,53 +1775,54 @@ set "uguzip=%TEMP%\Universal_Gallery_Unlocker.zip"
 set "uguhardzip=%TEMP%\hard.zip"
 set "ugusoftzip=%TEMP%\soft.zip"
 set "ugudir=%WORKDIR%\game\_mods\"
-del /f /q "%uguzip%" %DEBUGREDIR%
-del /f /q "%uguhardzip%" %DEBUGREDIR%
-del /f /q "%ugusoftzip%" %DEBUGREDIR%
-
 
 call :elog .
-call :elog "%YEL%!TWADD.%LNG%! %ugudir%.%RES%"
-call :elog "%YEL%!INCASEOF.%LNG%! %RES%"
+call :elog "!INCASEOF.%LNG%! %RES%"
 call :elog "%MAG%https://f95zone.to/threads/universal-gallery-unlocker-2024-01-24-zlzk.136812/%RES%"
-call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog .
+call :elog "!TWADD.%LNG%! %YEL%%ugudir%.%RES%"
+call :elog .
+call :elog "!INCASEDEL.%LNG%!%RES%"
 call :elog "%YEL%%ugudir%\ZLZK_UGU_soft%RES%"
 call :elog .
-call :elog .
-echo !choiceh.%LNG%!... >> "%UNRENLOG%"
-if not "%OPTION%" == "m" echo.
-<nul set /p="!choiceh.%LNG%!... "
+call :elog -n "%EMPTY%" "!choiceh.%LNG%!.."
 
-echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%uguzip%')"  >> "%UNRENLOG%"
+if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%uguzip%')" >> "%UNRENLOG%"
 "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%uguzip%')" %DEBUGREDIR%
-if %ERRORLEVEL% NEQ 0 (
-    call :elog "%RED%!FAIL.%LNG%!%RES%"
+if %errorlevel% NEQ 0 (
+    call :elog "%NOK%" "!UNDWNLD.%LNG%! %MAG%%url%%RES%"
+    call :elog .
+    goto :skip_ugu
+
 ) else (
-    echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%uguzip%' '%TEMP%'"  >> "%UNRENLOG%"
+    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%uguzip%' '%TEMP%'" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%uguzip%' '%TEMP%'" %DEBUGREDIR%
     if not exist "%uguhardzip%" (
-        echo %RED%!FAIL.%LNG%! !MISSING.%LNG%! %uguhardzip% %RES%
-        goto skip_ugu
+        call :elog "%NOK%" "!FNOTFOUND.%LNG%! %YEL%%uguhardzip%%RES%"
+        call :elog .
+        goto :skip_ugu
     )
     if not exist "%ugusoftzip%" (
-        echo %RED%!FAIL.%LNG%! !MISSING.%LNG%! %ugusoftzip% %RES%
-        goto skip_ugu
+        call :elog "%NOK%" "!FNOTFOUND.%LNG%! %YEL%%ugusoftzip%%RES%"
+        call :elog .
+        goto :skip_ugu
     )
-    echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%ugusoftzip%' '%WORKDIR%'"  >> "%UNRENLOG%"
+    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%ugusoftzip%' '%WORKDIR%'" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%ugusoftzip%' '%WORKDIR%'" %DEBUGREDIR%
-    if !ERRORLEVEL! NEQ 0 (
-        call :elog "%RED%!FAIL.%LNG%! !UNEXTRACT.%LNG%! %ugusoftzip% %RES%"
-        goto skip_ucd
+    if !errorlevel! NEQ 0 (
+        call :elog "%NOK%" "!UNEXTRACT.%LNG%! %YEL%%ugusoftzip%%RES%"
+        call :elog .
+        goto :skip_ucd
     ) else (
-        call :elog "%GRE%!PASS.%LNG%!%RES%"
+        call :elog "%OK%"
     )
     del /f /q "%ugusoftzip%" %DEBUGREDIR%
     del /f /q "%uguhardzip%" %DEBUGREDIR%
     del /f /q "%uguzip%" %DEBUGREDIR%
     del /f /q "%TEMP%\readme.txt" %DEBUGREDIR%
 )
-
-goto finish
+timeout /T 1 %DEBUGREDIR%
+goto :finish
 
 
 :: Add the Universal Choice Descriptor to the game folder
@@ -1423,57 +1832,56 @@ set "url=https://attachments.f95zone.to/2024/01/3314453_Universal_Choice_Descrip
 set "ucdzip=%TEMP%\Universal_Choice_Descriptor.zip"
 set "ucdzip_part1=%TEMP%\Universal_Choice_Descriptor_[2024-01-24]_[ZLZK].zip"
 set "ucdzip_part2=%TEMP%\ZLZK_[2024-01-24]_[ZLZK].zip"
-
 set "ucddir=%WORKDIR%\game\_mods\"
-del /f /q "%ucdzip%" %DEBUGREDIR%
-del /f /q "%ucdzip_part1%" %DEBUGREDIR%
-del /f /q "%ucdzip_part2%" %DEBUGREDIR%
-del /f /q "%TEMP%\Readme.txt" %DEBUGREDIR%
 
 call :elog .
-call :elog "%YEL%!TWADD.%LNG%! %ucddir%.%RES%"
-call :elog "%YEL%!INCASEOF.%LNG%! %RES%"
+call :elog "!INCASEOF.%LNG%!%RES%"
 call :elog "%MAG%https://f95zone.to/threads/universal-gallery-unlocker-2024-01-24-zlzk.136812/%RES%"
-call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog .
+call :elog "!TWADD.%LNG%! %YEL%%ucddir%.%RES%"
+call :elog .
+call :elog "!INCASEDEL.%LNG%!%RES%"
 call :elog "%YEL%%ucddir%%RES%"
 call :elog .
-call :elog .
-echo !choicei.%LNG%!... >> "%UNRENLOG%"
-if not "%OPTION%" == "m" echo.
-<nul set /p="!choicei.%LNG%!... "
-echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%ucdzip%')" >> "%UNRENLOG%"
+call :elog -n "%EMPTY%" "!choicei.%LNG%!.."
+
+if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%ucdzip%')" >> "%UNRENLOG%"
 "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%ucdzip%')" %DEBUGREDIR%
 if not exist "%ucdzip%" (
-	call :elog "%RED%!FAIL.%LNG%! !UNDWNLD.%LNG%! %url% %RES%"
-	goto skip_ucd
+	call :elog "%NOK%" "!UNDWNLD.%LNG%! %MAG%%url%%RES%"
+    call :elog .
+	goto :skip_ucd
 ) else (
-    echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%ucdzip%' '%TEMP%'" >> "%UNRENLOG%"
+    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%ucdzip%' '%TEMP%'" >> "%UNRENLOG%"
 	"%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%ucdzip%' '%TEMP%'" %DEBUGREDIR%
     if not exist "%ucdzip_part1%" (
-        call :elog "%RED%!FAIL.%LNG%! !MISSING.%LNG%! %ucdzip_part1% %RES%"
-        goto skip_ucd
+        call :elog "%NOK%" "!FNOTFOUND.%LNG%! %YEL%%ucdzip_part1%%RES%"
+        call :elog .
+        goto :skip_ucd
     ) else (
         move /y "%ucdzip_part1%" %TEMP%\part1.zip %DEBUGREDIR%
     )
     if not exist "%ucdzip_part2%" (
-        call :elog "%RED%!FAIL.%LNG%! !MISSING.%LNG%! %ucdzip_part2% %RES%"
-        goto skip_ucd
+        call :elog "%NOK%" "!FNOTFOUND.%LNG%! %YEL%%ucdzip_part2%%RES%"
+        call :elog .
+        goto :skip_ucd
     ) else (
         move /y "%ucdzip_part2%" %TEMP%\part2.zip %DEBUGREDIR%
     )
-    echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%TEMP%\part1.zip' '%WORKDIR%'" >> "%UNRENLOG%"
+    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%TEMP%\part1.zip' '%WORKDIR%'" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%TEMP%\part1.zip' '%WORKDIR%'" %DEBUGREDIR%
-    if !ERRORLEVEL! NEQ 0 (
-        call :elog "%RED%!FAIL.%LNG%! !UNEXTRACT.%LNG%! %ucdzip_part1% %RES%"
-        goto skip_ucd
+    if !errorlevel! NEQ 0 (
+        call :elog "%NOK%" "!UNEXTRACT.%LNG%! %YEL%%ucdzip_part1%%RES%"
+        goto :skip_ucd
     )
-    echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%TEMP%\part2.zip' '%WORKDIR%'" >> "%UNRENLOG%"
+    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%TEMP%\part2.zip' '%WORKDIR%'" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%TEMP%\part2.zip' '%WORKDIR%'" %DEBUGREDIR%
-    if !ERRORLEVEL! NEQ 0 (
-        call :elog "%RED%!FAIL.%LNG%! !UNEXTRACT.%LNG%! %ucdzip_part2% %RES%"
-        goto skip_ucd
+    if !errorlevel! NEQ 0 (
+        call :elog "%NOK%" "!UNEXTRACT.%LNG%! %YEL%%ucdzip_part2%%RES%"
+        call :elog .
+        goto :skip_ucd
     )
-    call :elog "%GRE%!PASS.%LNG%!%RES%"
+    call :elog "%OK%%"
     :skip_ucd
 	del /f /q "%ucdzip%" %DEBUGREDIR%
     del /f /q "%ucdzip_part1%" %DEBUGREDIR%
@@ -1482,67 +1890,76 @@ if not exist "%ucdzip%" (
     del /f /q "%TEMP%\part2.zip" %DEBUGREDIR%
     del /f /q "%TEMP%\readme.txt" %DEBUGREDIR%
 )
-
-goto finish
+timeout /T i %DEBUGREDIR%
+goto :finish
 
 
 :: Download and install Universal Transparent Text Box Mod by Penfold Mole
 :add_utbox
+set "utboxmsg.en=Checking for 7zip.exe availability."
+set "utboxmsg.fr=Vérification de la disponibilité de 7zip.exe."
+set "utboxmsg.es=Verificación de la disponibilidad de 7zip.exe."
+set "utboxmsg.it=Verifica la disponibilità di 7zip.exe."
+set "utboxmsg.de=7zip.exe Verfication."
+set "utboxmsg.ru=Проверка доступности 7zip.exe."
+set "utboxmsg.zh=检查7zip.exe的可用性。"
+
 set "utbox_name=Universal Transparent Text Box Mod"
 set "url=https://attachments.f95zone.to/2023/12/3214690_RenPy_universal_transparent_textbox_mod_v2.6.4_by_Penfold_Mole.7z"
 set "utboxzip=%TEMP%\RenPy_Transparent_Text_Box_Mod.7z"
 set "utbox_file=%WORKDIR%\game\y_outline.rpy"
 set "utbox_tdir=%TEMP%\utbox"
 
+call :elog -n "%EMPTY%" "!utboxmsg.%LNG%!.."
 :: Need 7z.exe for extraction
 if not exist "%_7ZIPLOC%" (
+    call :elog "%NOK%" "!FNOTFOUND.%LNG%! %YEL%%_7ZIPLOC%%RES%"
     call :elog .
-    call :elog "%RED%!FAIL.%LNG%! !MISSING.%LNG%! %YEL%%_7ZIPLOC% %RES%"
-    timeout /t 2 %DEBUGREDIR%
-    goto skip_utbox
+    timeout /T 1 %DEBUGREDIR%
+    goto :skip_utbox
+) else (
+    call :elog "%OK%"
 )
 
 call :elog .
-call :elog "%YEL%!TWADD.%LNG%! %utbox_file%.%RES%"
-call :elog "%YEL%!INCASEOF.%LNG%! %RES%"
+call :elog "!INCASEOF.%LNG%! %RES%"
 call :elog "%MAG%https://f95zone.to/threads/renpy-transparent-text-box-mod-v2-6-4.11925/%RES%"
-call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog .
+call :elog "!TWADD.%LNG%! %YEL%%utbox_file%.%RES%"
+call :elog .
+call :elog "!INCASEDEL.%LNG%!%RES%"
 call :elog "%YEL%%utbox_file%%RES%"
 call :elog .
-call :elog .
-echo !choicej.%LNG%!... >> "%UNRENLOG%"
-if not "%OPTION%" == "m" echo.
-<nul set /p="!choicej.%LNG%!..."
-
-del /f /q "%utbox_file%" %DEBUGREDIR%
-del /f /q "%utboxzip%" %DEBUGREDIR%
-rd /s /q "%utbox_tdir%" %DEBUGREDIR%
-
-echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%utboxzip%')" >> "%UNRENLOG%"
+call :elog -n "%EMPTY%" "!choicej.%LNG%!.."
+if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%utboxzip%')" >> "%UNRENLOG%"
 "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%utboxzip%')" %DEBUGREDIR%
 if not exist "%utboxzip%" (
-    echo %RED% !FAIL.%LNG%! !UNDWNLD.%LNG%! %url% %RES%
-    goto skip_utbox
+    call :elog "%NOK%" "!UNDWNLD.%LNG%! %MAG%%url%%RES%"
+    call :elog .
+    goto :skip_utbox
 ) else (
-    echo "%_7ZIPLOC%" x -y -o"%utbox_tdir%" "%utboxzip%" >> "%UNRENLOG%"
+    if %DEBUGLEVEL% GEQ 1 echo "%_7ZIPLOC%" x -y -o"%utbox_tdir%" "%utboxzip%" >> "%UNRENLOG%"
     "%_7ZIPLOC%" x -y -o"%utbox_tdir%" "%utboxzip%" %DEBUGREDIR%
     if not exist "%utbox_tdir%\game\y_outline.rpy" (
-        echo %RED% !FAIL.%LNG%! !UNEXTRACT.%LNG%! "%utboxzip%" %RES%
-        goto skip_utbox
+        call :elog "%NOK%" "!UNEXTRACT.%LNG%! %YEL%%utboxzip%%RES%"
+        call :elog .
+        goto :skip_utbox
     ) else (
         move /y "%utbox_tdir%\game\y_outline.rpy" "%WORKDIR%\game" %DEBUGREDIR%
         if exist "%utbox_file%" (
-            echo %GRE% !PASS.%LNG%!%RES%
+            call :elog "%OK%"
         ) else (
-            echo %RED% !FAIL.%LNG%! !MISSING.%LNG%! %YEL%%utbox_file% %RES%
+            call :elog "%NOK%" "!FNOTFOUND.%LNG%! %YEL%%utbox_file%%RES%"
+            call :elog .
         )
     )
-    :skip_utbox
-    if not "%utboxzip%" == "" del /f /q "%utboxzip%" %DEBUGREDIR%
-    if not "%utbox_tdir%" == "" rd /s /q "%utbox_tdir%" %DEBUGREDIR%
 )
+:skip_utbox
+if exist "%utboxzip%" if not %utboxzip% == "" (del /f /q "%utboxzip%" %DEBUGREDIR%)
+if exist "%utbox_tdir%" if not %utbox_tdir% == "" (rd /s /q "%utbox_tdir%" %DEBUGREDIR%)
 
-goto finish
+timeout /T 1 %DEBUGREDIR%
+goto :finish
 
 
 :: Download 0x52_URM and add to the game
@@ -1551,126 +1968,335 @@ set "urm_name=0x52_URM"
 set "url=https://attachments.f95zone.to/2025/07/5028578_0x52_URM.zip"
 set "urm_zip=%TEMP%\0x52_URM.zip"
 set "urm_rpa=%WORKDIR%\game\0x52_URM.rpa"
-del /f /q "%urm_zip%" %DEBUGREDIR%
 
 call :elog .
-call :elog "%YEL%!TWADD.%LNG%! %urm_rpa%.%RES%"
-call :elog "%YEL%!INCASEOF.%LNG%! %RES%"
+call :elog "!INCASEOF.%LNG%! %RES%"
 call :elog "%MAG%https://f95zone.to/threads/universal-renpy-mod-urm-2-6-2-mod-any-renpy-game-yourself.48025/%RES%"
-call :elog "%YEL%!INCASEDEL.%LNG%!%RES%"
+call :elog .
+call :elog "!TWADD.%LNG%! %YEL%%urm_rpa%.%RES%"
+call :elog .
+call :elog "!INCASEDEL.%LNG%!%RES%"
 call :elog "%YEL%%urm_rpa%%RES%"
 call :elog .
-call :elog .
-echo !choicek.%LNG%!... >> "%UNRENLOG%"
-if not "%OPTION%" == "m" echo.
-<nul set /p="!choicek.%LNG%!... "
+call :elog -n "%EMPTY%" "!choicek.%LNG%!.."
 
-echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%urm_zip%.tmp')" >> "%UNRENLOG%"
+if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%urm_zip%.tmp')" >> "%UNRENLOG%"
 "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%urm_zip%.tmp')" %DEBUGREDIR%
 if not exist "%urm_zip%.tmp" (
-	echo %RED%!FAIL.%LNG%! !UNDWNLD.%LNG%! !urm_name!.zip.%RES%
+	call :elog "%NOK%" "!UNDWNLD.%LNG%! %YEL%!urm_name!.zip.%RES%"
+    call :elog .
+    goto :skip_urm
 ) else (
     move /y "%urm_zip%.tmp" "%urm_zip%" %DEBUGREDIR%
-    echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%urm_zip%' '%WORKDIR%\game'" >> "%UNRENLOG%"
+    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%urm_zip%' '%WORKDIR%\game'" >> "%UNRENLOG%"
 	"%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%urm_zip%' '%WORKDIR%\game'" %DEBUGREDIR%
-	if !ERRORLEVEL! NEQ 0 (
-		echo %RED%!FAIL.%LNG%! !UNINSTALL.%LNG%! !urm_name! %RES%
+	if !errorlevel! NEQ 0 (
+		call :elog "%NOK%" "!FNOTFOUND.%LNG%! %YEL%!urm_name!%RES%"
+        call :elog .
 	) else (
-		echo %GRE%!PASS.%LNG%!%RES%
+		call :elog "%OK%"
 	)
+    :skip_urm
 	del /f /q "%urm_zip%" %DEBUGREDIR%
 )
+timeout /T 1 %DEBUGREDIR%
+goto :finish
 
-goto finish
 
+:: Add a custom add-on
+:add_custom_addon
+set "download.en=Download and install a custom add-on from a URL or local path."
+set "download.fr=Téléchargez et installez un add-on personnalisé à partir d'une URL ou d'un chemin local."
+set "download.es=Descarga e instala un complemento personalizado desde una URL o ruta local."
+set "download.it=Scarica e installa un add-on personalizzato dall'URL o dal percorso locale."
+set "download.de=Laden und installieren Sie ein benutzerdefiniertes Add-on aus einer URL oder einem lokalen Pfad."
+set "download.ru=Загрузите и установите пользовательский аддон по URL или локальному пути."
+set "download.zh=从 URL 或本地路径下载并安装自定义插件。"
 
-:: Replace MCName in game files
-:replace_mcname
-set "unr-mcchange=%WORKDIR%\game\unren-mcchange.rpy"
+set "custom_name.en=Custom Add-on"
+set "custom_name.fr=Add-on personnalisé"
+set "custom_name.es=Add-on personalizado"
+set "custom_name.it=Add-on personalizzato"
+set "custom_name.de=Benutzerdefiniertes Add-on"
+set "custom_name.ru=Пользовательский аддон"
+set "custom_name.zh=自定义插件"
 
-set "rmcname.en=Please input the new name (without quotes): "
-set "rmcname.fr=Veuillez saisir le nouveau nom (sans guillemets) : "
-set "rmcname.es=Por favor ingrese el nuevo nombre (sin comillas): "
-set "rmcname.it=Si prega di inserire il nuovo nome (senza virgolette): "
-set "rmcname.de=Bitte geben Sie den neuen Namen (ohne Anführungszeichen) ein: "
-set "rmcname.ru=Пожалуйста, введите новое имя (без кавычек): "
-set "rmcname.zh=请输入新名称（不带引号）："
-
-set "rmcname2.en=No name provided."
-set "rmcname2.fr=Aucun nom fourni."
-set "rmcname2.es=No se proporcionó ningún nombre."
-set "rmcname2.it=Nome non fornito."
-set "rmcname2.de=Kein Name angegeben."
-set "rmcname2.ru=Имя не указано."
-set "rmcname2.zh=未提供名称。"
-
-set "rmcname3.en=Please input the old name (without quotes): "
-set "rmcname3.fr=Veuillez saisir l'ancien nom (sans guillemets) : "
-set "rmcname3.es=Por favor ingrese el nombre antiguo (sin comillas): "
-set "rmcname3.it=Si prega di inserire il vecchio nome (senza virgolette): "
-set "rmcname3.de=Bitte geben Sie den alten Namen (ohne Anführungszeichen) ein: "
-set "rmcname3.ru=Пожалуйста, введите старое имя (без кавычек): "
-set "rmcname3.zh=请输入旧名称（不带引号）："
-
-echo %YEL%!TWADD.%LNG%! %unr-mcchange%.%RES%
-echo %YEL%!INCASEDEL.%LNG%!%RES%
-echo %YEL%%unr-mcchange%%RES%
-echo %YEL%%unr-mcchange%c%RES%
+set "enter_url.en=Enter the URL or local path to the add-on (zip, rar, or folder): "
+set "enter_url.fr=Entrez l'URL ou le chemin local vers l'add-on (zip, rar ou dossier) : "
+set "enter_url.es=Ingrese la URL o ruta local al add-on (zip, rar o carpeta): "
+set "enter_url.it=Inserisci l'URL o il percorso locale all'add-on (zip, rar o cartella): "
+set "enter_url.de=Geben Sie die URL oder den lokalen Pfad zum Add-on ein (zip, rar oder Ordner): "
+set "enter_url.ru=Введите URL или локальный путь к аддону (zip, rar или папка): "
+set "enter_url.zh=输入插件的 URL 或本地路径（zip、rar 或文件夹）："
 
 call :elog .
-if not "%OPTION%" == "m" echo.
-set "oldmcname="
-echo oldmcname=!rmcname3.%LNG%! >> "%UNRENLOG%"
-set /p "oldmcname=!rmcname3.%LNG%!"
-
-if "!oldmcname!" == "" (
-    echo %RED%!FAIL.%LNG%! !rmcname2.%LNG%!.%RES%
-    goto mcend
-) else (
-    echo oldmcname=!oldmcname! >> "%UNRENLOG%"
-)
-
+call :elog "!TWADD.%LNG%! %YEL%%WORKDIR%\game\!custom_name.%LNG%!...%RES%"
 call :elog .
-set "newmcname="
-echo newmcname=!rmcname.%LNG%! >> "%UNRENLOG%"
-set /p "newmcname=!rmcname.%LNG%!"
+call :elog "!choicep.%LNG%!.."
 
-if "!newmcname!" == "" (
-    echo %RED%!FAIL.%LNG%! !rmcname2.%LNG%!.%RES%
-    goto mcend
-) else (
-    echo newmcname=!newmcname! >> "%UNRENLOG%"
+set /p "addon_path=!enter_url.%LNG%!"
+if not defined addon_path (
+    call :elog "%NOK%" "No path provided."
+    goto :eof
 )
 
-call :elog .
-if not "%OPTION%" == "m" echo.
-<nul set /p="!choicel.%LNG%!... "
+set "addon_path=%addon_path:"=%"
 
->"%unr-mcchange%.b64" (
-    echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KZGVmaW5lIDk5OSBtY25hbWUgPSAibmV3bWNuYW1lIg0KZGVmaW5lIDk5OSBNQyA9ICJuZXdtY25hbWUiDQpkZWZpbmUgOTk5IE1DX25hbWUgPSAibmV3bWNuYW1lIg0KZGVmaW5lIDk5OSBtY19uYW1lID0gIm5ld21jbmFtZSINCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIGltcG9ydCByZQ0KDQogICAgIyBQbGFjZWhvbGRlcnMgcmVwbGFjZWQgYnkgUG93ZXJTaGVsbCBiZWZvcmUgZXhlY3V0aW9uDQogICAgT0xEID0gIm9sZG1jbmFtZSINCiAgICBORVcgPSAibmV3bWNuYW1lIg0KDQogICAgZGVmIF9jYXNlX2xpa2UocywgbW9kZWwpOg0KICAgICAgICAjIEFsaWduIHRoZSBjYXNlIG9mIHMgd2l0aCB0aGF0IG9mIG1vZGVsICh1cHBlciwgVGl0bGUsIGxvd2VyKQ0KICAgICAgICBpZiBtb2RlbC5pc3VwcGVyKCk6DQogICAgICAgICAgICByZXR1cm4gcy51cHBlcigpDQogICAgICAgIGVsaWYgbW9kZWxbOjFdLmlzdXBwZXIoKSBhbmQgbW9kZWxbMTpdLmlzbG93ZXIoKToNCiAgICAgICAgICAgIHJldHVybiBzLmNhcGl0YWxpemUoKQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgcmV0dXJuIHMubG93ZXIoKQ0KDQogICAgZGVmIHJlcGxhY2VfdGV4dCh0KToNCiAgICAgICAgb2xkID0gT0xEDQogICAgICAgIG5ldyA9IE5FVw0KDQogICAgICAgIG9fZXNjID0gcmUuZXNjYXBlKG9sZCkNCiAgICAgICAgZl9vbGQgPSBvbGRbOjFdDQogICAgICAgIGZfbmV3ID0gbmV3WzoxXQ0KDQogICAgICAgICMgMSkgUmVwbGFjZW1lbnQgb2YgdGhlIGVudGlyZSB3b3JkIChjYXNlLWluc2Vuc2l0aXZlKSB3aXRoIGNhc2UgcmVzdG9yYXRpb24NCiAgICAgICAgYmFzZV9wYXQgPSByZS5jb21waWxlKHJmIlxiKD9pOih7b19lc2N9KSlcYiIpDQogICAgICAgIGRlZiBiYXNlX3JlcGwobSk6DQogICAgICAgICAgICByZXR1cm4gX2Nhc2VfbGlrZShuZXcsIG0uZ3JvdXAoMSkpDQogICAgICAgIHQgPSBiYXNlX3BhdC5zdWIoYmFzZV9yZXBsLCB0KQ0KDQogICAgICAgICMgMikgU3R1dHRlcmluZyB0eXBlOiBjLWNvbm5vciDihpIgai1qb2UgKGFuZCBjYXNlIHZhcmlhbnRzKQ0KICAgICAgICBzdDFfcGF0ID0gcmUuY29tcGlsZShyZiJcYihbe2Zfb2xkLmxvd2VyKCl9e2Zfb2xkLnVwcGVyKCl9XSktKD9pOih7b19lc2N9KSlcYiIpDQogICAgICAgIGRlZiBzdDFfcmVwbChtKToNCiAgICAgICAgICAgIHByZWYgPSBtLmdyb3VwKDEpICAgICAgICMgcHJlZml4IGxldHRlciAoYy9DKQ0KICAgICAgICAgICAgb2xkX3BhcnQgPSBtLmdyb3VwKDIpICAgIyB3b3JkIChjb25ub3IvQ29ubm9yL0NPTk5PUikNCiAgICAgICAgICAgIG5ld193b3JkID0gX2Nhc2VfbGlrZShuZXcsIG9sZF9wYXJ0KQ0KICAgICAgICAgICAgbmV3X2ZpcnN0ID0gZl9uZXcudXBwZXIoKSBpZiBwcmVmLmlzdXBwZXIoKSBlbHNlIGZfbmV3Lmxvd2VyKCkNCiAgICAgICAgICAgIHJldHVybiBmIntuZXdfZmlyc3R9LXtuZXdfd29yZH0iDQogICAgICAgIHQgPSBzdDFfcGF0LnN1YihzdDFfcmVwbCwgdCkNCg0KICAgICAgICAjIDMpIFN0dXR0ZXJpbmcgdHlwZTogY28tY29ubm9yIOKGkiBqby1qb2UgKGFuZCBjYXNlIHZhcmlhbnRzKQ0KICAgICAgICBzdDJfcGF0ID0gcmUuY29tcGlsZShyZiJcYihbe2Zfb2xkLmxvd2VyKCl9e2Zfb2xkLnVwcGVyKCl9XSkoW29PXSktKD9pOih7b19lc2N9KSlcYiIpDQogICAgICAgIGRlZiBzdDJfcmVwbChtKToNCiAgICAgICAgICAgIHByZWYgPSBtLmdyb3VwKDEpICAgICAgICMgcHJlZml4IGxldHRlciAoYy9DKQ0KICAgICAgICAgICAgb2NoYXIgPSBtLmdyb3VwKDIpICAgICAgIyAnbycgb3IgJ08nDQogICAgICAgICAgICBvbGRfcGFydCA9IG0uZ3JvdXAoMykgICAjIHdvcmQgKGNvbm5vci9Db25ub3IvQ09OTk9SKQ0KICAgICAgICAgICAgbmV3X3dvcmQgPSBfY2FzZV9saWtlKG5ldywgb2xkX3BhcnQpDQogICAgICAgICAgICBuZXdfZmlyc3QgPSBmX25ldy51cHBlcigpIGlmIHByZWYuaXN1cHBlcigpIGVsc2UgZl9uZXcubG93ZXIoKQ0KICAgICAgICAgICAgIyBLZWVwIHRoZSBjYXNlIG9mIHRoZSAnbycgbGV0dGVyIGFzIGVuY291bnRlcmVkDQogICAgICAgICAgICByZXR1cm4gZiJ7bmV3X2ZpcnN0fXtvY2hhcn0te25ld193b3JkfSINCiAgICAgICAgdCA9IHN0Ml9wYXQuc3ViKHN0Ml9yZXBsLCB0KQ0KDQogICAgICAgIHJldHVybiB0DQoNCiAgICBjb25maWcucmVwbGFjZV90ZXh0ID0gcmVwbGFjZV90ZXh0DQogICAgZGVsIHJlcGxhY2VfdGV4dA0K
-)
-echo "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllBytes('!unr-mcchange!.tmp', [Convert]::FromBase64String((Get-Content '!unr-mcchange!.b64' -Raw)))" >> "%UNRENLOG%"
-"%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllBytes('!unr-mcchange!.tmp', [Convert]::FromBase64String((Get-Content '!unr-mcchange!.b64' -Raw)))" %DEBUGREDIR%
-if not exist "%unr-mcchange%.tmp" (
-    echo %RED%!FAIL.%LNG%!%RES% !MISSING.%LNG%! !unr-mcchange!.tmp
-    goto mcend
-) else (
-    del /f /q "%unr-mcchange%.b64" %DEBUGREDIR%
-    echo "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-mcchange%.tmp') -replace 'newmcname', '%newmcname%' | Set-Content '%unr-mcchange%'" >> "%UNRENLOG%"
-    "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-mcchange%.tmp') -replace 'newmcname', '%newmcname%' | Set-Content '%unr-mcchange%'" %DEBUGREDIR%
-    echo "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-mcchange%') -replace 'oldmcname', '%oldmcname%' | Set-Content '%unr-mcchange%'" >> "%UNRENLOG%"
-    "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-mcchange%') -replace 'oldmcname', '%oldmcname%' | Set-Content '%unr-mcchange%'" %DEBUGREDIR%
-    if not exist "%unr-mcchange%" (
-        echo %RED%!FAIL.%LNG%!%RES% !MISSING.%LNG%! !unr-mcchange!
-        goto mcend
+:: Check if it's a URL or local path
+echo %addon_path% | findstr /r "^https\?://" >nul
+if %errorlevel% EQU 0 (
+    :: It's a URL
+    set "temp_zip=%TEMP%\custom_addon.zip"
+    call :elog -n "%EMPTY%" "!download.%LNG%!.."
+    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%addon_path%','%temp_zip%')" >> "%UNRENLOG%"
+    "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%addon_path%','%temp_zip%')" %DEBUGREDIR%
+    if !errorlevel! NEQ 0 (
+        call :elog "%NOK%" "!UNDWNLD.%LNG%! %MAG%%addon_path%%RES%"
+        goto :skip_custom
     )
-    del /f /q "%unr-mcchange%.tmp" %DEBUGREDIR%
-    echo %GRE%!PASS.%LNG%!%RES%
+    set "source=%temp_zip%"
+) else (
+    :: Local path
+    if not exist "%addon_path%" (
+        call :elog "%NOK%" "!FNOTFOUND.%LNG%! %YEL%%addon_path%%RES%"
+        goto :skip_custom
+    )
+    set "source=%addon_path%"
 )
 
-:mcend
+:: Check if it's a zip/rar or folder
+if exist "%source%\*" (
+    :: It's a folder, copy it
+    call :elog "Copying folder..."
+    xcopy "%source%" "%WORKDIR%\game\" /E /I /H /Y %DEBUGREDIR%
+    if !errorlevel! NEQ 0 (
+        call :elog "%NOK%" "Failed to copy folder."
+    ) else (
+        call :elog "%OK%"
+    )
+) else (
+    :: Assume it's an archive
+    call :elog -n "%EMPTY%" "Extracting archive..."
+    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%source%' '%WORKDIR%\game'" >> "%UNRENLOG%"
+    "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%source%' '%WORKDIR%\game'" %DEBUGREDIR%
+    if !errorlevel! NEQ 0 (
+        call :elog "%NOK%" "!UNEXTRACT.%LNG%! %YEL%%source%%RES%"
+    ) else (
+        call :elog "%OK%"
+    )
+    if defined temp_zip del /f /q "%temp_zip%" %DEBUGREDIR%
+)
 
-goto finish
+:skip_custom
+timeout /T 1 %DEBUGREDIR%
+goto :finish
+
+
+:: Replace any character name in game files
+:replace_anyname
+set "renaname.en=Please input the new name (without quotes): "
+set "renaname.fr=Veuillez saisir le nouveau nom (sans guillemets) : "
+set "renaname.es=Por favor ingrese el nuevo nombre (sin comillas): "
+set "renaname.it=Si prega di inserire il nuovo nome (senza virgolette): "
+set "renaname.de=Bitte geben Sie den neuen Namen (ohne Anführungszeichen) ein: "
+set "renaname.ru=Пожалуйста, введите новое имя (без кавычек): "
+set "renaname.zh=请输入新名称（不带引号）："
+
+set "renaname2.en=No name provided."
+set "renaname2.fr=Aucun nom fourni."
+set "renaname2.es=No se proporcionó ningún nombre."
+set "renaname2.it=Nome non fornito."
+set "renaname2.de=Kein Name angegeben."
+set "renaname2.ru=Имя не указано."
+set "renaname2.zh=未提供名称。"
+
+set "renaname3.en=Please input the old name (without quotes): "
+set "renaname3.fr=Veuillez saisir l'ancien nom (sans guillemets) : "
+set "renaname3.es=Por favor ingrese el nombre antiguo (sin comillas): "
+set "renaname3.it=Si prega di inserire il vecchio nome (senza virgolette): "
+set "renaname3.de=Bitte geben Sie den alten Namen (ohne Anführungszeichen) ein: "
+set "renaname3.ru=Пожалуйста, введите старое имя (без кавычек): "
+set "renaname3.zh=请输入旧名称（不带引号）："
+
+set "unr-unkonwn=%WORKDIR%\game\unr-unkonwn.rpy"
+
+call :elog .
+:oldname
+call :elog .
+if not "%OPTION%" == "m" echo.
+set "oldname="
+echo oldname=!renaname3.%LNG%! >> "%UNRENLOG%"
+set /p "oldname=!renaname3.%LNG%!"
+
+if "%oldname%" == "" (
+    call :elog .
+    call :elog "%NOK%" "!renaname2.%LNG%!%RES%"
+    call :elog .
+    goto :oldname
+) else (
+    echo oldname=!oldname! >> "%UNRENLOG%"
+)
+set "unr-unkonwn=%WORKDIR%\game\unr-%oldname%.rpy"
+
+call :elog .
+call :elog "!TWADD.%LNG%! %YEL%%unr-unkonwn%.%RES%"
+call :elog .
+call :elog "!INCASEDEL.%LNG%!%RES%"
+call :elog "%YEL%%unr-unkonwn%%RES%"
+call :elog "%YEL%%unr-unkonwn%c%RES%"
+
+:newname
+call :elog .
+set "newname="
+echo newname=!renaname.%LNG%! >> "%UNRENLOG%"
+set /p "newname=!renaname.%LNG%!"
+
+if "%newname%" == "" (
+    call :elog .
+    call :elog "%NOK%" "!renaname2.%LNG%!%RES%""
+    call :elog .
+    goto :newname
+) else (
+    echo newname=!newname! >> "%UNRENLOG%"
+)
+
+>"%unr-unkonwn%.b64" (
+    echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIGltcG9ydCByZQ0KDQogICAgIyBQbGFjZWhvbGRlcnMgcmVwbGFjZWQgYnkgUG93ZXJTaGVsbCBiZWZvcmUgZXhlY3V0aW9uDQogICAgT0xEID0gIm9sZG5hbWUiDQogICAgTkVXID0gIm5ld25hbWUiDQoNCiAgICBkZWYgX2Nhc2VfbGlrZShzLCBtb2RlbCk6DQogICAgICAgICMgQWxpZ24gdGhlIGNhc2Ugb2YgcyB3aXRoIHRoYXQgb2YgbW9kZWwgKHVwcGVyLCBUaXRsZSwgbG93ZXIpDQogICAgICAgIGlmIG1vZGVsLmlzdXBwZXIoKToNCiAgICAgICAgICAgIHJldHVybiBzLnVwcGVyKCkNCiAgICAgICAgZWxpZiBtb2RlbFs6MV0uaXN1cHBlcigpIGFuZCBtb2RlbFsxOl0uaXNsb3dlcigpOg0KICAgICAgICAgICAgcmV0dXJuIHMuY2FwaXRhbGl6ZSgpDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICByZXR1cm4gcy5sb3dlcigpDQoNCiAgICBkZWYgcmVwbGFjZV90ZXh0KHQpOg0KICAgICAgICBvbGQgPSBPTEQNCiAgICAgICAgbmV3ID0gTkVXDQoNCiAgICAgICAgb19lc2MgPSByZS5lc2NhcGUob2xkKQ0KICAgICAgICBmX29sZCA9IG9sZFs6MV0NCiAgICAgICAgZl9uZXcgPSBuZXdbOjFdDQoNCiAgICAgICAgIyAxKSBSZXBsYWNlbWVudCBvZiB0aGUgZW50aXJlIHdvcmQgKGNhc2UtaW5zZW5zaXRpdmUpIHdpdGggY2FzZSByZXN0b3JhdGlvbg0KICAgICAgICBiYXNlX3BhdCA9IHJlLmNvbXBpbGUocmYiXGIoP2k6KHtvX2VzY30pKVxiIikNCiAgICAgICAgZGVmIGJhc2VfcmVwbChtKToNCiAgICAgICAgICAgIHJldHVybiBfY2FzZV9saWtlKG5ldywgbS5ncm91cCgxKSkNCiAgICAgICAgdCA9IGJhc2VfcGF0LnN1YihiYXNlX3JlcGwsIHQpDQoNCiAgICAgICAgIyAyKSBTdHV0dGVyaW5nIHR5cGU6IGMtY29ubm9yIOKGkiBqLWpvZSAoYW5kIGNhc2UgdmFyaWFudHMpDQogICAgICAgIHN0MV9wYXQgPSByZS5jb21waWxlKHJmIlxiKFt7Zl9vbGQubG93ZXIoKX17Zl9vbGQudXBwZXIoKX1dKS0oP2k6KHtvX2VzY30pKVxiIikNCiAgICAgICAgZGVmIHN0MV9yZXBsKG0pOg0KICAgICAgICAgICAgcHJlZiA9IG0uZ3JvdXAoMSkgICAgICAgIyBwcmVmaXggbGV0dGVyIChjL0MpDQogICAgICAgICAgICBvbGRfcGFydCA9IG0uZ3JvdXAoMikgICAjIHdvcmQgKGNvbm5vci9Db25ub3IvQ09OTk9SKQ0KICAgICAgICAgICAgbmV3X3dvcmQgPSBfY2FzZV9saWtlKG5ldywgb2xkX3BhcnQpDQogICAgICAgICAgICBuZXdfZmlyc3QgPSBmX25ldy51cHBlcigpIGlmIHByZWYuaXN1cHBlcigpIGVsc2UgZl9uZXcubG93ZXIoKQ0KICAgICAgICAgICAgcmV0dXJuIGYie25ld19maXJzdH0te25ld193b3JkfSINCiAgICAgICAgdCA9IHN0MV9wYXQuc3ViKHN0MV9yZXBsLCB0KQ0KDQogICAgICAgICMgMykgU3R1dHRlcmluZyB0eXBlOiBjby1jb25ub3Ig4oaSIGpvLWpvZSAoYW5kIGNhc2UgdmFyaWFudHMpDQogICAgICAgIHN0Ml9wYXQgPSByZS5jb21waWxlKHJmIlxiKFt7Zl9vbGQubG93ZXIoKX17Zl9vbGQudXBwZXIoKX1dKShbb09dKS0oP2k6KHtvX2VzY30pKVxiIikNCiAgICAgICAgZGVmIHN0Ml9yZXBsKG0pOg0KICAgICAgICAgICAgcHJlZiA9IG0uZ3JvdXAoMSkgICAgICAgIyBwcmVmaXggbGV0dGVyIChjL0MpDQogICAgICAgICAgICBvY2hhciA9IG0uZ3JvdXAoMikgICAgICAjICdvJyBvciAnTycNCiAgICAgICAgICAgIG9sZF9wYXJ0ID0gbS5ncm91cCgzKSAgICMgd29yZCAoY29ubm9yL0Nvbm5vci9DT05OT1IpDQogICAgICAgICAgICBuZXdfd29yZCA9IF9jYXNlX2xpa2UobmV3LCBvbGRfcGFydCkNCiAgICAgICAgICAgIG5ld19maXJzdCA9IGZfbmV3LnVwcGVyKCkgaWYgcHJlZi5pc3VwcGVyKCkgZWxzZSBmX25ldy5sb3dlcigpDQogICAgICAgICAgICAjIEtlZXAgdGhlIGNhc2Ugb2YgdGhlICdvJyBsZXR0ZXIgYXMgZW5jb3VudGVyZWQNCiAgICAgICAgICAgIHJldHVybiBmIntuZXdfZmlyc3R9e29jaGFyfS17bmV3X3dvcmR9Ig0KICAgICAgICB0ID0gc3QyX3BhdC5zdWIoc3QyX3JlcGwsIHQpDQoNCiAgICAgICAgcmV0dXJuIHQNCg0KICAgIGNvbmZpZy5yZXBsYWNlX3RleHQgPSByZXBsYWNlX3RleHQNCiAgICBkZWwgcmVwbGFjZV90ZXh0DQo=
+)
+call :elog .
+call :pwsh_exp "!choicel.%LNG%!.." "%unr-unkonwn%"
+if not exist "%unr-unkonwn%" (
+    call :elog "%NOK%" "!FNOTFOUND.%LNG%! %YEL%!unr-unkonwn!%RES%"
+    call :elog .
+    goto :anynameend
+) else (
+    del /f /q "%unr-unkonwn%.b64" %DEBUGREDIR%
+    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-unkonwn%.tmp') -replace 'newname', '%newname%' | Set-Content '%unr-unkonwn%'" >> "%UNRENLOG%"
+    "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-unkonwn%.tmp') -replace 'newname', '%newname%' | Set-Content '%unr-unkonwn%'" %DEBUGREDIR%
+    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-unkonwn%') -replace 'oldname', '%oldname%' | Set-Content '%unr-unkonwn%'" >> "%UNRENLOG%"
+    "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-unkonwn%') -replace 'oldname', '%oldname%' | Set-Content '%unr-unkonwn%'" %DEBUGREDIR%
+    if not exist "%unr-unkonwn%" (
+        call :elog "%NOK%" "" !FNOTFOUND.%LNG%! %YEL%!unr-unkonwn!%RES%"
+        call :elog .
+        goto :anynameend
+    ) else (
+        set "rename4.en=Renamed character from %YEL%!oldname!%RES% to %YEL%!newname!%RES%"
+        set "rename4.fr=Personnage renommé de %YEL%!oldname!%RES% à %YEL%!newname!%RES%"
+        set "rename4.es=Personaje renombrado de %YEL%!oldname!%RES% a %YEL%!newname!%RES%"
+        set "rename4.it=Personaggio rinominato da %YEL%!oldname!%RES% a %YEL%!newname!%RES%"
+        set "rename4.de=Charakter umbenannt von %YEL%!oldname!%RES% zu %YEL%!newname!%RES%"
+        set "rename4.ru=Персонаж переименован с %YEL%!oldname!%RES% на %YEL%!newname!%RES%"
+        set "rename4.zh=角色已从 %YEL%!oldname!%RES% 重命名为 %YEL%!newname!%RES%"
+
+        call :elog "%OK%" "!rename4.%LNG%!"
+    )
+    :anynameend
+    del /f /q "%unr-unkonwn%.tmp" %DEBUGREDIR%
+)
+
+:anynameend
+timeout /T 1 %DEBUGREDIR%
+goto :finish
+
+
+:: Restore .org files into their original name
+:restore_files
+call :elog .
+call :elog "!choicer.%LNG%!"
+
+set "file_found=0"
+set "prevDir="
+for /R . %%f in (*.rpa.org *.rpy.org *.rpyc.org) do (
+    set "currDir=%%~dpf"
+    set "orgfile=%%f"
+    set "filename=%%~nxf"
+    set "dstfilename=!filename:.org=!"
+    set "dstfile=!orgfile:.org=!"
+
+    set "rmsg.en=Moving %YEL%!filename!%RES% to %YEL%!dstfilename!%RES%"
+    set "rmsg.fr=Renommage de %YEL%!filename!%RES% en %YEL%!dstfilename!%RES%"
+    set "rmsg.es=Cambio de nombre de %YEL%!filename!%RES% a %YEL%!dstfilename!%RES%"
+    set "rmsg.it=Rinominare %YEL%!filename!%RES% in %YEL%!dstfilename!%RES%"
+    set "rmsg.de=Umbenennung von %YEL%!filename!%RES% in %YEL%!dstfilename!%RES%"
+    set "rmsg.tu=Переименование %YEL%!filename!%RES% в %YEL%!dstfilename!%RES%"
+    set "rmsg.zh=將 %YEL%!filename!%RES% 重新命名為 %YEL%!dstfilename!%RES%"
+
+    if not "!prevDir!" == "!currDir!" (
+        call :elog .
+        call :elog "!MTITLE.%LNG%! %YEL%!currDir!%RES%"
+        set "prevDir=!currDir!"
+    )
+
+    if exist "!orgfile!" (
+        set "file_found=1"
+    )
+
+    call :elog -n "%EMPTY%" "!rmsg.%LNG%!"
+    move /y "!orgfile!" "!dstfile!" %DEBUGREDIR%
+    if not exist "!dstfile!" (
+        call :elog "%NOK%" "!FMOVE.%LNG%! %YEL%!filename!%RES% -> %YEL%!dstfilename!%RES%"
+    ) else (
+        call :elog "%OK%"
+    )
+)
+
+if %file_found% EQU 0 (
+    call :elog .
+    call :elog "%SKIP%" "!NOTFOUND.%LNG%!."
+    call :elog .
+)
+timeout /T 1 %DEBUGREDIR%
+goto :finish
+
+
+:: Delete .org files made by the script
+:delete_backups
+call :elog .
+call :elog "!choices.%LNG%!"
+
+set "file_found=0"
+set "prevDir="
+for /R . %%f in (*.rpa.org *.rpy.org *.rpyc.org) do (
+    set "orgfile=%%f"
+    set "currDir=%%~dpf"
+    set "filename=%%~nxf"
+
+    set "dmsg.en=Deleting %YEL%!filename!%RES%"
+    set "dmsg.fr=Suppression de %YEL%!filename!%RES%"
+    set "dmsg.es=Eliminación de %YEL%!filename!%RES%"
+    set "dmsg.it=Eliminazione de %YEL%!filename!%RES%"
+    set "dmsg.de=Löschen von %YEL%!filename!%RES%"
+    set "dmsg.ru=Удаление %YEL%!filename!%RES%"
+    set "dmsg.zh=刪除 %YEL%!filename!%RES%"
+
+    if not "!prevDir!" == "!currDir!" (
+        call :elog .
+        call :elog "!MTITLE.%LNG%! %YEL%!currDir!%RES%"
+        set "prevDir=!currDir!"
+    )
+
+    if exist "!orgfile!" (
+        set "file_found=1"
+    )
+
+    call :elog -n "%EMPTY%" "!dmsg.%LNG%!"
+    del /f /q "!orgfile!" %DEBUGREDIR%
+    if exist "!orgfile!" (
+        call :elog "%NOK%" "!FDELETE.%LNG%! %YEL%!orgfile!%RES%"
+    ) else (
+        call :elog "%OK%"
+    )
+)
+
+call :elog .
+if !file_found! EQU 0 (
+    call :elog .
+    call :elog "%SKIP%" "!NOTFOUND.%LNG%!."
+    call :elog .
+    exit /b 1
+)
+timeout /T 1 %DEBUGREDIR%
+goto :finish
 
 
 :: All your choices in one shot
@@ -1703,7 +2329,7 @@ for /L %%I in (0,1,15) do (
         echo.
         echo.
         echo %RED%!uchoice.%LNG%! %YEL%!CHAR!%RES%
-        timeout /t 2 >nul
+        timeout /t 2 %DEBUGREDIR%
         echo.
     )
 )
@@ -1724,7 +2350,7 @@ for %%C in (a b c d e f g h i j k l t + -) do (
         if /i "%%C" == "i" call :add_ucd
         if /i "%%C" == "j" call :add_utbox
         if /i "%%C" == "k" call :add_urm
-        if /i "%%C" == "l" call :replace_mcname
+        if /i "%%C" == "l" call :replace_anyname
         if /i "%%C" == "t" call :extract_text
 
         if "%%C" == "+" call :add_reg
@@ -1735,7 +2361,7 @@ for %%C in (a b c d e f g h i j k l t + -) do (
 echo.
 echo.
 pause
-goto menu
+goto :menu
 
 
 :: Extract text for translation purpose
@@ -1748,7 +2374,9 @@ if "%LNG%" == "de"  set translation_lang=german
 if "%LNG%" == "ru"  set translation_lang=russian
 if "%LNG%" == "zh"  set translation_lang=chinese
 
+setlocal disableDelayedExpansion
 cd /d "%WORKDIR%"
+endlocal
 
 set "etext1.en=Searching for game name"
 set "etext1.fr=Recherche du nom du jeu"
@@ -1790,23 +2418,69 @@ set "etext5.de=Bitte geben Sie den Namen des Spiels ein (ohne Erweiterung): "
 set "etext5.ru=Пожалуйста, введите название игры (без расширения): "
 set "etext5.zh=请输入游戏名称（不带扩展名）："
 
-:: find the current game name by checking the presence of same name with .exe, .py and .sh extension
+set "etext6.en=No *.rpy files found in the game directory."
+set "etext6.fr=Aucun fichier *.rpy trouvé dans le répertoire du jeu."
+set "etext6.es=No se encontraron archivos *.rpy en el directorio del juego."
+set "etext6.it=Nessun file *.rpy trovato nella directory del gioco."
+set "etext6.de=Keine *.rpy-Dateien im Spielverzeichnis gefunden."
+set "etext6.ru=Не удалось найти *.rpy-файлы в каталоге игры."
+set "etext6.zh=未找到游戏目录中的 *.rpy 文件。"
+
+set "etext7.en=Please use option 2 to decompile the game first."
+set "etext7.fr=Veuillez utiliser l'option 2 pour décompiler le jeu d'abord."
+set "etext7.es=Por favor, use la opción 2 para descompilar el juego primero."
+set "etext7.it=Si prega di utilizzare l'opzione 2 per decompilare il gioco prima."
+set "etext7.de=Bitte verwenden Sie zuerst Option 2, um das Spiel zudekompilieren."
+set "etext7.ru=Пожалуйста, сначала используйте опцию 2, чтобы декомпилировать игру."
+set "etext7.zh=请先使用选项 2 来反编译游戏。"
+
+set "etext8.en=Please use option 1 to decompile the game first."
+set "etext8.fr=Veuillez utiliser l'option 1 pour décompiler le jeu d'abord."
+set "etext8.es=Por favor, use la opcion 1 para descompilar el juego primero."
+set "etext8.it=Si prega di utilizzare l'opzione 1 per decompilare il gioco prima."
+set "etext8.de=Bitte verwenden Sie zuerst Option 1, um das Spiel zudekompilieren."
+set "etext8.ru=Пожалуйста, сначала используйте опцию 1, чтобы декомпилировать игру."
+set "etext8.zh=请先使用选项 1 来反编译游戏。"
+
+:: Check if needed files for extraction are present
+set "RpysFound=0"
+for /r ".\game" %%F in (*.rpy) do (
+    echo %%F | findstr /i /c:"\\tl\\" >nul 2>&1
+    if errorlevel 1 set /a RpysFound+=1
+)
+if %RpysFound% LEQ 3 (
+    call :elog .
+    call :elog "%NOK%" "!etext6.%LNG%!"
+    set "RpycFound=0"
+    for /r ".\game" %%F in (*.rpyc) do (
+        echo %%F | findstr /i /c:"\\tl\\" >nul 2>&1
+        if errorlevel 1 set /a RpycFound+=1
+    )
+    if !RpycFound! GTR 0 (
+        call :elog "%NOK%" "!etext7.%LNG%!"
+    ) else (
+        call :elog "%NOK%" "!etext8.%LNG%!"
+    )
+    timeout /T 1 %DEBUGREDIR%
+    exit /b 1
+)
+
 call :elog .
 if not "%OPTION%" == "m" echo.
-<nul set /p="!etext1.%LNG%!... "
+call :elog -n "%EMPTY%" "!etext1.%LNG%!..."
 
+:: find the current game name by checking the presence of same name with .exe, .py and .sh extension
 set "processed="
 set "fname="
-
 :: Do not test with sh, it can be not shipped
 for %%e in (exe py) do (
     for %%f in (*.%%e) do (
         set "tempfname=%%~nf"
 
-        :: Check if this name has already been processed
-        echo !processed! | findstr /i "\!tempfname!" >nul
-        if ERRORLEVEL 1 (
-            :: Count how many files with this name exist
+        REM Check if this name has already been processed
+        echo !processed! |  "%SystemRoot%\System32\findstr.exe"  /i "\!tempfname!" >nul
+        if errorlevel 1 (
+            REM Count how many files with this name exist
             set /a count=0
             for %%x in (exe py) do (
                 if exist "%%~dpf!tempfname!.%%x" (
@@ -1814,10 +2488,10 @@ for %%e in (exe py) do (
                 )
             )
             if !count! EQU 2 (
-                echo %YEL%!tempfname! %GRE%!PASS.%LNG%!%YEL%%RES%
+                call :elog "%OK%" "%YEL%!tempfname!%RES%"
                 set "processed=!processed! !tempfname!"
                 set "fname=!tempfname!"
-                goto found_name
+                goto :found_name
             )
         )
     )
@@ -1825,21 +2499,21 @@ for %%e in (exe py) do (
 
 :: If no name found, ask user to input the name
 if "%fname%"  == "" (
-    echo %RED%!FAIL.%LNG%! !etext2.%LNG%!%RES%
-    goto input_name
+    call :elog "%NOK%" "!etext2.%LNG%!"
+    goto :input_name
 )
 
 :input_name
 call :elog .
 set /p "fname=!etext5.%LNG%!"
 if "%fname%" == "" (
-    echo %RED%!FAIL.%LNG%! !etext2.%LNG%!%RES%
-    goto input_name
+    call :elog "%NOK%" "!etext2.%LNG%!"
+    goto :input_name
 ) else (
     REM set "fname=%fname:.=%"
     if not exist "%WORKDIR%\%fname%.exe" (
-        echo %RED%!FAIL.%LNG%! !etext2.%LNG%!%RES%
-        goto input_name
+        call :elog "%NOK%" "!etext2.%LNG%!"
+        goto :input_name
     )
 )
 
@@ -1856,26 +2530,35 @@ if not exist "%WORKDIR%\game\tl\" (
 )
 
 call :elog .
-call :elog .
-echo !choicet.%LNG%!.. >> "%UNRENLOG%"
-if not "%OPTION%" == "m" echo.
-<nul set /p="!choicet.%LNG%!... "
+call :elog -n "%EMPTY%" "!choicet.%LNG%!..."
 
 cd /d "%WORKDIR%"
-echo "%PYTHONHOME%python.exe" %PYNOASSERT% "%fname%.py" game translate "%translation_lang%" >> "%UNRENLOG%"
+if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%python.exe" %PYNOASSERT% "%fname%.py" game translate "%translation_lang%" >> "%UNRENLOG%"
 "%PYTHONHOME%python.exe" %PYNOASSERT% "%fname%.py" game translate "%translation_lang%" %DEBUGREDIR%
-if %ERRORLEVEL% NEQ 0 (
-	echo %RED%!FAIL.%LNG%! !etext4.%LNG%!%RES%
+if %errorlevel% NEQ 0 (
+	call :elog "%NOK%" "!etext4.%LNG%!"
 ) else (
-    echo %GRE%!PASS.%LNG%!%RES%
+    call :elog "%OK%"
 )
-call :elog .
+timeout /T 1 %DEBUGREDIR%
+goto :finish
 
-goto finish
+
+:: Check if old registry key is present and require Administrator rights to remove it
+:check_old_reg
+"%SystemRoot%\System32\reg.exe" query "HKLM\Software\Classes\Directory\shell\Run%SCRIPTNAME%" %DEBUGREDIR%
+if %errorlevel% EQU 0 (
+    set OLDREG=1
+) else (
+    set OLDREG=0
+)
+goto :eof
 
 
 :: Add entry to registry
 :add_reg
+set "reg=%SystemRoot%\System32\reg.exe"
+
 set "areg1.en=This will add an entry to the right-click menu for folders."
 set "areg1.fr=Cela ajoutera une entrée au menu contextuel pour les dossiers."
 set "areg1.es=Esto añadirá una entrada al menú contextual para las carpetas."
@@ -1892,21 +2575,21 @@ set "areg2.de=Wenn Sie diese Option auswählen,"
 set "areg2.ru=Когда вы выберете эту опцию,"
 set "areg2.zh=当您选择此选项时，"
 
-set "areg2a.en=the script "%SCRIPTDIR%%SCRIPTNAME%" will be executed."
-set "areg2a.fr=le script "%SCRIPTDIR%%SCRIPTNAME%" sera exécuté."
-set "areg2a.es=se ejecutará el script "%SCRIPTDIR%%SCRIPTNAME%"."
-set "areg2a.it=verrà eseguito lo script "%SCRIPTDIR%%SCRIPTNAME%"."
-set "areg2a.de=wird das Skript "%SCRIPTDIR%%SCRIPTNAME%" ausgeführt."
-set "areg2a.ru=будет выполнен скрипт "%SCRIPTDIR%%SCRIPTNAME%"."
-set "areg2a.zh=脚本 "%SCRIPTDIR%%SCRIPTNAME%" 将被执行。"
+set "areg2a.en=the script %YEL%%SCRIPTDIR%%SCRIPTNAME%%RES% will be executed."
+set "areg2a.fr=le script %YEL%%SCRIPTDIR%%SCRIPTNAME%%RES% sera exécuté."
+set "areg2a.es=se ejecutará el script %YEL%%SCRIPTDIR%%SCRIPTNAME%%RES%."
+set "areg2a.it=verrà eseguito lo script %YEL%%SCRIPTDIR%%SCRIPTNAME%%RES%."
+set "areg2a.de=wird das Skript %YEL%%SCRIPTDIR%%SCRIPTNAME%%RES% ausgeführt."
+set "areg2a.ru=будет выполнен скрипт %YEL%%SCRIPTDIR%%SCRIPTNAME%%RES%."
+set "areg2a.zh=脚本 %YEL%%SCRIPTDIR%%SCRIPTNAME%%RES% 将被执行。"
 
-set "areg3.en=Adding the right-click menu entry to the registry... "
-set "areg3.fr=Ajout de l'entrée de menu contextuel au registre... "
-set "areg3.es=Adding the right-click menu entry to the registry... "
-set "areg3.it=Aggiunta della voce del menu contestuale al registro... "
-set "areg3.de=Hinzufügen des Rechtsklick-Menüeintrags zur Registrierung... "
-set "areg3.ru=Добавление элемента контекстного меню в реестр... "
-set "areg3.zh=正在向注册表添加右键菜单项... "
+set "areg3.en=Adding the right-click menu entry to the registry"
+set "areg3.fr=Ajout de l'entrée de menu contextuel au registre"
+set "areg3.es=Adding the right-click menu entry to the registry"
+set "areg3.it=Aggiunta della voce del menu contestuale al registro"
+set "areg3.de=Hinzufügen des Rechtsklick-Menüeintrags zur Registrierung"
+set "areg3.ru=Добавление элемента контекстного меню в реестр"
+set "areg3.zh=正在向注册表添加右键菜单项"
 
 set "areg4.en=Run %SCRIPTNAME% Script"
 set "areg4.fr=Exécuter le script %SCRIPTNAME%"
@@ -1916,37 +2599,57 @@ set "areg4.de=Führen Sie das Skript %SCRIPTNAME% aus"
 set "areg4.ru=Запустить скрипт %SCRIPTNAME%"
 set "areg4.zh=运行 %SCRIPTNAME% 脚本"
 
-call :check_admin
+set "areg5.en=You need to first remove the old registry key with the - option."
+set "areg5.fr=Vous deez d'abord supprimer l'ancienne clé du registre avec l'option -."
+set "areg5.es=Primero debe eliminar la clave de registro antigua con la opción -."
+set "areg5.it=Devi prima rimuovere la vecchia chiave di registro con l'opzione -."
+set "areg5.de=Sie müssen zuerst den alten Registrierungsschlüssel mit der - Option entfernen."
+set "areg5.ru=Сначала вам нужно удалить старый ключ реестра с помощью опции -. "
+set "areg5.zh=您需要先使用 - 选项删除旧的注册表键。"
 
-call :elog .
-call :elog "%YEL%!areg1.%LNG%!%RES%"
-call :elog "%YEL%!areg2.%LNG%!%RES%"
-call :elog "%YEL%!areg2a.%LNG%!%RES%"
-call :elog .
-echo !areg3.%LNG%! >> "%UNRENLOG%"
-<nul set /p="!areg3.%LNG%!"
-
-:: Add registry key
-reg add "HKCR\Directory\shell\Run%SCRIPTNAME%" /ve /d "!areg4.%LNG%!" /f %DEBUGREDIR%
-reg add "HKCR\Directory\shell\Run%SCRIPTNAME%" /v "Icon" /d "%SystemRoot%\System32\shell32.dll,-154" /f %DEBUGREDIR%
-reg add "HKCR\Directory\shell\Run%SCRIPTNAME%\command" /ve /d "%SystemRoot%\System32\cmd.exe /c cd /d \"%%V\" && \"%SCRIPTDIR%%SCRIPTNAME%\" \"%%V\"" /f %DEBUGREDIR%
-if %ERRORLEVEL% EQU 0 (
-	echo %GRE%!PASS.%LNG%!%RES%
-) else (
-	echo %RED%!FAIL.%LNG%!%RES%
+call :check_old_reg
+if %OLDREG% EQU 1 (
     call :elog .
-    echo !ARIGHT.%LNG%!
+    call :elog "%YEL%!areg5.%LNG%!%RES%"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!
-
-    call :exitn 3
+    pause>nul|set/p=.      !ANYKEY.%LNG%!...
+    exit /b
 )
 
-goto finish
+call :elog .
+call :elog "!areg1.%LNG%!"
+call :elog "!areg2.%LNG%!"
+call :elog "!areg2a.%LNG%!%RES%"
+call :elog .
+call :elog -n "%EMPTY%" "!areg3.%LNG%!..."
+
+"%regexe%" add "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" /ve /d "!areg4.%LNG%!" /f  >> "%UNRENLOG%" 2>&1
+set error=%errorlevel%
+"%regexe%" add "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" /v "Icon" /d "%SystemRoot%\System32\shell32.dll,-154" /f >> "%UNRENLOG%" 2>&1
+set /a error=%error%+%errorlevel%
+"%regexe%" add "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%\command" /ve /d "%SystemRoot%\System32\cmd.exe /c cd /d \"%%V\" && \"%SCRIPTDIR%%SCRIPTNAME%\" \"%%V\"" /f >> "%UNRENLOG%" 2>&1
+set /a error=%error%+%errorlevel%
+"%regexe%" add "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /ve /d "!areg4.%LNG%!" /f >> "%UNRENLOG%" 2>&1
+set error=%errorlevel%
+"%regexe%" add "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /v "Icon" /d "%SystemRoot%\System32\shell32.dll,-154" /f >> "%UNRENLOG%" 2>&1
+set /a error=%error%+%errorlevel%
+"%regexe%" add "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%\command" /ve /d "%SystemRoot%\System32\cmd.exe /c cd /d \"%%V\" && \"%SCRIPTDIR%%SCRIPTNAME%\" \"%%V\"" /f >> "%UNRENLOG%" 2>&1
+set /a error=%error%+%errorlevel%
+if %error% EQU 0 (
+	call :elog "%OK%"
+) else (
+	call :elog "%NOK%" "!LOGCHK.%LNG%!"
+)
+call :elog .
+
+timeout /T 1 %DEBUGREDIR%
+goto :finish
 
 
 :: Remove entry from registry
 :remove_reg
+set "regexe=%SystemRoot%\System32\reg.exe"
+
 set "rreg1.en=This will remove the previously added entry from the right-click menu for folders."
 set "rreg1.fr=Cela supprimera l'entrée précédemment ajoutée du menu contextuel pour les dossiers."
 set "rreg1.es=Esto eliminará la entrada previamente añadida del menú contextual para las carpetas."
@@ -1955,41 +2658,79 @@ set "rreg1.de=Dies wird den zuvor hinzugefügten Eintrag aus dem Rechtsklick-Men
 set "rreg1.ru=Это удалит ранее добавленный элемент из контекстного меню для папок."
 set "rreg1.zh=这将移除先前为文件夹添加的右键菜单项。"
 
-set "rreg2.en=Removing the right-click menu entry from the registry... "
-set "rreg2.fr=Suppression de l'entrée de menu contextuel du registre... "
-set "rreg2.es=Eliminando la entrada del menú contextual del registro... "
-set "rreg2.it=Rimozione della voce del menu contestuale dal registro... "
-set "rreg2.de=Entfernen des Rechtsklick-Menüeintrags aus der Registrierung... "
-set "rreg2.ru=Удаление элемента контекстного меню из реестра... "
-set "rreg2.zh=正在从注册表中移除右键菜单项... "
+set "rreg2.en=Removing the right-click menu entry from the registry"
+set "rreg2.fr=Suppression de l'entrée de menu contextuel du registre"
+set "rreg2.es=Eliminando la entrada del menú contextual del registro"
+set "rreg2.it=Rimozione della voce del menu contestuale dal registro"
+set "rreg2.de=Entfernen des Rechtsklick-Menüeintrags aus der Registrierung"
+set "rreg2.ru=Удаление элемента контекстного меню из реестра"
+set "rreg2.zh=正在从注册表中移除右键菜单项"
 
-call :check_admin
-
-call :elog .
-call :elog "%YEL%!rreg1.%LNG%!%RES%"
-call :elog .
-echo !rreg2.%LNG%! >> "%UNRENLOG%"
-<nul set /p="!rreg2.%LNG%!"
-:: Remove registry key
-reg delete "HKCR\Directory\shell\RunUnrenForAll" /f %DEBUGREDIR%
-reg delete "HKCR\Directory\shell\Run%SCRIPTNAME%" /f %DEBUGREDIR%
-if %ERRORLEVEL% EQU 0 (
-	echo %GRE%!PASS.%LNG%!%RES%
-) else (
-	echo %RED%!FAIL.%LNG%!.%RES%
-    call :elog .
-    echo !ARIGHT.%LNG%!
-    call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!
-
-    call :exitn 3
+:: Remove registry key with Administrator rights if old registry key is present,
+:: otherwise remove registry key with current user rights
+set OLDREG=0
+call :check_old_reg
+if %OLDREG% EQU 1 (
+    call :check_admin
 )
 
-goto finish
+call :elog .
+call :elog .
+call :elog "!rreg1.%LNG%!"
+call :elog .
+call :elog -n "%EMPTY%" "!rreg2.%LNG%!..."
+
+set error=0
+if %OLDREG% EQU 1 (
+    "!regexe!" query "HKLM\SOFTWARE\Classes\Directory\shell\RunUnrenForAll" >> "%UNRENLOG%" 2>&1
+    if !errorlevel! EQU 0 (
+        "!regexe!" delete "HKLM\SOFTWARE\Classes\Directory\shell\RunUnrenForAll" /f >> "%UNRENLOG%" 2>&1
+        set error=!errorlevel!
+    )
+    "!regexe!" query "HKLM\SOFTWARE\Classes\Directory\shell\Run%SCRIPTNAME%" >> "%UNRENLOG%" 2>&1
+    if !errorlevel! EQU 0 (
+        "!regexe!" delete "HKLM\SOFTWARE\Classes\Directory\shell\Run%SCRIPTNAME%" /f >> "%UNRENLOG%" 2>&1
+        set /a error=!error!+!errorlevel!
+    )
+    "!regexe!" query "HKLM\SOFTWARE\Classes\Directory\Background\shell\Run%SCRIPTNAME%" >> "%UNRENLOG%" 2>&1
+    if !errorlevel! EQU 0 (
+        "!regexe!" delete "HKLM\SOFTWARE\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /f >> "%UNRENLOG%" 2>&1
+        set /a error=!error!+!errorlevel!
+    )
+    if !error! NEQ 0 (
+        call :elog "%NOK%" "!ARIGHT.%LNG%!"
+        call :elog .
+        pause>nul|set/p=.      !ANYKEY.%LNG%!...
+
+        call :exitn 3
+    )
+) else (
+    "!regexe!" query "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" >> "%UNRENLOG%" 2>&1
+    if !errorlevel! EQU 0 (
+        "!regexe!" delete "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" /f >> "%UNRENLOG%" 2>&1
+        set error=!errorlevel!
+    )
+    "!regexe!" query "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" >> "%UNRENLOG%" 2>&1
+    if !errorlevel! EQU 0 (
+        "!regexe!" delete "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /f >> "%UNRENLOG%" 2>&1
+        set /a error=!error!+!errorlevel!
+    )
+    if !error! NEQ 0 (
+        call :elog "%NOK%"
+    )
+)
+if !error! EQU 0 (
+    call :elog "%OK%"
+    set OLDREG=0
+)
+
+timeout /T 1 %DEBUGREDIR%
+goto :finish
 
 
 :: Check for administrative privileges
 :check_admin
+setlocal
 set "admright.en=Check Admin right"
 set "admright.fr=Vérification des droits administrateur"
 set "admright.es=Comprobando derechos de administrador"
@@ -2016,25 +2757,24 @@ set "admright3.zh=请以管理员权限重新启动脚本。"
 
 call :elog .
 call :elog .
-echo !admright.%LNG%!... >> "%UNRENLOG%"
-<nul set /p="!admright.%LNG%!... "
+call :elog -n "%EMPTY%" "!admright.%LNG%!..."
 
 net session %DEBUGREDIR%
-if %ERRORLEVEL% EQU 0 (
-    echo %GRE%!PASS.%LNG%!%RES%
+if %errorlevel% EQU 0 (
+    call :elog "%OK%"
 ) else (
-	echo %RED%!FAIL.%LNG%!.%RES%
+	call :elog "%NOK%"
     call :elog .
-    echo !admright2.%LNG%!
-    echo !admright3.%LNG%!
+    call :elog "!admright2.%LNG%!"
+    call :elog "!admright3.%LNG%!"
     call :elog .
-    timeout /t 2 %DEBUGREDIR%
-    echo "%PWRSHELL%" -NoProfile -Command "Start-Process '%~f0' -ArgumentList '%WORKDIR%' -Verb RunAs" >> "%UNRENLOG%"
-    "%PWRSHELL%" -NoProfile -Command "Start-Process '%~f0' -ArgumentList '%WORKDIR%' -Verb RunAs"
+    timeout /T 2 %DEBUGREDIR%
+    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "Start-Process '%~f0' -ArgumentList '%WORKDIR%' -Verb RunAs" >> "%UNRENLOG%"
+    "%PWRSHELL%" -NoProfile -Command "Start-Process '%~f0' -ArgumentList '%WORKDIR%' -Verb RunAs" %DEBUGREDIR%
 
-    goto exitn
+    goto :exitn
 )
-
+endlocal
 goto :eof
 
 
@@ -2061,63 +2801,63 @@ set "running_batch=%~nx0"
 
 :: If no difference do nothing
 "%SystemRoot%\System32\fc.exe" "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%.bat" %DEBUGREDIR%
-if %ERRORLEVEL% EQU 0 (
+if %errorlevel% EQU 0 (
     goto :eof
 )
 
 :: Check if the new batch file is different from the running one
-if "%batch_name%.bat" == "%running_batch%" goto special_upd
+if "%batch_name%.bat" == "%running_batch%" goto :special_upd
 
-<nul set /p="!updating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%"
-move /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old" %DEBUGREDIR%
-if %ERRORLEVEL% NEQ 0 (
-    echo %RED%!FAIL.%LNG%! %RES%
+call :elog -n "%EMPTY%" "!updating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat%RES%"
+move /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old" >> "%UNRENLOG%" 2>&1
+if %errorlevel% NEQ 0 (
+    call :elog "%NOK%" "!LOGCHK.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    pause>nul|set/p=.      !ANYKEY.%LNG%!...
 
     call :exitn 2
 )
-copy /y "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%.bat" %DEBUGREDIR%
-if %ERRORLEVEL% NEQ 0 (
-    echo %RED%!FAIL.%LNG%! %RES%
+copy /y "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%.bat" >> "%UNRENLOG%" 2>&1
+if %errorlevel% NEQ 0 (
+    call :elog "%NOK%" "!LOGCHK.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    pause>nul|set/p=.      !ANYKEY.%LNG%!...
 
     call :exitn 2
 ) else (
-    echo %GRE%!PASS.%LNG%!%RES%
+    call :elog "%OK%"
 )
-
+timeout /T 2 %DEBUGREDIR%
 goto :eof
 
 
 :special_upd
-<nul set /p="!rupdating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%"
-copy /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old" %DEBUGREDIR%
-if %ERRORLEVEL% NEQ 0 (
-    echo %RED%!FAIL.%LNG%! %RES%
+call :elog -n "%EMPTY%" "!rupdating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%"
+copy /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old"  >> "%UNRENLOG%" 2>&1
+if %errorlevel% NEQ 0 (
+    call :elog "%NOK%" "!LOGCHK.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    pause>nul|set/p=.      !ANYKEY.%LNG%!...
 
     call :exitn 2
 )
-copy /y "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%-new.bat" %DEBUGREDIR%
-if %ERRORLEVEL% NEQ 0 (
-    echo %RED%!FAIL.%LNG%! %RES%
+copy /y "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%-new.bat" >> "%UNRENLOG%" 2>&1
+if %errorlevel% NEQ 0 (
+    call :elog "%NOK%" "!LOGCHK.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!
+    pause>nul|set/p=.      !ANYKEY.%LNG%!...
 
     call :exitn 2
 ) else (
-    echo %GRE%!PASS.%LNG%!%RES%
+    call :elog "%OK%"
 )
 set "relaunch=1"
-
 goto :eof
 
 
 :: When it's not unavailable, show message and exit
 :unavailable
+setlocal
 if "%RENPYVERSION%" == "7" (
     set "unavailable.en=This feature is unavailable in this version."
     set "unavailable.fr=Cette fonctionnalité n'est pas disponible dans cette version."
@@ -2138,15 +2878,11 @@ if "%RENPYVERSION%" == "8" (
 )
 
 call :elog .
-call :elog .
-echo !unavailable.%LNG%! >> "%UNRENLOG%"
-<nul set /p="%YEL%!unavailable.%LNG%!%RES%"
+call :elog "%WARN%" "!unavailable.%LNG%!"
 
-timeout /t 2 %DEBUGREDIR%
-
+timeout /T 2 %DEBUGREDIR%
+endlocal
 goto :menu
-
-exit /b
 
 
 :: Verify if an update is necessary
@@ -2207,13 +2943,13 @@ set "cupd6.de=Fehler beim Herunterladen des Updates."
 set "cupd6.ru=Ошибка при загрузке обновления."
 set "cupd6.zh=下载更新时出错。"
 
-set "cupd7.en=Do you want to update now? [y/n] (default: n):"
-set "cupd7.fr=Voulez-vous faire la mise à jour maintenant ? [o/n] (défaut : n) :"
-set "cupd7.es=¿Desea actualizar ahora? [s/n] (predeterminado: n):"
-set "cupd7.it=Vuoi aggiornare adesso? [s/n] (impostazione predefinita: n):"
-set "cupd7.de=Möchten Sie jetzt aktualisieren? [y/n] (Standard: n):"
-set "cupd7.ru=Хотите обновиться сейчас? [y/n] (по умолчанию: n):"
-set "cupd7.zh=是否立即更新？[y/n]（默认 n）："
+set "cupd7.en=Do you want to update now? [Y/N] (default: N):"
+set "cupd7.fr=Voulez-vous faire la mise à jour maintenant ? [O/N] (défaut : N) :"
+set "cupd7.es=¿Desea actualizar ahora? [S/N] (predeterminado: N):"
+set "cupd7.it=Vuoi aggiornare adesso? [S/N] (impostazione predefinita: N):"
+set "cupd7.de=Möchten Sie jetzt aktualisieren? [Y/N] (Standard: N):"
+set "cupd7.ru=Хотите обновиться сейчас? [Y/N] (по умолчанию: N):"
+set "cupd7.zh=是否立即更新？[Y/N]（默认 N）："
 
 set "cupd8.en=No download update link found."
 set "cupd8.fr=Aucun lien de téléchargement de mise à jour trouvé."
@@ -2224,36 +2960,35 @@ set "cupd8.ru=Ссылка для загрузки обновления не н�
 set "cupd8.zh=未找到下载更新链接。"
 
 call :elog .
-echo !cupd1.%LNG%!... >> "%UNRENLOG%"
-<nul set /p="!cupd1.%LNG%!..."
+call :elog -n "%EMPTY%" "!cupd1.%LNG%!..."
 del /f /q "%TEMP%\%upd_link%.tmp" %DEBUGREDIR%
-echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%upd_url%', '%TEMP%\%upd_link%.tmp')" >> "%UNRENLOG%"
+if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%upd_url%', '%TEMP%\%upd_link%.tmp')" >> "%UNRENLOG%"
 "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%upd_url%', '%TEMP%\%upd_link%.tmp')" %DEBUGREDIR%
 if not exist "%TEMP%\%upd_link%.tmp" (
-    call :elog "%RED% !FAIL.%LNG%! %YEL%!cupd6.%LNG%!%RES%"
-    exit /b
+    call :elog "%NOK%" "!cupd6.%LNG%!"
+    goto :eof
 ) else (
-    :: First time
+    REM First time
     if not exist "%SCRIPTDIR%%upd_link%.txt" (
         copy nul "%SCRIPTDIR%%upd_link%.txt" %DEBUGREDIR%
     )
-    "%SystemRoot%\System32\fc.exe" "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" %DEBUGREDIR%
-    if !ERRORLEVEL! GEQ 1 (
-        call :elog "%YEL% !cupd3.%LNG%!%RES%"
+    "%SystemRoot%\System32\fc.exe" "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" >> "%UNRENLOG%" 2>&1
+    if !errorlevel! GEQ 1 (
+        call :elog "%OK%" "%YEL%!cupd3.%LNG%!%RES%"
 
-        :: Rename and launch %upd_link%.bat to generate UnRen-Changelog.txt
+        REM Rename and launch %upd_link%.bat to generate UnRen-Changelog.txt
         copy /y "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.bat" %DEBUGREDIR%
         set "forall_url="
         call "%SCRIPTDIR%%upd_link%.bat" %DEBUGREDIR%
         del /f /q "%SCRIPTDIR%%upd_link%.bat" %DEBUGREDIR%
         if not defined forall_url (
-            call :elog "%RED% !FAIL.%LNG%! %YEL%!cupd8.%LNG%!%RES%"
+            call :elog "%NOK%" "%YEL%!cupd8.%LNG%!%RES%"
             call :elog .
-            timeout /t 2 %DEBUGREDIR%
+            timeout /T 1 %DEBUGREDIR%
             goto :eof
         )
         move /y "%SCRIPTDIR%%upd_clog%.txt" "%SCRIPTDIR%%upd_clog%.b64" %DEBUGREDIR%
-        echo "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllBytes('%SCRIPTDIR%%upd_clog%.tmp', [Convert]::FromBase64String((Get-Content '%SCRIPTDIR%%upd_clog%.b64' -Raw)))" >> "%UNRENLOG%"
+        if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllBytes('%SCRIPTDIR%%upd_clog%.tmp', [Convert]::FromBase64String((Get-Content '%SCRIPTDIR%%upd_clog%.b64' -Raw)))" >> "%UNRENLOG%"
         "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllBytes('%SCRIPTDIR%%upd_clog%.tmp', [Convert]::FromBase64String((Get-Content '%SCRIPTDIR%%upd_clog%.b64' -Raw)))" %DEBUGREDIR%
         call :elog .
         type "%SCRIPTDIR%%upd_clog%.tmp"
@@ -2263,47 +2998,46 @@ if not exist "%TEMP%\%upd_link%.tmp" (
         call :elog .
         call :elog .
         call :choiceEx "!cupd7.%LNG%!" "OSJYN" "N" "%CTIME%" "-rawMsg"
-        if !ERRORLEVEL! EQU 5 goto :eof
+        if !errorlevel! EQU 5 goto :eof
         set "new_upd=1"
     ) else (
-        call :elog "%YEL% !cupd2.%LNG%!%RES%"
+        call :elog "%SKIP%" "%YEL%!cupd2.%LNG%!%RES%"
 
         goto :eof
     )
 )
 
-call :elog "%YEL%!INCASEOF.%LNG%! %RES%"
+call :elog .
+call :elog "!INCASEOF.%LNG%!%RES%"
 call :elog "%MAG%%URL_REF%%RES%"
 if %new_upd% EQU 1 (
     call :elog .
-    echo !cupd4.%LNG%! %YEL%%forall_url%%RES%... >> "%UNRENLOG%"
-    <nul set /p="!cupd4.%LNG%! %YEL%%forall_url%%RES%... "
-    echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%forall_url%','%TEMP%\%upd_file%.tmp')" >> "%UNRENLOG%"
+    call :elog -n "%EMPTY%" "!cupd4.%LNG%! %YEL%%forall_url%%RES%..."
+    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%forall_url%','%TEMP%\%upd_file%.tmp')" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%forall_url%','%TEMP%\%upd_file%.tmp')" %DEBUGREDIR%
     if not exist "%TEMP%\%upd_file%.tmp" (
-        call :elog "%RED%!FAIL.%LNG%! %YEL%!cupd6.%LNG%!%RES%"
+        call :elog "%NOK%" "%YEL%!cupd6.%LNG%!%RES%"
         call :elog .
-        pause
+        timeout /T 1 %DEBUGREDIR%
 
         goto :eof
     ) else (
-        echo %GRE%!PASS.%LNG%!%RES%
-        move /y "%TEMP%\%upd_file%.tmp" "%TEMP%\%upd_file%.zip" %DEBUGREDIR%
+        move /y "%TEMP%\%upd_file%.tmp" "%TEMP%\%upd_file%.zip" >> "%UNRENLOG%" 2>&1
         if not exist "%TEMP%\%upd_file%.zip" (
-            call :elog "%RED%!FAIL.%LNG%! %YEL%!cupd6.%LNG%!%RES%"
+            call :elog "%NOK%" "%YEL%!cupd6.%LNG%!%RES%"
             call :elog .
-            pause
+            timeout /T 1 %DEBUGREDIR%
 
             goto :eof
         ) else (
             if exist "%UPD_TDIR%" rd /s /q "%UPD_TDIR%" %DEBUGREDIR%
             mkdir "%UPD_TDIR%" %DEBUGREDIR%
             echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Path '%TEMP%\%upd_file%.zip' -DestinationPath '%UPD_TDIR%' -Force" >> "%UNRENLOG%"
-            "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Path '%TEMP%\%upd_file%.zip' -DestinationPath '%UPD_TDIR%' -Force" %DEBUGREDIR%
-            if !ERRORLEVEL! NEQ 0 (
-                call :elog "%RED%!FAIL.%LNG%! %YEL%!cupd6.%LNG%!%RES%"
+            "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Path '%TEMP%\%upd_file%.zip' -DestinationPath '%UPD_TDIR%' -Force" >> "%UNRENLOG%" 2>&1
+            if !errorlevel! NEQ 0 (
+                call :elog "%NOK%" "%YEL%!cupd6.%LNG%!%RES%"
                 call :elog .
-                pause
+                timeout /T 1 %DEBUGREDIR%
 
                 goto :eof
             ) else (
@@ -2312,22 +3046,22 @@ if %new_upd% EQU 1 (
             for %%f in (forall legacy current) do (
                 call :update_file "UnRen-%%~f"
             )
-            copy /y "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" %DEBUGREDIR%
-            rd /s /q "%UPD_TDIR%" %DEBUGREDIR%
+            copy /y "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" >> "%UNRENLOG%" 2>&1
+            rd /s /q "%UPD_TDIR%" >> "%UNRENLOG%" 2>&1
             if !relaunch! EQU 1 (
                 call :elog .
-                pause
+                timeout /T 1 %DEBUGREDIR%
                 call "%SCRIPTDIR%!BASENAME!-new.bat" "%WORKDIR%"
 
                 call :exitn 0
             )
             call :elog .
-            echo %YEL%!cupd5.%LNG%!%RES%
+            call :elog "%OK%" "%YEL%!cupd5.%LNG%!%RES%"
             call :elog .
         )
     )
 )
-
+timeout /T 2 %DEBUGREDIR%
 goto :eof
 
 
@@ -2349,15 +3083,15 @@ set "cdwnld.de=Fehlende Datei herunterladen von:"
 set "cdwnld.ru=Скачать недостающий файл с:"
 set "cdwnld.zh=从以下位置下载缺失的文件："
 
-echo !cfile.%LNG%!... >> "%UNRENLOG%"
-<nul set /p="!cfile.%LNG%!..."
+call :elog -n "%EMPTY%" "!cfile.%LNG%!..."
 for %%F in (legacy current forall) do (
     if not exist "%SCRIPTDIR%UnRen-%%~F.bat" (
-        call :elog "%RED% !FAIL.%LNG%! %YEL%!MISSING.%LNG%! UnRen-%%~F %RES%"
+        call :elog "%NOK%" "%YEL%!FNOTFOUND.%LNG%! %YEL%UnRen-%%~F %RES%"
+        call :elog .
         call :elog "!cdwnld.%LNG%! %RES%"
         call :elog "%MAG%%URL_REF% %RES%"
         call :elog .
-        pause>nul|set/p=.      !ANYKEY.%LNG%!
+        pause>nul|set/p=.      !ANYKEY.%LNG%!...
 
         call :exitn 3
     ) else (
@@ -2369,15 +3103,14 @@ for %%F in (legacy current forall) do (
 set "BASENAMENONEW=%BASENAME:-new=%"
 if exist "%SCRIPTDIR%%BASENAMENONEW%-new.bat" (
     if "%SCRIPTNAME%" == "%BASENAMENONEW%-new.bat" (
-        copy /y "%SCRIPTDIR%%BASENAMENONEW%-new.bat" "%SCRIPTDIR%%BASENAMENONEW%.bat" %DEBUGREDIR%
+        copy /y "%SCRIPTDIR%%BASENAMENONEW%-new.bat" "%SCRIPTDIR%%BASENAMENONEW%.bat" >> "%UNRENLOG%" 2>&1
     ) else (
-        del /f /q "%SCRIPTDIR%%BASENAME%-new.bat" %DEBUGREDIR%
+        del /f /q "%SCRIPTDIR%%BASENAME%-new.bat" >> "%UNRENLOG%" 2>&1
     )
 )
-del /f /q "%SCRIPTDIR%%BASENAMENONEW%.old" %DEBUGREDIR%
+del /f /q "%SCRIPTDIR%%BASENAMENONEW%.old" >> "%UNRENLOG%" 2>&1
 
-call :elog "%GRE% !PASS.%LNG%!%RES%"
-
+call :elog "%OK%"
 exit /b
 
 
@@ -2385,11 +3118,10 @@ exit /b
 :finish
 if "%OPTION%" == "m" goto :eof
 echo.
-echo.
-pause
+timeout /t 2 %DEBUGREDIR%
 if "%nocls%" EQU 0 cls
 
-goto menu
+goto :menu
 
 
 :: Params:
@@ -2399,71 +3131,235 @@ goto menu
 :: 4 - Timeout in seconds (e.g. "10" for 10 seconds)
 :: 5 - Additional options (optional) (e.g. "-rawMsg" to not encapsulate the default choice in the choice list)
 :choiceEx
-    set "choiceEx_py=%TEMP%\choiceEx.py"
-    del /f /q "%choiceEx_py%" %DEBUGREDIR%
-    if not exist "%choiceEx_py%" (
-        >"%choiceEx_py%.b64" (
-            echo IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQojIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLQ0KDQppbXBvcnQgc3lzDQppbXBvcnQgdGltZQ0KaW1wb3J0IG1zdmNydA0KaW1wb3J0IGNvZGVjcw0KDQppZiBzeXMudmVyc2lvbl9pbmZvWzBdIDwgMzoNCiAgICBpbXBvcnQgY3R5cGVzDQogICAgIyBGb3JjZSBsYSBjb25zb2xlIFdpbmRvd3MgZW4gVVRGLTgNCiAgICBjdHlwZXMud2luZGxsLmtlcm5lbDMyLlNldENvbnNvbGVDUCg2NTAwMSkNCiAgICBjdHlwZXMud2luZGxsLmtlcm5lbDMyLlNldENvbnNvbGVPdXRwdXRDUCg2NTAwMSkNCg0KICAgICMgQ1JVQ0lBTDogRW52ZWxvcHBlIHN0ZG91dCBhdmVjIHVuIHdyaXRlciBVVEYtOA0KICAgIHN5cy5zdGRvdXQgPSBjb2RlY3MuZ2V0d3JpdGVyKCd1dGYtOCcpKHN5cy5zdGRvdXQpDQogICAgc3lzLnN0ZGVyciA9IGNvZGVjcy5nZXR3cml0ZXIoJ3V0Zi04Jykoc3lzLnN0ZGVycikNCg0KIyBHw6hyZSBsZXMgZGV1eCBQeXRob24gMiBldCAzDQppZiBzeXMudmVyc2lvbl9pbmZvWzBdIDwgMzoNCiAgICBtc2cgPSBzeXMuYXJndlsxXS5kZWNvZGUoJ2xhdGluLTEnKSBpZiBpc2luc3RhbmNlKHN5cy5hcmd2WzFdLCBzdHIpIGVsc2Ugc3lzLmFyZ3ZbMV0NCmVsc2U6DQogICAgbXNnID0gc3lzLmFyZ3ZbMV0NCg0KY2hvaWNlcyAgICAgPSBzeXMuYXJndlsyXQ0KZGVmYXVsdCAgICAgPSBzeXMuYXJndlszXQ0KdGltZW91dCAgICAgPSBpbnQoc3lzLmFyZ3ZbNF0pDQpyYXcgICAgICAgICA9IChsZW4oc3lzLmFyZ3YpID4gNSBhbmQgc3lzLmFyZ3ZbNV0gPT0gIi1yYXdNc2ciKQ0KDQppZiByYXc6DQogICAgZGlzcGxheSA9IG1zZw0KZWxzZToNCiAgICBkaXNwID0gWyJbJXNdIiAlIGMgaWYgYyA9PSBkZWZhdWx0IGVsc2UgYyBmb3IgYyBpbiBjaG9pY2VzXQ0KICAgIGRpc3BsYXkgPSAiJXMgKCVzLCB0aW1lb3V0ICVzcykgOiAiICUgKG1zZywgJy8nLmpvaW4oZGlzcCksIHRpbWVvdXQpDQoNCnN5cy5zdGRvdXQud3JpdGUoZGlzcGxheSkNCnN5cy5zdGRvdXQuZmx1c2goKQ0KDQplbmQgPSB0aW1lLnRpbWUoKSArIHRpbWVvdXQNCnJlc3VsdCA9IGRlZmF1bHQNCg0Kd2hpbGUgdGltZS50aW1lKCkgPCBlbmQ6DQogICAgaWYgbXN2Y3J0LmtiaGl0KCk6DQogICAgICAgIGtleSA9IG1zdmNydC5nZXR3Y2goKQ0KICAgICAgICBpZiBrZXkgPT0gIlxyIjogICMgRW50ZXINCiAgICAgICAgICAgIGJyZWFrDQogICAgICAgIGtleSA9IGtleS51cHBlcigpDQogICAgICAgIGlmIGtleSBpbiBjaG9pY2VzOg0KICAgICAgICAgICAgcmVzdWx0ID0ga2V5DQogICAgICAgICAgICBicmVhaw0KICAgIHRpbWUuc2xlZXAoMC4wNSkNCg0Kc3lzLnN0ZG91dC53cml0ZShyZXN1bHQpDQpzeXMuc3Rkb3V0LndyaXRlKCJcbiIpDQpzeXMuZXhpdChjaG9pY2VzLmluZGV4KHJlc3VsdCkgKyAxKQ==
-        )
-        echo "%PWRSHELL%" -NoProfile -Command "& { [IO.File]::WriteAllBytes('%choiceEx_py%.tmp', [Convert]::FromBase64String([IO.File]::ReadAllText('%choiceEx_py%.b64')))}" >> "%UNRENLOG%"
-        "%PWRSHELL%" -NoProfile -Command "& { [IO.File]::WriteAllBytes('%choiceEx_py%.tmp', [Convert]::FromBase64String([IO.File]::ReadAllText('%choiceEx_py%.b64')))}" %DEBUGREDIR%
-        move /y "%choiceEx_py%.tmp" "%choiceEx_py%" %DEBUGREDIR%
-        del /f /q "%choiceEx_py%.b64" %DEBUGREDIR%
+set "choiceEx=%TEMP%\choiceEx.py"
+if not exist "%choiceEx%" if not defined AlreadyCreated (
+    >"%choiceEx%.b64" (
+        echo IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQojIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLQ0KDQppbXBvcnQgc3lzDQppbXBvcnQgdGltZQ0KaW1wb3J0IG1zdmNydA0KaW1wb3J0IGNvZGVjcw0KDQppZiBzeXMudmVyc2lvbl9pbmZvWzBdIDwgMzoNCiAgICBpbXBvcnQgY3R5cGVzDQogICAgIyBGb3JjZSBsYSBjb25zb2xlIFdpbmRvd3MgZW4gVVRGLTgNCiAgICBjdHlwZXMud2luZGxsLmtlcm5lbDMyLlNldENvbnNvbGVDUCg2NTAwMSkNCiAgICBjdHlwZXMud2luZGxsLmtlcm5lbDMyLlNldENvbnNvbGVPdXRwdXRDUCg2NTAwMSkNCg0KICAgICMgQ1JVQ0lBTDogRW52ZWxvcHBlIHN0ZG91dCBhdmVjIHVuIHdyaXRlciBVVEYtOA0KICAgIHN5cy5zdGRvdXQgPSBjb2RlY3MuZ2V0d3JpdGVyKCd1dGYtOCcpKHN5cy5zdGRvdXQpDQogICAgc3lzLnN0ZGVyciA9IGNvZGVjcy5nZXR3cml0ZXIoJ3V0Zi04Jykoc3lzLnN0ZGVycikNCg0KIyBHw6hyZSBsZXMgZGV1eCBQeXRob24gMiBldCAzDQppZiBzeXMudmVyc2lvbl9pbmZvWzBdIDwgMzoNCiAgICBtc2cgPSBzeXMuYXJndlsxXS5kZWNvZGUoJ2xhdGluLTEnKSBpZiBpc2luc3RhbmNlKHN5cy5hcmd2WzFdLCBzdHIpIGVsc2Ugc3lzLmFyZ3ZbMV0NCmVsc2U6DQogICAgbXNnID0gc3lzLmFyZ3ZbMV0NCg0KY2hvaWNlcyAgICAgPSBzeXMuYXJndlsyXQ0KZGVmYXVsdCAgICAgPSBzeXMuYXJndlszXQ0KdGltZW91dCAgICAgPSBpbnQoc3lzLmFyZ3ZbNF0pDQpyYXcgICAgICAgICA9IChsZW4oc3lzLmFyZ3YpID4gNSBhbmQgc3lzLmFyZ3ZbNV0gPT0gIi1yYXdNc2ciKQ0KDQppZiByYXc6DQogICAgZGlzcGxheSA9IG1zZw0KZWxzZToNCiAgICBkaXNwID0gWyJbJXNdIiAlIGMgaWYgYyA9PSBkZWZhdWx0IGVsc2UgYyBmb3IgYyBpbiBjaG9pY2VzXQ0KICAgIGRpc3BsYXkgPSAiJXMgKCVzLCB0aW1lb3V0ICVzcykgOiAiICUgKG1zZywgJy8nLmpvaW4oZGlzcCksIHRpbWVvdXQpDQoNCnN5cy5zdGRvdXQud3JpdGUoZGlzcGxheSkNCnN5cy5zdGRvdXQuZmx1c2goKQ0KDQplbmQgPSB0aW1lLnRpbWUoKSArIHRpbWVvdXQNCnJlc3VsdCA9IGRlZmF1bHQNCg0Kd2hpbGUgdGltZS50aW1lKCkgPCBlbmQ6DQogICAgaWYgbXN2Y3J0LmtiaGl0KCk6DQogICAgICAgIGtleSA9IG1zdmNydC5nZXR3Y2goKQ0KICAgICAgICBpZiBrZXkgPT0gIlxyIjogICMgRW50ZXINCiAgICAgICAgICAgIGJyZWFrDQogICAgICAgIGtleSA9IGtleS51cHBlcigpDQogICAgICAgIGlmIGtleSBpbiBjaG9pY2VzOg0KICAgICAgICAgICAgcmVzdWx0ID0ga2V5DQogICAgICAgICAgICBicmVhaw0KICAgIHRpbWUuc2xlZXAoMC4wNSkNCg0Kc3lzLnN0ZG91dC53cml0ZShyZXN1bHQpDQpzeXMuc3Rkb3V0LndyaXRlKCJcbiIpDQpzeXMuZXhpdChjaG9pY2VzLmluZGV4KHJlc3VsdCkgKyAxKQ==
     )
-    echo "%PYTHONHOME%\python.exe" %PYNOASSERT% "%choiceEx_py%" "%~1" "%~2" "%~3" "%~4" "%~5" >> "%UNRENLOG%"
-    "%PYTHONHOME%\python.exe" %PYNOASSERT% "%choiceEx_py%" "%~1" "%~2" "%~3" "%~4" "%~5"
+    if defined PYTHONHOME (
+        if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%\python.exe" %PYNOASSERT% "%TEMP%\b64decode.py" "%choiceEx%.b64" "%choiceEx%.tmp" >> "%UNRENLOG%"
+        "%PYTHONHOME%\python.exe" %PYNOASSERT% "%TEMP%\b64decode.py" "%choiceEx%.b64" "%choiceEx%.tmp" %DEBUGREDIR%
+    ) else (
+        if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "& { [IO.File]::WriteAllBytes('%choiceEx%.tmp', [Convert]::FromBase64String([IO.File]::ReadAllText('%choiceEx%.b64')))}" >> "%UNRENLOG%"
+        "%PWRSHELL%" -NoProfile -Command "& { [IO.File]::WriteAllBytes('%choiceEx%.tmp', [Convert]::FromBase64String([IO.File]::ReadAllText('%choiceEx%.b64')))}" %DEBUGREDIR%
+    )
+    if %DEBUGLEVEL% GEQ 1 echo move /y "%choiceEx%.tmp" "%choiceEx%" >> "%UNRENLOG%"
+    move /y "%choiceEx%.tmp" "%choiceEx%" %DEBUGREDIR%
+    if %DEBUGLEVEL% GEQ 1 del /f /q "%choiceEx%.b64" >> "%UNRENLOG%"
+    del /f /q "%choiceEx%.b64" %DEBUGREDIR%
+    set "AlreadyCreated=1"
+)
 
-    exit /b %ERRORLEVEL%
+if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%\python.exe" %PYNOASSERT% "%choiceEx%" "%~1" "%~2" "%~3" "%~4" "%~5" >> "%UNRENLOG%"
+"%PYTHONHOME%\python.exe" %PYNOASSERT% "%choiceEx%" "%~1" "%~2" "%~3" "%~4" "%~5"
+
+exit /b %errorlevel%
 
 
 :: For debugging help
 :DisplayVars
 set "emsg=%~1"
-echo. >> "%UNRENLOG%"
+
+>> "%UNRENLOG%" echo.
 echo "%emsg%" >> "%UNRENLOG%"
-echo SCRIPTDIR		 = %SCRIPTDIR% >> "%UNRENLOG%"
-echo WORKDIR 		 = %WORKDIR% >> "%UNRENLOG%"
-echo PYTHONHOME		 = %PYTHONHOME% >> "%UNRENLOG%"
-echo PYNOASSERT		 = [%PYNOASSERT%] >> "%UNRENLOG%"
-echo PYTHONHOME		 = %PYTHONHOME% >> "%UNRENLOG%"
-echo PYTHONPATH		 = %PYTHONPATH% >> "%UNRENLOG%"
-echo PYTHONVERS		 = [%PYTHONVERS%] >> "%UNRENLOG%"
-echo RPATOOL-NEW 	 = %RPATOOL-NEW% >> "%UNRENLOG%"
-echo RENPYVERSION 	 = [%RENPYVERSION%] >> "%UNRENLOG%"
-echo OFFSET			 = [%OFFSET%] >> "%UNRENLOG%"
-echo. >> "%UNRENLOG%"
+echo SCRIPTDIR      = %SCRIPTDIR% >> "%UNRENLOG%"
+echo WORKDIR        = %WORKDIR% >> "%UNRENLOG%"
+echo PYTHONHOME     = %PYTHONHOME% >> "%UNRENLOG%"
+echo PYTHONPATH     = %PYTHONPATH% >> "%UNRENLOG%"
+echo PYTHONEXE      = %PYTHONEXE% >> "%UNRENLOG%"
+echo PYNOASSERT     = [%PYNOASSERT%] >> "%UNRENLOG%"
+echo PYVERSION      = [%PYVERSION%] >> "%UNRENLOG%"
+echo PYVERSION2     = [%PYVERSION2%] >> "%UNRENLOG%"
+echo PYVERSION3     = [%PYVERSION3%] >> "%UNRENLOG%"
+echo PYTHONSYSTEM   = [%PYTHONSYSTEM%] >> "%UNRENLOG%"
+echo PYTHONVERS     = [%PYTHONVERS%] >> "%UNRENLOG%"
+echo RPATOOL_NEW    = %RPATOOL_NEW% >> "%UNRENLOG%"
+echo UNRPYC_NEW     = %UNRPYC_NEW% >> "%UNRENLOG%"
+echo RENPYVERSION   = [%RENPYVERSION%] >> "%UNRENLOG%"
+echo OFFSET         = [%OFFSET%] >> "%UNRENLOG%"
+>> "%UNRENLOG%" echo.
+goto :eof
 
-exit /b
+
+:: Expand a b64-encoded and save it as a file
+:: Usage:
+::   call :pwsh_exp "Message to display while expanding" "path\to\file_to_expand"
+:pwsh_exp
+set "expmsg=%~1"
+set "f2expand=%~2"
+::set DEBUGLEVEL=1
+
+if %DEBUGLEVEL% GEQ 1 (
+    echo "expmsg=%expmsg%" >> "%UNRENLOG%"
+    echo "f2expand=%f2expand%" >> "%UNRENLOG%"
+    echo "PREVMSG=%PREVMSG%" >> "%UNRENLOG%"
+    echo "PREVMOD=%PREVMOD%" >> "%UNRENLOG%"
+)
+
+call :elog -n "%EMPTY%" "%expmsg%"
+if not exist "%f2expand%.b64" (
+    call :elog "%NOK%" "!FCREATE.%LNG%! %YEL%!f2expand!.b64%RES%"
+    goto :eof
+) else (
+    set "f2ps=!f2expand:'=''!"
+    if defined PYTHONHOME (
+        if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%\python.exe" %PYNOASSERT% "%TEMP%\b64decode.py" "!f2ps!.b64" "!f2ps!.tmp" >> "%UNRENLOG%"
+        "%PYTHONHOME%\python.exe" %PYNOASSERT% "%TEMP%\b64decode.py" "!f2ps!.b64" "!f2ps!.tmp"
+    ) else (
+        if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "& { $src='!f2ps!.b64'; $dst='!f2ps!.tmp'; [IO.File]::WriteAllBytes($dst, [Convert]::FromBase64String([IO.File]::ReadAllText($src)))}" >> "%UNRENLOG%"
+        "%PWRSHELL%" -NoProfile -Command "& { $src='!f2ps!.b64'; $dst='!f2ps!.tmp'; [IO.File]::WriteAllBytes($dst, [Convert]::FromBase64String([IO.File]::ReadAllText($src)))}" >> "%UNRENLOG%" 2>&1
+    )
+    if %DEBUGLEVEL% GEQ 1 echo del /f /q "!f2expand!.b64" >> "%UNRENLOG%"
+    del /f /q "!f2expand!.b64" %DEBUGREDIR%
+    if not exist "%f2expand%.tmp" (
+        call :elog "%NOK%" "!FCREATE.%LNG%! %YEL%!f2expand!.tmp%RES%"
+        goto :eof
+    ) else (
+        if %DEBUGLEVEL% GEQ 1 echo move /y "!f2expand!.tmp" "!f2expand!" >> "%UNRENLOG%"
+        move /y "!f2expand!.tmp" "!f2expand!" %DEBUGREDIR%
+    )
+)
+set "expmsg=" & set "f2expand=" & set "f2ps="
+::set /a DEBUGLEVEL-=1
+goto :eof
 
 
-:: Define a function to log messages
+:: elog  —  Enhanced echo with optional no-newline mode
+::
+:: Usage:
+::   call :elog .                         Print an empty line
+::   call :elog "msg"                     Print msg with newline
+::   call :elog "msg" "msg2"              Print msg and msg2 with newline
+::   call :elog -n "module" "msg"         Print [module] msg without newline, store module and msg for next call
+::   call :elog "status"                  After -n: replace [module] with [status], reprint msg, add newline
+::   call :elog "status" "supplement"     After -n: replace [module] with [status], reprint msg and supplement, add newline
+::   call :elog .                         After -n: clear the line and reprint msg alone, without the module
+::
+:: Where module/status is one of: %EMPTY%, %OK%, %NOK%, %SKIP%
+::
+:: ANSI codes are stripped when writing to the log file.
 :elog
-:: Display msg (%~1) to console and "%UNRENLOG%"
+setlocal EnableDelayedExpansion
+
+if %DEBUGLEVEL% GEQ 1 (
+    setlocal enabledelayedexpansion
+    set "arg2=%~2"
+    set "arg2=!arg2:(=^(!"
+    set "arg2=!arg2:)=^)!"
+    echo arg2=!arg2! >> "%UNRENLOG%"
+    endlocal
+)
+if "%~1" == "-n" (
+    <nul set /p="[2K[1000D%~2 %~3"
+    endlocal & set "PREVMOD=%~2" & set "PREVMSG=%~3"
+    goto :eof
+)
+
 set "msg=%~1"
-if "%msg%" == "." (
-    echo.
-    if defined UNRENLOG (
-       echo. >> "%UNRENLOG%"
+set "msg2=%~2"
+
+:: Calculation of cleanmsg (without ANSI codes)
+if defined PREVMOD (
+    if defined msg2 (
+        set "cleanmsg=%~1 %PREVMSG% %~2"
+    ) else (
+        set "cleanmsg=%~1 %PREVMSG%"
     )
 ) else (
-    echo %msg%
-
-    if defined UNRENLOG (
-        :: Strip color variables for logging
-        set "cleanmsg=%msg%"
-        for %%C in (GRY RED GRE YEL MAG CYA RES) do (
-            call set "cleanmsg=%%cleanmsg:!%%C!=%%"
-        )
-        echo !cleanmsg! >> "%UNRENLOG%"
+    if defined msg2 (
+        set "cleanmsg=%~1 %~2"
+    ) else (
+        set "cleanmsg=%~1"
     )
 )
 
-exit /b
+:: Strip ANSI codes from cleanmsg
+setlocal EnableDelayedExpansion
+for %%C in (GRY RED GRE YEL MAG CYA RES) do (
+    call set "cleanmsg=%%cleanmsg:!%%C!=%%"
+)
+
+:: Console display
+if "!msg!" == "." (
+    if defined PREVMOD (
+        <nul set /p="[2K[1000D!PREVMSG!"
+        echo.
+        if exist "%UNRENLOG%" >> "%UNRENLOG%" echo !cleanmsg!
+    ) else (
+        echo.
+        if exist "%UNRENLOG%" >> "%UNRENLOG%" echo.
+    )
+    endlocal & endlocal & set "PREVMOD=" & set "PREVMSG="
+    goto :eof
+)
+
+if defined PREVMOD (
+    if defined msg2 (
+        <nul set /p="[2K[1000D!msg! !PREVMSG! !msg2!"
+    ) else (
+        <nul set /p="[2K[1000D!msg! !PREVMSG!"
+    )
+    echo.
+    if exist "%UNRENLOG%" >> "%UNRENLOG%" echo !cleanmsg!
+    endlocal & endlocal & set "PREVMOD=" & set "PREVMSG="
+    goto :eof
+)
+
+if defined msg2 (
+    echo !msg! !msg2!
+) else (
+    echo !msg!
+)
+if exist "%UNRENLOG%" >> "%UNRENLOG%" echo !cleanmsg!
+endlocal & endlocal & set "PREVMOD=" & set "PREVMSG="
+goto :eof
 
 
-:: Call :exitn for cleanup only or goto exitn for ending script
+:: Auto centering message
+:center
+setlocal Enabledelayedexpansion
+set "msg=%~1"
+
+:: Strip color variables for logging
+set "cleanmsg=%msg%"
+for %%C in (GRY RED GRE YEL MAG CYA RES) do (
+    call set "cleanmsg=%%cleanmsg:!%%C!=%%"
+)
+
+set "len=0"
+for /l %%i in (0,1,300) do (
+    if "!cleanmsg:~%%i,1!"=="" (
+        set "len=%%i"
+        goto :len_done
+    )
+)
+
+:len_done
+:: Calculating left padding
+set /a pad=(%NEW_COLS% - len) / 2
+if !pad! LSS 0 set "pad=0"
+
+:: Space Design
+set "spaces="
+for /l %%i in (1,1,!pad!) do set "spaces=!spaces! "
+
+echo(!spaces!!msg!
+endlocal
+goto :eof
+
+
+:: Call :exitn for cleanup only or goto :exitn for ending script
 :exitn
 set "val=%~1"
+
+if exist "%TEMP%\b64decode.py" (
+    if %DEBUGLEVEL% GEQ 1 echo del /f /q "%TEMP%\b64decode.py" >> "%UNRENLOG%"
+    del /f /q "%TEMP%\b64decode.py" %DEBUGREDIR%
+)
+if exist "%TEMP%\choiceEx.py" (
+    if %DEBUGLEVEL% GEQ 1 echo del /f /q "%TEMP%\choiceEx.py" >> "%UNRENLOG%"
+    del /f /q "%TEMP%\choiceEx.py" %DEBUGREDIR%
+)
 
 if %DEBUGLEVEL% GEQ 1 (
     echo === Variables ===
@@ -2472,17 +3368,18 @@ if %DEBUGLEVEL% GEQ 1 (
 )
 
 :: Restore modified configuration and we exit with the appropriate code
-"%SystemRoot%\System32\chcp.com" %OLD_CP% >nul
+"%SystemRoot%\System32\chcp.com" %OLD_CP% %DEBUGREDIR%
 
 :: Restore original console mode
-if %DEBUGLEVEL% EQU 0 (
-    "%SystemRoot%\System32\mode.com" con: cols=%ORIG_COLS% lines=%ORIG_LINES%
-
-    REM Remove old bug entries
-    reg delete "HKCU\Console\MyScript" /f %DEBUGREDIR%
-    reg delete "HKCU\Console\UnRen-forall.bat" /f %DEBUGREDIR%
+if not defined WT_SESSION (
+    if %DEBUGLEVEL% GEQ 1 echo "%SystemRoot%\System32\mode.com" con: cols=%ORIG_COLS% lines=%ORIG_LINES% >> "%UNRENLOG%"
+    "%SystemRoot%\System32\mode.com" con: cols=%ORIG_COLS% lines=%ORIG_LINES% %DEBUGREDIR%
 )
+
+:: Remove old bug entries
+"%SystemRoot%\System32\reg.exe" delete "HKCU\Console\MyScript" /f %DEBUGREDIR%
+"%SystemRoot%\System32\reg.exe" delete "HKCU\Console\UnRen-forall.bat" /f %DEBUGREDIR%
 
 if defined val exit !val!
 
-exit /b 0
+exit 0
