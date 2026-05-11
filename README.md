@@ -24,6 +24,8 @@ I've made these scripts with ❤️ to simplify the management of your favorite 
 
 What started as a simple launcher evolved into a multilingual toolkit with customizable options, version-aware execution, and update support. I hope it makes your experience smoother and more enjoyable.
 
+If you like my work: [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/joelurmel)    
+
 ---
 
 ## 📦 Included Files
