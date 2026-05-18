@@ -4,6 +4,26 @@ All dates are in the format MM/DD/YY.
 
 ---
 
+05/18/26:
+	UnRen-forall.bat 0.77, UnRen-current.bat 9.7.80 & UnRen-legacy.bat 9.7.60
+
+	Common modifications for all scripts:
+	- Added support for Windows 7 via Ansicon project (https://github.com/adoxa/ansicon/releases)
+	  Extract the content from x86 or x64 according to your OS to your Windows directory only.
+	- Solved an old nasty corruption bug when you decrypt base64 from an echo longer than 8191 chars.
+	  It's hard to find because it appears randomly in Windows 10, but thanks to Windows 7, it's always there.
+	- Fixed a bug that prevented users from specifying a game directory,
+      if the script was run from a directory other than the game directory.
+	- Added the orange color to the list of messages (my preferred).
+	- Added new option n for removing the sync folder in %APPDATA%\roaming\renpy\-gamename-
+	- Finally found a way for checking all invalid characters in the PATH.
+	- Safer new Python script for decoding embedded Base64.
+	- Updated detect_renpy_version.py to include support of modified game.
+	- Corrected some typos...
+	- Fixed a bug that prevented to run with Admin rights.
+
+---
+
 ## 03/21/26:
 	UnRen-forall.bat 0.70, UnRen-current.bat 9.7.73 & UnRen-legacy.bat 9.7.53
 

@@ -1,8 +1,8 @@
 ### 🔖 Versions
 
-![UnRen-forall](https://img.shields.io/badge/UnRen--forall-0.71-blue)
-![UnRen-legacy](https://img.shields.io/badge/UnRen--legacy-9.7.54-green)
-![UnRen-current](https://img.shields.io/badge/UnRen--current-9.7.74-purple)
+![UnRen-forall](https://img.shields.io/badge/UnRen--forall-0.77-blue)
+![UnRen-legacy](https://img.shields.io/badge/UnRen--legacy-9.7.60-green)
+![UnRen-current](https://img.shields.io/badge/UnRen--current-9.7.80-purple)
 ![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
 ![Downloads](https://img.shields.io/github/downloads/Lurmel/UnRen-forall/total)
 
@@ -24,23 +24,23 @@ I've made these scripts with ❤️ to simplify the management of your favorite 
 
 What started as a simple launcher evolved into a multilingual toolkit with customizable options, version-aware execution, and update support. I hope it makes your experience smoother and more enjoyable.
 
-If you like my work: [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/joelurmel)    
+If you like my work: [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/joelurmel)
 
 ---
 
 ## 📦 Included Files
 
-- `UnRen-forall.bat` — Multilingual launcher (Version 0.71)
-- `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.7.54)
-- `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.74)
-- `UnRen-cfg.zip` — Contains `UnRen-cfg.bat` to configure language and batch behavior
+- `UnRen-forall.bat` — Multilingual launcher (Version 0.77)
+- `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.7.5604)
+- `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.80)
+- `UnRen-cfg.txt` — To configure language and batch behavior
 - `UnRen-link.txt` — Contains the download link for the full package and a changelog for updates
 
 ---
 
 ## 📥 Download
 
-[⬇️ Download latest release](https://github.com/Lurmel/UnRen-forall/releases/download/main/UnRen-forall-la_0.71-le_9.7.54-cu_9.7.74.zip)
+[⬇️ Download latest release](https://github.com/Lurmel/UnRen-forall/releases/download/main/UnRen-forall-la_0.77-le_9.7.60-cu_9.7.80.zip)
 
 ---
 

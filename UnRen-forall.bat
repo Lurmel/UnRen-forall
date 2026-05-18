@@ -11,7 +11,7 @@ set "TEMPDIR=%~1"
 if "%~1" == "--norestart" set "TEMPDIR=%~2"
 if "%~1" == "--norelaunch" set "TEMPDIR=%~2"
 
-setlocal EnableDelayedExpansion
+setlocal enabledelayedexpansion
 
 :: UnRen-forall.bat - UnRen Launcher Script named UnRen-forall.bat for compatibility
 :: Made by (SM) aka JoeLurmel @ f95zone.to
@@ -20,7 +20,7 @@ setlocal EnableDelayedExpansion
 :: DO NOT MODIFY BELOW THIS LINE unless you know what you're doing
 :: Define various global names
 set "NAME=forall"
-set "VERSION=v0.71 - 05/10/26"
+set "VERSION=v0.77 - 05/17/26"
 title UnRen-%NAME%.bat - %VERSION%
 set "URL_REF=https://f95zone.to/threads/92717/post-17110063/"
 set "SCRIPTDIR=%~dp0"
@@ -115,12 +115,12 @@ if not defined LNG set "LNG=en"
 :lngtest
 set "SUPPORTED= de es en fr it ru zh "
 set "FIND= %LNG% "
-echo "%SUPPORTED%" | "%SystemRoot%\System32\find.exe" /i "%FIND%" >nul
+echo "%SUPPORTED%" | "%SystemRoot%\System32\findstr.exe" /i "%FIND%" >nul
 if %errorlevel% NEQ 0 set "LNG=en"
 
 :: To be able to take screenshots for F95zone
 if not "%~2" == "" (
-    echo "%SUPPORTED%" | "%SystemRoot%\System32\find.exe" /i " %~2 " >nul
+    echo "%SUPPORTED%" | "%SystemRoot%\System32\findstr.exe" /i " %~2 " >nul
     if %errorlevel% EQU 0 set "LNG=%~2"
 )
 
@@ -132,6 +132,7 @@ if "%LNGID%" == "1036" if "%LNG%" == "zh" (
 :: Definition of reusable texts not language dependent
 set "GRY=[90m"
 set "RED=[91m"
+set "ORA=[38;5;208m"
 set "GRE=[92m"
 set "YEL=[93m"
 set "MAG=[95m"
@@ -139,13 +140,43 @@ set "CYA=[96m"
 set "RES=[0m"
 for /f "tokens=4-5 delims=. " %%i in ('ver') do set OSVERS=%%i.%%j
 if "%OSVERS%" == "6.1" (
-    set "GRY="
-    set "RED="
-    set "GRE="
-    set "YEL="
-    set "MAG="
-    set "CYA="
-    set "RES="
+    if exist "%SystemRoot%\ansicon.exe" (
+        "%SystemRoot%\ansicon.exe" -i %DEBUGREDIR%
+    ) else (
+        set "ansmsg1.en=Warning: ANSI colors not supported on Windows 7 without Ansicon."
+        set "ansmsg1.fr=Attention : les couleurs ANSI ne sont pas prises en charge sur Windows 7 sans Ansicon."
+        set "ansmsg1.es=Advertencia: Colores ANSI no soportados en Windows 7 sin Ansicon."
+        set "ansmsg1.it=Attenzione: colori ANSI non supportati su Windows 7 senza Ansicon."
+        set "ansmsg1.de=Warnung: ANSI Farben nicht unterstuetzt auf Windows 7 ohne Ansicon."
+        set "ansmsg1.ru=Предупреждение: ANSI-цвета не поддерживаются на Windows 7 без Ansicon."
+        set "ansmsg1.zh=注意：Windows 7 无 Ansicon 不支持 ANSI 颜色。"
+
+        set "ansmsg2.en=Please download Ansicon from https://github.com/adoxa/ansicon/releases"
+        set "ansmsg2.fr=Veuillez télécharger Ansicon depuis https://github.com/adoxa/ansicon/releases"
+        set "ansmsg2.es=Por favor, descargue Ansicon desde https://github.com/adoxa/ansicon/releases"
+        set "ansmsg2.it=Per favore, scarica Ansicon da https://github.com/adoxa/ansicon/releases"
+        set "ansmsg2.de=Bitte laden Sie Ansicon von https://github.com/adoxa/ansicon/releases herunter"
+        set "ansmsg2.ru=Пожалуйста, загрузите Ansicon с https://github.com/adoxa/ansicon/releases"
+        set "ansmsg2.zh=请从 https://github.com/adoxa/ansicon/releases 下载 Ansicon"
+
+        set "ansmsg3.en=Extract x86/x64 directory content to %SystemRoot% and it will be used automatically."
+        set "ansmsg3.fr=Extrayez le contenu du répertoire x86/x64 dans %SystemRoot% et il sera utilisé automatiquement."
+        set "ansmsg3.es=Extraiga el contenido del directorio x86/x64 a %SystemRoot% y se usara automaticamente."
+        set "ansmsg3.it=Estrae il contenuto del cartella x86/x64 in %SystemRoot% e verra' usato automaticamente."
+        set "ansmsg3.de=Extrahieren Sie den Inhalt des Verzeichnisses x86/x64 in %SystemRoot% und es wird automatisch verwendet."
+        set "ansmsg3.ru=Извлеките содержимое каталога x86/x64 в %SystemRoot% и он будет использоваться автоматически."
+        set "ansmsg3.zh=将 x86/x64 目录内容提取到 %SystemRoot% 并且它将自动使用。"
+
+        echo.
+        echo !ansmsg1.%LNG%!
+        echo.
+        echo !ansmsg2.%LNG%!
+        echo !ansmsg3.%LNG%!
+        echo.
+        pause
+
+        call :exitn 3
+    )
 )
 
 
@@ -154,7 +185,7 @@ set "EMPTY=[      ]"
 set "NOK=[  %RED%NOK%RES% ]"
 set "OK=[  %GRE%OK%RES%  ]"
 set "SKIP=[ %CYA%SKIP%RES% ]"
-set "WARN=[ %YEL%WARN%RES% ]"
+set "WARN=[ %ORA%WARN%RES% ]"
 
 :: language dependent here, defined for each supported language.
 :: The script will use the appropriate one based on the detected or selected language.
@@ -321,7 +352,7 @@ set "UNIT.zh=字节"
 
 
 :: Initializing debug mode
-set "DEBUGREDIR=>nul 2>&1"
+set "DEBUGREDIR=>nul 2>>%UNRENLOG%"
 set "DEBUGLEVEL=0"
 set "NOCLS=0"
 
@@ -346,7 +377,7 @@ if not defined WT_SESSION (
         for %%B in (%%A) do (
             set "val=%%B"
             REM Check if it's a number
-            echo !val! |  "%SystemRoot%\System32\findstr.exe"  /r "[0-9][0-9]" >nul
+            echo !val! |  "%SystemRoot%\System32\findstr.exe" /r "[0-9][0-9]" >nul
             if !errorlevel! EQU 0 (
                 set /a count+=1
                 if !count! EQU 1 (
@@ -366,8 +397,8 @@ if not defined WT_SESSION (
 :thanks
 set "regexe=%SystemRoot%\System32\reg.exe"
 
-::"%regexe%" delete "HKCU\Software\UnRen" /va /f >nul 2>&1
-"%regexe%" query "HKCU\Software\UnRen" /v Thanks >nul 2>&1
+::"%regexe%" delete "HKCU\Software\UnRen" /va /f %DEBUGREDIR%
+"%regexe%" query "HKCU\Software\UnRen" /v Thanks %DEBUGREDIR%
 if %errorlevel% EQU 0 (
     goto :nothanks
 )
@@ -475,31 +506,32 @@ color
 if defined OLD_FACE (
    "%regexe%" add "HKCU\Console" /v FaceName /t REG_SZ /d "%OLD_FACE%" /f >nul
 ) else (
-   "%regexe%" delete "HKCU\Console" /v FaceName /f >nul 2>&1
+   "%regexe%" delete "HKCU\Console" /v FaceName /f %DEBUGREDIR%
 )
 
 if defined OLD_SIZE (
    "%regexe%" add "HKCU\Console" /v FontSize /t REG_DWORD /d %OLD_SIZE% /f >nul
 ) else (
-   "%regexe%" delete "HKCU\Console" /v FontSize /f >nul 2>&1
+   "%regexe%" delete "HKCU\Console" /v FontSize /f %DEBUGREDIR%
 )
 
 if defined OLD_FAMILY (
    "%regexe%" add "HKCU\Console" /v FontFamily /t REG_DWORD /d %OLD_FAMILY% /f >nul
 ) else (
-   "%regexe%" delete "HKCU\Console" /v FontFamily /f >nul 2>&1
+   "%regexe%" delete "HKCU\Console" /v FontFamily /f %DEBUGREDIR%
 )
 
 if defined OLD_WEIGHT (
    "%regexe%" add "HKCU\Console" /v FontWeight /t REG_DWORD /d %OLD_WEIGHT% /f >nul
 ) else (
-   "%regexe%" delete "HKCU\Console" /v FontWeight /f >nul 2>&1
+   "%regexe%" delete "HKCU\Console" /v FontWeight /f %DEBUGREDIR%
 )
 
 "%regexe%" add "HKCU\Software\UnRen" /v Thanks /t REG_DWORD /d 1 /f >nul
 
 :nothanks
 cls
+
 
 :: We need PowerShell for later, make sure it exists
 set "pshell.en=Checking for availability of PowerShell"
@@ -545,7 +577,7 @@ if not exist "%PWRSHELL%" (
     call :elog "    !pshell2.%LNG%!"
     call :elog "    !pshell3.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!...
+    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
 
     call :exitn 3
 ) else (
@@ -558,13 +590,36 @@ call :check_all_files
 
 
 :: Set the working directory
+set "wdir1.en=Error The specified directory does not exist."
+set "wdir1.fr=Erreur Le répertoire spécifié n'existe pas."
+set "wdir1.es=Error El directorio especificado no existe."
+set "wdir1.it=Errore la directory specificata non esiste."
+set "wdir1.de=Fehler Das angegebene Verzeichnis existiert nicht."
+set "wdir1.ru=Ошибка Указанный каталог не существует."
+set "wdir1.zh=错误：指定的目录不存在。"
+
+set "wdir2.en=Are you sure we're in the game's root directory?"
+set "wdir2.fr=Êtes-vous sûr que nous sommes dans le répertoire racine du jeu ?"
+set "wdir2.es=¿Está seguro de que estamos en el directorio raíz del juego?"
+set "wdir2.it=Sei sicuro che siamo nella directory principale del gioco?"
+set "wdir2.de=Sind Sie sicher, dass wir uns im Stammverzeichnis des Spiels befinden?"
+set "wdir2.ru=Вы уверены, что находимся в корневом каталоге игры?"
+set "wdir2.zh=确定我们在游戏根目录中吗？"
+
+set "wdir3.en=Testing write access to game directory"
+set "wdir3.fr=Test de l'accès en écriture au répertoire du jeu"
+set "wdir3.es=Prueba de acceso de escritura al directorio del juego"
+set "wdir3.it=Verifica l'accesso in scrittura alla directory di gioco"
+set "wdir3.de=Testen des Schreibzugriffs auf das Spieledirectory"
+set "wdir3.ru=Проверка доступа на запись в каталог игры"
+set "wdir3.zh=测试对游戏目录的写入权限"
+
 :: Check if game path is provided and set it
 set "LAUNCHED_WDIR=0"
 set "WORKDIR="
-setlocal disabledelayedexpansion
 :: Remove surrounding quotes if any
-if not "%TEMPDIR%" == "" set "TEMPDIR=%TEMPDIR:"=%"
-if "%TEMPDIR%" == "" (
+if not "!TEMPDIR!" == "" set "TEMPDIR=!TEMPDIR:"=!"
+if "!TEMPDIR!" == "" (
     set "setpath1.en=Enter the path to the game, drag'n'drop it here,"
     set "setpath1.fr=Entrez le chemin vers le jeu, faites-le glisser ici,"
     set "setpath1.es=Introduzca la ruta al juego, arrástrelo aquí,"
@@ -594,14 +649,16 @@ if "%TEMPDIR%" == "" (
     echo !setpath1.%LNG%!
     echo !setpath2.%LNG%!
     echo.
-    set /p "WORKDIR=!setpath3.%LNG%!"
-    setlocal disabledelayedexpansion
+    set "_question=!setpath3.%LNG%!"
+    for /f "delims=" %%A in ("!_question!") do (
+        endlocal
+        set /p "WORKDIR=%%A"
+    )
     if not defined WORKDIR (
         set "WORKDIR=%cd%"
     )
 ) else (
-    setlocal disabledelayedexpansion
-    set "WORKDIR=%TEMPDIR%"
+    set "WORKDIR=!TEMPDIR!"
     if "%WORKDIR%" == "." (
         set "WORKDIR=%cd%"
     )
@@ -615,10 +672,23 @@ set "WORKDIR=%WORKDIR:"=%"
 :: Normalize WORKDIR to an absolute path
 for %%A in ("%WORKDIR%") do set "WORKDIR=%%~fA"
 
+:: Check if WORKDIR is a valid path
 set "HAS_BAD="
 :: Characters that CAN appear in a valid Windows path but WILL break batch logic:
-for %%C in ("&" "!" "(" ")" "=" ";" "'" "`" "[" "]" "{" "}" "+" "~") do (
-    echo "%WORKDIR%" | "%SystemRoot%\System32\findstr.exe" "%%~C" >nul && (
+setlocal disabledelayedexpansion
+echo "%WORKDIR%" | "%SystemRoot%\System32\findstr.exe" /C:"!" >nul && (
+    call set "HAS_BAD=!"
+)
+echo "%WORKDIR%" | "%SystemRoot%\System32\findstr.exe" /C:"&" >nul && (
+    if not defined HAS_BAD (
+        call set "HAS_BAD=&"
+    ) else (
+        call set "HAS_BAD=%%HAS_BAD%%,&"
+    )
+)
+endlocal & set "HAS_BAD=%HAS_BAD%"
+for %%C in ("(" ")" "=" ";" "'" "`" "[" "]" "{" "}" "+" "~") do (
+    echo "%WORKDIR%" | "%SystemRoot%\System32\findstr.exe" /C:"%%~C" >nul && (
         if not defined HAS_BAD (
             call set "HAS_BAD=%%~C"
         ) else (
@@ -626,7 +696,6 @@ for %%C in ("&" "!" "(" ")" "=" ";" "'" "`" "[" "]" "{" "}" "+" "~") do (
         )
     )
 )
-
 setlocal enabledelayedexpansion
 if defined HAS_BAD (
     set "invchars.en=Invalid character detected in the path"
@@ -637,55 +706,31 @@ if defined HAS_BAD (
     set "invchars.ru=Обнаружен недействительный символ в пути доступа"
     set "invchars.zh=路径中检测到无效字符"
 
-    call :elog .
     echo %NOK% !invchars.%LNG%! '%RED%!HAS_BAD!%RES%'. !UNACONT.%LNG%!
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!...
+    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
 
     call :exitn 3
 )
-
-set "wdir1.en=Error The specified directory does not exist."
-set "wdir1.fr=Erreur Le répertoire spécifié n'existe pas."
-set "wdir1.es=Error El directorio especificado no existe."
-set "wdir1.it=Errore la directory specificata non esiste."
-set "wdir1.de=Fehler Das angegebene Verzeichnis existiert nicht."
-set "wdir1.ru=Ошибка Указанный каталог не существует."
-set "wdir1.zh=错误：指定的目录不存在。"
-
-set "wdir2.en=Are you sure we're in the game's root directory?"
-set "wdir2.fr=Êtes-vous sûr que nous sommes dans le répertoire racine du jeu ?"
-set "wdir2.es=¿Está seguro de que estamos en el directorio raíz del juego?"
-set "wdir2.it=Sei sicuro che siamo nella directory principale del gioco?"
-set "wdir2.de=Sind Sie sicher, dass wir uns im Stammverzeichnis des Spiels befinden?"
-set "wdir2.ru=Вы уверены, что находимся в корневом каталоге игры?"
-set "wdir2.zh=确定我们在游戏根目录中吗？"
-
-set "wdir3.en=Testing write access to game directory"
-set "wdir3.fr=Test de l'accès en écriture au répertoire du jeu"
-set "wdir3.es=Prueba de acceso de escritura al directorio del juego"
-set "wdir3.it=Verifica l'accesso in scrittura alla directory di gioco"
-set "wdir3.de=Testen des Schreibzugriffs auf das Spieledirectory"
-set "wdir3.ru=Проверка доступа на запись в каталог игры"
-set "wdir3.zh=测试对游戏目录的写入权限"
 
 setlocal disabledelayedexpansion
-cd /d "%WORKDIR%"
-if %errorlevel% NEQ 0 (
-    setlocal enabledelayedexpansion
-    call :elog "%NOK%" "!wdir1.%LNG%!%RES%"
-    call :elog .
-    call :elog "    !wdir2.%LNG%!"
-    call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!...
+for /f "delims=" %%A in ("%WORKDIR%") do (
+    endlocal
+    cd /d "%%A"
+    if %errorlevel% NEQ 0 (
+        call :elog "%NOK%" "!wdir1.%LNG%!%RES%"
+        call :elog .
+        call :elog "    !wdir2.%LNG%!"
+        call :elog .
+        pause>nul|set /p=".      !ANYKEY.%LNG%!..."
 
-    call :exitn 3
+        call :exitn 3
+    )
 )
-endlocal
 
 :: Analysis of debug arguments
 if /i "%~3" == "-d" (
-    set "DEBUGREDIR=>> %UNRENLOG% 2>&1"
+    set "DEBUGREDIR=>>%UNRENLOG% 2>&1"
     set "DEBUGLEVEL=1"
     set "NOCLS=1"
     if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(!NEW_COLS!,5000)" >> "%UNRENLOG%"
@@ -693,7 +738,7 @@ if /i "%~3" == "-d" (
 )
 if /i "%~3" == "-dd" (
     echo on
-    set "DEBUGREDIR="
+    set "DEBUGREDIR=>>%UNRENLOG% 2>&1"
     set "DEBUGLEVEL=2"
     set "NOCLS=1"
     if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(!NEW_COLS!,9000)" >> "%UNRENLOG%"
@@ -711,8 +756,10 @@ set "reqdir1.ru=Проверка наличия каталогов game, lib, re
 set "reqdir1.zh=检查 game、lib、renpy 目录是否存在"
 
 setlocal disabledelayedexpansion
-cd /d "%WORKDIR%"
-endlocal
+for /f "delims=" %%A in ("%WORKDIR%") do (
+    endlocal
+    cd /d "%%A"
+)
 set "missing="
 call :elog -n "%EMPTY%" "!reqdir1.%LNG%!..."
 set "missing="
@@ -747,32 +794,28 @@ if defined missing (
     call :elog "    !reqdir2.%LNG%!. !UNACONT.%LNG%!"
     call :elog "    !wdir2.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!...
+    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
 
     call :exitn 3
 ) else (
     call :elog "%OK%"
 )
 
-:: Check if %WORKDIR%\game is writable
+:: Check if .\game is writable
 call :elog -n "%EMPTY%" "!wdir3.%LNG%!..."
-setlocal disabledelayedexpansion
-if %DEBUGLEVEL% GEQ 1 echo copy nul "%WORKDIR%\game\test.txt" >> "%UNRENLOG%"
-copy nul "%WORKDIR%\game\test.txt" %DEBUGREDIR%
-endlocal
+if %DEBUGLEVEL% GEQ 1 echo copy /y nul ".\game\test.txt" >> "%UNRENLOG%"
+copy /y nul ".\game\test.txt" %DEBUGREDIR%
 if %errorlevel% NEQ 0 (
     call :elog "%NOK%"
     call :elog .
     call :elog "    !wdir2.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!...
+    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
 
     call :exitn 3
 ) else (
-    setlocal disabledelayedexpansion
-    if %DEBUGLEVEL% GEQ 1 echo del /f /q "%WORKDIR%\game\test.txt" >> "%UNRENLOG%"
-    del /f /q "%WORKDIR%\game\test.txt" %DEBUGREDIR%
-    endlocal
+    if %DEBUGLEVEL% GEQ 1 echo del /f /q ".\game\test.txt" >> "%UNRENLOG%"
+    del /f /q ".\game\test.txt" %DEBUGREDIR%
     call :elog "%OK%"
 )
 
@@ -780,7 +823,14 @@ if %errorlevel% NEQ 0 (
 :: Set UNRENLOG for debugging purpose
 If exist "%TEMP%\%BASENAME%.log" (
     if %DEBUGLEVEL% GEQ 1 echo move /y "%TEMP%\%BASENAME%.log" "%WORKDIR%\%BASENAME%.log" >> "%UNRENLOG%"
-    move /y "%TEMP%\%BASENAME%.log" "%WORKDIR%\%BASENAME%.log" %DEBUGREDIR%
+    move /y "%TEMP%\%BASENAME%.log" "%WORKDIR%\%BASENAME%.log" >nul 2>&1
+    if !errorlevel! NEQ 0 (
+        call :elog "%NOK%" "!FMOVE.%LNG%! %YEL%%TEMP%\%BASENAME%.log%RES% !decm10a.%LNG%! %YEL%%WORKDIR%\%BASENAME%.log%RES%"
+        call :elog .
+        pause>nul|set /p=".      !ANYKEY.%LNG%!..."
+
+        call :exitn 3
+    )
 )
 set "UNRENLOG=%WORKDIR%\%BASENAME%.log"
 set "UNRENLOG=%UNRENLOG:"=%"
@@ -840,7 +890,7 @@ set "pythonsystem="
 call :elog -n "%EMPTY%" "!pysystem1.%LNG%!..."
 if exist "%SystemRoot%\py.exe" (
     "%SystemRoot%\py.exe" --list >"%TEMP%\pylist.txt" 2>&1
-    for /f "tokens=1,2 delims=:" %%A in ('findstr /i "V:" "%TEMP%\pylist.txt"') do (
+    for /f "tokens=1,2 delims=:" %%A in ('%SystemRoot%\System32\findstr.exe /i "V:" "%TEMP%\pylist.txt"') do (
         :: %%B contains major.minor eg: "3.14", "3.9 *", "2.7"
         for /f "tokens=1,2 delims=." %%M in ("%%B") do (
             :: %%M = major (eg: "3"), %%N = minor with optional " *" (eg: "14", "9 *")
@@ -868,7 +918,7 @@ del /f /q "%TEMP%\pylist.txt" %DEBUGREDIR%
 set "PATH=%SystemDrive%\Python27:%PATH%"
 for /f "delims=" %%A in ('"%SystemRoot%\System32\where.exe" python.exe 2^>nul') do (
     if not "%%A" == "" (
-        echo "%%A" | findstr /i "WindowsApps" >nul
+        echo "%%A" | "%SystemRoot%\System32\findstr.exe" /i "WindowsApps" >nul
         if errorlevel 1 (
             if exist "%%A" (
                 for /f "tokens=2 delims= " %%B in ('"%%A" -V 2^>^&1') do (
@@ -1022,7 +1072,7 @@ if not exist "%PYTHONPATH%" (
     call :elog "    %RED%!python3.%LNG%!%RES%. !UNACONT.%LNG%!"
     call :elog "    !wdir2.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!...
+    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
 
     call :exitn 3
 ) else (
@@ -1035,12 +1085,42 @@ if not defined PYTHONEXE (
 :: Used later for base64 decoding
 >"%TEMP%\b64decode.py" (
     echo import base64, sys, os
+    echo.
+    echo if len^(sys.argv^) ^< 3:
+    echo     sys.stderr.write^("Usage: script.py <src> <dst>\n"^)
+    echo     sys.exit^(1^)
+    echo.
     echo src, dst = sys.argv[1], sys.argv[2]
+    echo.
     echo try:
-    echo     with open^(src,'rb'^) as f: data=base64.b64decode^(f.read^(^).replace^(b'\r',b''^).replace^(b'\n',b''^)^)
-    echo     with open^(dst,'wb'^) as f: f.write^(data^)
-    echo except Exception:
-    echo     if os.path.exists^(dst^): os.remove^(dst^)
+    echo    with open^(src, 'rb'^) as f:
+    echo        raw = f.read^(^)
+    echo except IOError as e:
+    echo    sys.stderr.write^("Failed to read source file '%%s': %%s\n" %% ^(src, e^)^)
+    echo    sys.exit^(1^)
+    echo.
+    echo try:
+    echo    raw = raw.replace^(b'\r', b''^).replace^(b'\n', b''^)
+    echo    missing = len^(raw^) %% 4
+    echo    if missing:
+    echo        raw += b'=' * ^(4 - missing^)
+    echo    data = base64.b64decode^(raw^)
+    echo except Exception as e:
+    echo    sys.stderr.write^("Failed to decode base64 from '%%s': %%s\n" %% ^(src, e^)^)
+    echo    sys.exit^(1^)
+    echo.
+    echo try:
+    echo    with open^(dst, 'wb'^) as f:
+    echo        f.write^(data^)
+    echo except IOError as e:
+    echo    sys.stderr.write^("Failed to write destination file '%%s': %%s\n" %% ^(dst, e^)^)
+    echo    if os.path.exists^(dst^):
+    echo        try:
+    echo            os.remove^(dst^)
+    echo            sys.stderr.write^("Cleaned up partial file '%%s'\n" %% dst^)
+    echo        except OSError as e2:
+    echo            sys.stderr.write^("Failed to clean up '%%s': %%s\n" %% ^(dst, e2^)^)
+    echo    sys.exit^(1^)
 )
 
 :: Check for Ren'Py version
@@ -1077,13 +1157,15 @@ set "renpyvers4.ru=убедитесь, что игра совместима с U
 set "renpyvers4.zh=请确保游戏与 UnRen 兼容。"
 
 setlocal disabledelayedexpansion
-cd /d "%WORKDIR%"
-endlocal
+for /f "delims=" %%A in ("%WORKDIR%") do (
+    endlocal
+    cd /d "%%A"
+)
 
 set "detect_renpy_version=%WORKDIR%\detect_renpy_version.py"
 >"%detect_renpy_version%.b64" (
-    echo IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQojIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLQ0KDQppbXBvcnQgb3MNCmltcG9ydCBzeXMNCmltcG9ydCByZQ0KI2ltcG9ydCBzdHJ1Y3QNCg0KDQppbXBvcnQgb3MsIHJlDQoNCmRlZiBkZXRlY3RfZnJvbV9zY3JpcHRfdmVyc2lvbihnYW1lX2Rpcik6DQogICAgIyAxKSBSZW4nUHkgNy84IDogc2NyaXB0X3ZlcnNpb24udHh0DQogICAgcGF0aCA9IG9zLnBhdGguam9pbihnYW1lX2RpciwgInNjcmlwdF92ZXJzaW9uLnR4dCIpDQogICAgaWYgb3MucGF0aC5pc2ZpbGUocGF0aCk6DQogICAgICAgIHRyeToNCiAgICAgICAgICAgIHdpdGggb3BlbihwYXRoLCAiciIpIGFzIGY6DQogICAgICAgICAgICAgICAgY29udGVudCA9IGYucmVhZCgpLnN0cmlwKCkNCg0KICAgICAgICAgICAgIyBUdXBsZSBmb3JtYXQgOiAoOCwgMSwgMCkNCiAgICAgICAgICAgIG0gPSByZS5zZWFyY2gocidcKFxzKihcZCspXHMqLCcsIGNvbnRlbnQpDQogICAgICAgICAgICBpZiBtOg0KICAgICAgICAgICAgICAgIHJldHVybiBpbnQobS5ncm91cCgxKSkNCg0KICAgICAgICAgICAgIyBTaW1wbGUgZm9ybWF0IDogOC4xLjAgb3UgOA0KICAgICAgICAgICAgbSA9IHJlLm1hdGNoKHInXHMqKFxkKyknLCBjb250ZW50KQ0KICAgICAgICAgICAgaWYgbToNCiAgICAgICAgICAgICAgICByZXR1cm4gaW50KG0uZ3JvdXAoMSkpDQoNCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbjoNCiAgICAgICAgICAgIHBhc3MNCg0KICAgICMgMikgUmVuJ1B5IDYgOiByZW5weS92ZXJzaW9uLnB5DQogICAgdmVyc2lvbl9weSA9IG9zLnBhdGguam9pbihnYW1lX2RpciwgInJlbnB5IiwgInZlcnNpb24ucHkiKQ0KICAgIGlmIG9zLnBhdGguaXNmaWxlKHZlcnNpb25fcHkpOg0KICAgICAgICB0cnk6DQogICAgICAgICAgICB3aXRoIG9wZW4odmVyc2lvbl9weSwgInIiKSBhcyBmOg0KICAgICAgICAgICAgICAgIGNvbnRlbnQgPSBmLnJlYWQoKQ0KDQogICAgICAgICAgICAjIHZlcnNpb24gPSAiNi45OS4xNCINCiAgICAgICAgICAgIG0gPSByZS5zZWFyY2gocid2ZXJzaW9uXHMqPVxzKiIoXGQrKScsIGNvbnRlbnQpDQogICAgICAgICAgICBpZiBtOg0KICAgICAgICAgICAgICAgIHJldHVybiBpbnQobS5ncm91cCgxKSkNCg0KICAgICAgICBleGNlcHQgRXhjZXB0aW9uOg0KICAgICAgICAgICAgcGFzcw0KDQogICAgcmV0dXJuIE5vbmUNCg0KDQpkZWYgZGV0ZWN0X2Zyb21fcnB5YyhnYW1lX2Rpcik6DQogICAgIiIiDQogICAgUmVhZHMgdGhlIG1hZ2ljIG51bWJlciBvZiAucnB5YyAvIC5ycHltYyBmaWxlcy4NCiAgICBSZW4nUHkgNjogbWFnaWMg4oCcUkVOUFkgUlBDMeKAnSAgLT4gbWFqb3IgNiAoYW5kIHNvbWUgZWFybHkgNykNCiAgICBSZW4nUHkgNzogbWFnaWMg4oCcUkVOUFkgUlBDMuKAnSAgLT4gbWFqb3IgNw0KICAgIFJlbidQeSA4OiBtYWdpYyDigJxSRU5QWSBSUEMy4oCdICB3aXRoIFB5dGhvbiAzIChjYW5ub3QgYmUgZWFzaWx5IGRpc3Rpbmd1aXNoZWQNCiAgICAgICAgICAgICAgICBmcm9tIDcgdXNpbmcgbWFnaWMgYWxvbmUsIG90aGVyIG1ldGhvZHMgYXJlIHVzZWQgdG8gY29tcGxldGUgdGhlIHByb2Nlc3MpDQogICAgTm90ZTogc29tZSBlYXJseSBSZW4nUHkgNyBtYXkgc3RpbGwgdXNlIOKAnFJFTlBZIFJQQzHigJ0gbWFnaWMsIGJ1dCB0aGV5IGFyZSByYXJlIGFuZCB3ZSBwcmlvcml0aXplIHRoZSBtb3JlIGNvbW1vbiBjYXNlLg0KICAgICIiIg0KICAgIG1hZ2ljX21hcCA9IHsNCiAgICAgICAgYiJSRU5QWSBSUEMxIjogNiwNCiAgICAgICAgYiJSRU5QWSBSUEMyIjogNywgICMgY2FuIGFsc28gYmUgOA0KICAgIH0NCiAgICBmb3Igcm9vdCwgZGlycywgZmlsZXMgaW4gb3Mud2FsayhnYW1lX2Rpcik6DQogICAgICAgIGZvciBmbmFtZSBpbiBmaWxlczoNCiAgICAgICAgICAgIGlmIGZuYW1lLmVuZHN3aXRoKCIucnB5YyIpIG9yIGZuYW1lLmVuZHN3aXRoKCIucnB5bWMiKToNCiAgICAgICAgICAgICAgICBmcGF0aCA9IG9zLnBhdGguam9pbihyb290LCBmbmFtZSkNCiAgICAgICAgICAgICAgICB0cnk6DQogICAgICAgICAgICAgICAgICAgIHdpdGggb3BlbihmcGF0aCwgInJiIikgYXMgZjoNCiAgICAgICAgICAgICAgICAgICAgICAgIGhlYWRlciA9IGYucmVhZCgxMCkNCiAgICAgICAgICAgICAgICAgICAgZm9yIG1hZ2ljLCBtYWpvciBpbiBtYWdpY19tYXAuaXRlbXMoKToNCiAgICAgICAgICAgICAgICAgICAgICAgIGlmIGhlYWRlci5zdGFydHN3aXRoKG1hZ2ljKToNCiAgICAgICAgICAgICAgICAgICAgICAgICAgICByZXR1cm4gbWFqb3INCiAgICAgICAgICAgICAgICBleGNlcHQgRXhjZXB0aW9uOg0KICAgICAgICAgICAgICAgICAgICBjb250aW51ZQ0KICAgIHJldHVybiBOb25lDQoNCg0KZGVmIGRldGVjdF9mcm9tX2V4ZWN1dGFibGUoZ2FtZV9kaXIpOg0KICAgICIiIg0KICAgIExvb2sgZm9yIHZlcnNpb24gY2x1ZXMgaW4gdGhlIGV4ZWN1dGFibGVzL2xpYnMgcHJlc2VudA0KICAgIGluIHRoZSBnYW1lIGZvbGRlciAoc3RyaW5ncyDigJw3LuKAnSBvciDigJw4LuKAnSBjbG9zZSB0byDigJxSZW4nUHnigJ0pLg0KICAgICIiIg0KICAgIGJhc2UgPSBvcy5wYXRoLmRpcm5hbWUoZ2FtZV9kaXIpICAjIHBhcmVudCBmb2xkZXIgb2YgdGhlIGdhbWUvIGZvbGRlcg0KICAgIHNlYXJjaF9kaXJzID0gW2Jhc2UsIGdhbWVfZGlyXQ0KICAgIHBhdHRlcm5zID0gWw0KICAgICAgICAocmUuY29tcGlsZShyIlJlbi4/UHlccysoXGQpXC5cZCIpLCBOb25lKSwNCiAgICAgICAgKHJlLmNvbXBpbGUociJyZW5weVtfXC1dKFxkKVwuXGQiKSwgcmUuSUdOT1JFQ0FTRSksDQogICAgXQ0KICAgIGZvciBzZGlyIGluIHNlYXJjaF9kaXJzOg0KICAgICAgICBmb3IgZm5hbWUgaW4gb3MubGlzdGRpcihzZGlyKToNCiAgICAgICAgICAgIGZwYXRoID0gb3MucGF0aC5qb2luKHNkaXIsIGZuYW1lKQ0KICAgICAgICAgICAgaWYgbm90IG9zLnBhdGguaXNmaWxlKGZwYXRoKToNCiAgICAgICAgICAgICAgICBjb250aW51ZQ0KICAgICAgICAgICAgIyBPbmx5IHNtYWxsIHRleHQgb3IgbG9nIGZpbGVzIGFyZSByZWFkLg0KICAgICAgICAgICAgaWYgZm5hbWUuZW5kc3dpdGgoKCIudHh0IiwgIi5sb2ciLCAiLmluaSIsICIuY2ZnIiwgIi5qc29uIikpOg0KICAgICAgICAgICAgICAgIHRyeToNCiAgICAgICAgICAgICAgICAgICAgd2l0aCBvcGVuKGZwYXRoLCAiciIpIGFzIGY6DQogICAgICAgICAgICAgICAgICAgICAgICBjb250ZW50ID0gZi5yZWFkKDQwOTYpDQogICAgICAgICAgICAgICAgICAgIGZvciBwYXQsIGZsYWdzIGluIHBhdHRlcm5zOg0KICAgICAgICAgICAgICAgICAgICAgICAgbSA9IHBhdC5zZWFyY2goY29udGVudCkNCiAgICAgICAgICAgICAgICAgICAgICAgIGlmIG06DQogICAgICAgICAgICAgICAgICAgICAgICAgICAgbWFqb3IgPSBpbnQobS5ncm91cCgxKSkNCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBpZiBtYWpvciBpbiAoNiwgNywgOCk6DQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHJldHVybiBtYWpvcg0KICAgICAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb246DQogICAgICAgICAgICAgICAgICAgIHBhc3MNCiAgICByZXR1cm4gTm9uZQ0KDQoNCmRlZiBkZXRlY3RfZnJvbV9hcmNoaXZlKGdhbWVfZGlyKToNCiAgICAiIiINCiAgICBJbnNwZWN0IHRoZSAucnBhIGFyY2hpdmVzIHRvIGRldGVjdCB0aGUgdmVyc2lvbi4NCiAgICBSUEEtMS4wIC0+IFJlbidQeSA2IGVhcmx5DQogICAgUlBBLTIuMCAtPiBSZW4nUHkgNg0KICAgIFJQQS0zLjAgLT4gUmVuJ1B5IDYvNw0KICAgIFJQQU4zLjAgLT4gUmVuJ1B5IDggKG5ldyBuZXV0cm9uIGFyY2hpdmUpDQogICAgWmlYLTEyQSAtPiBSZW4nUHkgOCAobmV3IG5ldXRyb24gYXJjaGl2ZSkNCiAgICBaaVgtMTJCIC0+IFJlbidQeSA4IChuZXcgbmV1dHJvbiBhcmNoaXZlKQ0KICAgICIiIg0KICAgIHJwYV9tYWpvcl9tYXAgPSB7DQogICAgICAgIGIiUlBBLTEuMCI6IDYsDQogICAgICAgIGIiUlBBLTIuMCI6IDYsDQogICAgICAgIGIiUlBBLTMuMCI6IDcsICAgIyBNYXliZSA2IGFzIHdlbGwsIGJ1dCB3ZSdsbCByZWZpbmUgaXQgbGF0ZXIuDQogICAgICAgIGIiUlBBTjMuMCI6IDgsDQogICAgICAgIGIiWmlYLTEyQSI6IDgsDQogICAgICAgIGIiWmlYLTEyQiI6IDgsDQogICAgfQ0KICAgIGZvdW5kID0gTm9uZQ0KICAgIGZvciBmbmFtZSBpbiBvcy5saXN0ZGlyKGdhbWVfZGlyKToNCiAgICAgICAgaWYgbm90IGZuYW1lLmVuZHN3aXRoKCIucnBhIik6DQogICAgICAgICAgICBjb250aW51ZQ0KICAgICAgICBmcGF0aCA9IG9zLnBhdGguam9pbihnYW1lX2RpciwgZm5hbWUpDQogICAgICAgIHRyeToNCiAgICAgICAgICAgIHdpdGggb3BlbihmcGF0aCwgInJiIikgYXMgZjoNCiAgICAgICAgICAgICAgICBoZWFkZXIgPSBmLnJlYWQoOCkNCiAgICAgICAgICAgIGZvciBtYWdpYywgbWFqb3IgaW4gcnBhX21ham9yX21hcC5pdGVtcygpOg0KICAgICAgICAgICAgICAgIGlmIGhlYWRlci5zdGFydHN3aXRoKG1hZ2ljKToNCiAgICAgICAgICAgICAgICAgICAgIyBXZSBrZWVwIHRoZSBoaWdoZXN0IG1ham9yIGZvdW5kLg0KICAgICAgICAgICAgICAgICAgICBpZiBmb3VuZCBpcyBOb25lIG9yIG1ham9yID4gZm91bmQ6DQogICAgICAgICAgICAgICAgICAgICAgICBmb3VuZCA9IG1ham9yDQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb246DQogICAgICAgICAgICBwYXNzDQogICAgcmV0dXJuIGZvdW5kDQoNCg0KZGVmIGRldGVjdF9yZW5weV9tYWpvcihnYW1lX3BhdGgpOg0KICAgICIiIg0KICAgIERldGVjdHMgdGhlIG1ham9yIFJlbidQeSB2ZXJzaW9uICg2LCA3LCBvciA4KSBmcm9tIHRoZSBnYW1lIHBhdGguDQogICAgZ2FtZV9wYXRoIGNhbiBiZSB0aGUgZ2FtZSdzIHJvb3QgZm9sZGVyIG9yIHRoZSDigJxnYW1lL+KAnSBzdWJmb2xkZXIuDQogICAgIiIiDQogICAgIyBOb3JtYWxpemU6IHdlIHdhbnQgdGhlIOKAnGdhbWUv4oCdIGZvbGRlcg0KICAgIGlmIG9zLnBhdGguYmFzZW5hbWUoZ2FtZV9wYXRoKSA9PSAiZ2FtZSI6DQogICAgICAgIGdhbWVfZGlyID0gZ2FtZV9wYXRoDQogICAgZWxzZToNCiAgICAgICAgY2FuZGlkYXRlID0gb3MucGF0aC5qb2luKGdhbWVfcGF0aCwgImdhbWUiKQ0KICAgICAgICBpZiBvcy5wYXRoLmlzZGlyKGNhbmRpZGF0ZSk6DQogICAgICAgICAgICBnYW1lX2RpciA9IGNhbmRpZGF0ZQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgZ2FtZV9kaXIgPSBnYW1lX3BhdGggICMgd2UgdHJ5IGRpcmVjdGx5DQoNCiAgICBpZiBub3Qgb3MucGF0aC5pc2RpcihnYW1lX2Rpcik6DQogICAgICAgIHByaW50KCJFUlJPUjogZGlyZWN0b3J5IG5vdCBmb3VuZDoge30iLmZvcm1hdChnYW1lX2RpcikpDQogICAgICAgIHN5cy5leGl0KDEpDQoNCiAgICAjIDEuIHNjcmlwdF92ZXJzaW9uLnR4dCAocHJpb3JpdHkgYnV0IG9wdGlvbmFsKQ0KICAgIG1ham9yID0gZGV0ZWN0X2Zyb21fc2NyaXB0X3ZlcnNpb24oZ2FtZV9kaXIpDQogICAgaWYgbWFqb3IgaXMgbm90IE5vbmU6DQogICAgICAgIHJldHVybiBtYWpvcg0KDQogICAgIyAyLiBBcmNoaXZlcyAucnBhIChSZWxpYWJsZSBzaWduYXR1cmVzIGZvciBSZW4nUHkgOCkNCiAgICBtYWpvciA9IGRldGVjdF9mcm9tX2FyY2hpdmUoZ2FtZV9kaXIpDQogICAgaWYgbWFqb3IgaXMgbm90IE5vbmU6DQogICAgICAgICMgUlBBLTMuMCBjYW4gYmUgNiBvciA3OyB3ZSByZWZpbmUgaXQgd2l0aCB0aGUgLnJweWMgZmlsZXMuDQogICAgICAgIGlmIG1ham9yID09IDc6DQogICAgICAgICAgICBycHljX21ham9yID0gZGV0ZWN0X2Zyb21fcnB5YyhnYW1lX2RpcikNCiAgICAgICAgICAgIGlmIHJweWNfbWFqb3IgaXMgbm90IE5vbmU6DQogICAgICAgICAgICAgICAgcmV0dXJuIHJweWNfbWFqb3INCiAgICAgICAgcmV0dXJuIG1ham9yDQoNCiAgICAjIDMuIC5ycHljIGZpbGVzICh2ZXJ5IHJlbGlhYmxlIGZvciBSZW4nUHkgNiBhbmQgNywgYnV0IGRvIG5vdCBkaXN0aW5ndWlzaCBiZXR3ZWVuIDcgYW5kIDgpOg0KICAgIG1ham9yID0gZGV0ZWN0X2Zyb21fcnB5YyhnYW1lX2RpcikNCiAgICBpZiBtYWpvciBpcyBub3QgTm9uZToNCiAgICAgICAgcmV0dXJuIG1ham9yDQoNCiAgICAjIDQ
-    echo uIFRleHQgZmlsZXMgaW4gdGhlIHJvb3QgZm9sZGVyIChtYXkgY29udGFpbiB2ZXJzaW9uIGluZm8sIGVzcGVjaWFsbHkgZm9yIFJlbidQeSA4KToNCiAgICBtYWpvciA9IGRldGVjdF9mcm9tX2V4ZWN1dGFibGUoZ2FtZV9kaXIpDQogICAgaWYgbWFqb3IgaXMgbm90IE5vbmU6DQogICAgICAgIHJldHVybiBtYWpvcg0KDQogICAgcmV0dXJuIE5vbmUNCg0KDQpkZWYgbWFpbigpOg0KICAgIGlmIGxlbihzeXMuYXJndikgPCAyOg0KICAgICAgICBwcmludCgiVXNhZ2U6IHt9IDxnYW1lX3BhdGg+Ii5mb3JtYXQoc3lzLmFyZ3ZbMF0pKQ0KICAgICAgICBzeXMuZXhpdCgxKQ0KDQogICAgZ2FtZV9wYXRoID0gc3lzLmFyZ3ZbMV0NCg0KICAgIG1ham9yID0gZGV0ZWN0X3JlbnB5X21ham9yKGdhbWVfcGF0aCkNCg0KICAgIGlmIG1ham9yIGlzIE5vbmU6DQogICAgICAgIHByaW50KCJFUlJPUjogaW1wb3NzaWJsZSB0byBkZXRlY3QgUmVuJ1B5IHZlcnNpb24gaW4gOiB7fSIuZm9ybWF0KGdhbWVfcGF0aCkpDQogICAgICAgIHN5cy5leGl0KDEpDQoNCiAgICBpZiBtYWpvciBub3QgaW4gKDYsIDcsIDgpOg0KICAgICAgICBwcmludCgiRVJST1I6IHVuZXhwZWN0ZWQgUmVuJ1B5IHZlcnNpb24gZGV0ZWN0ZWQgOiB7fSIuZm9ybWF0KG1ham9yKSkNCiAgICAgICAgc3lzLmV4aXQoMSkNCg0KICAgIHByaW50KG1ham9yKQ0KDQoNCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6DQogICAgbWFpbigpDQo=
+    <nul set /p="IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQojIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLQ0KaW1wb3J0IG9zDQppbXBvcnQgc3lzDQppbXBvcnQgcmUNCg0KIyAtLS0gMS4gU3RhbmRhcmQgbWV0aG9kOiBpbXBvcnQgcmVucHkgLS0tDQp0cnk6DQogICAgaW1wb3J0IHJlbnB5DQogICAgcHJpbnQocmVucHkudmVyc2lvbl90dXBsZVswXSkNCiAgICBzeXMuZXhpdCgwKQ0KZXhjZXB0IEV4Y2VwdGlvbjoNCiAgICBwYXNzICAjIGZhbGxiYWNrIGJlbG93DQoNCmRlZiBkZXRlY3RfZnJvbV9zY3JpcHRfdmVyc2lvbihnYW1lX2Rpcik6DQogICAgIyAxKSBSZW4nUHkgNy84IDogc2NyaXB0X3ZlcnNpb24udHh0DQogICAgcGF0aCA9IG9zLnBhdGguam9pbihnYW1lX2RpciwgInNjcmlwdF92ZXJzaW9uLnR4dCIpDQogICAgaWYgb3MucGF0aC5pc2ZpbGUocGF0aCk6DQogICAgICAgIHRyeToNCiAgICAgICAgICAgIHdpdGggb3BlbihwYXRoLCAiciIpIGFzIGY6DQogICAgICAgICAgICAgICAgY29udGVudCA9IGYucmVhZCgpLnN0cmlwKCkNCg0KICAgICAgICAgICAgIyBUdXBsZSBmb3JtYXQgOiAoOCwgMSwgMCkNCiAgICAgICAgICAgIG0gPSByZS5zZWFyY2gocidcKFxzKihcZCspXHMqLCcsIGNvbnRlbnQpDQogICAgICAgICAgICBpZiBtOg0KICAgICAgICAgICAgICAgIHJldHVybiBpbnQobS5ncm91cCgxKSkNCg0KICAgICAgICAgICAgIyBTaW1wbGUgZm9ybWF0IDogOC4xLjAgb3UgOA0KICAgICAgICAgICAgbSA9IHJlLm1hdGNoKHInXHMqKFxkKyknLCBjb250ZW50KQ0KICAgICAgICAgICAgaWYgbToNCiAgICAgICAgICAgICAgICByZXR1cm4gaW50KG0uZ3JvdXAoMSkpDQoNCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbjoNCiAgICAgICAgICAgIHBhc3MNCg0KICAgICMgMikgUmVuJ1B5IDYgOiByZW5weS92ZXJzaW9uLnB5DQogICAgdmVyc2lvbl9weSA9IG9zLnBhdGguam9pbihnYW1lX2RpciwgInJlbnB5IiwgInZlcnNpb24ucHkiKQ0KICAgIGlmIG9zLnBhdGguaXNmaWxlKHZlcnNpb25fcHkpOg0KICAgICAgICB0cnk6DQogICAgICAgICAgICB3aXRoIG9wZW4odmVyc2lvbl9weSwgInIiKSBhcyBmOg0KICAgICAgICAgICAgICAgIGNvbnRlbnQgPSBmLnJlYWQoKQ0KDQogICAgICAgICAgICAjIHZlcnNpb24gPSAiNi45OS4xNCINCiAgICAgICAgICAgIG0gPSByZS5zZWFyY2gocid2ZXJzaW9uXHMqPVxzKiIoXGQrKScsIGNvbnRlbnQpDQogICAgICAgICAgICBpZiBtOg0KICAgICAgICAgICAgICAgIHJldHVybiBpbnQobS5ncm91cCgxKSkNCg0KICAgICAgICBleGNlcHQgRXhjZXB0aW9uOg0KICAgICAgICAgICAgcGFzcw0KDQogICAgcmV0dXJuIE5vbmUNCg0KDQpkZWYgZGV0ZWN0X2Zyb21fcnB5YyhnYW1lX2Rpcik6DQogICAgIiIiDQogICAgUmVhZHMgdGhlIG1hZ2ljIG51bWJlciBvZiAucnB5YyAvIC5ycHltYyBmaWxlcy4NCiAgICBSZW4nUHkgNjogbWFnaWMg4oCcUkVOUFkgUlBDMeKAnSAgLT4gbWFqb3IgNiAoYW5kIHNvbWUgZWFybHkgNykNCiAgICBSZW4nUHkgNzogbWFnaWMg4oCcUkVOUFkgUlBDMuKAnSAgLT4gbWFqb3IgNw0KICAgIFJlbidQeSA4OiBtYWdpYyDigJxSRU5QWSBSUEMy4oCdICB3aXRoIFB5dGhvbiAzIChjYW5ub3QgYmUgZWFzaWx5IGRpc3Rpbmd1aXNoZWQNCiAgICAgICAgICAgICAgICBmcm9tIDcgdXNpbmcgbWFnaWMgYWxvbmUsIG90aGVyIG1ldGhvZHMgYXJlIHVzZWQgdG8gY29tcGxldGUgdGhlIHByb2Nlc3MpDQogICAgTm90ZTogc29tZSBlYXJseSBSZW4nUHkgNyBtYXkgc3RpbGwgdXNlIOKAnFJFTlBZIFJQQzHigJ0gbWFnaWMsIGJ1dCB0aGV5IGFyZSByYXJlIGFuZCB3ZSBwcmlvcml0aXplIHRoZSBtb3JlIGNvbW1vbiBjYXNlLg0KICAgICIiIg0KICAgIG1hZ2ljX21hcCA9IHsNCiAgICAgICAgYiJSRU5QWSBSUEMxIjogNiwNCiAgICAgICAgYiJSRU5QWSBSUEMyIjogNywgICMgY2FuIGFsc28gYmUgOA0KICAgIH0NCiAgICBmb3Igcm9vdCwgZGlycywgZmlsZXMgaW4gb3Mud2FsayhnYW1lX2Rpcik6DQogICAgICAgIGZvciBmbmFtZSBpbiBmaWxlczoNCiAgICAgICAgICAgIGlmIGZuYW1lLmVuZHN3aXRoKCIucnB5YyIpIG9yIGZuYW1lLmVuZHN3aXRoKCIucnB5bWMiKToNCiAgICAgICAgICAgICAgICBmcGF0aCA9IG9zLnBhdGguam9pbihyb290LCBmbmFtZSkNCiAgICAgICAgICAgICAgICB0cnk6DQogICAgICAgICAgICAgICAgICAgIHdpdGggb3BlbihmcGF0aCwgInJiIikgYXMgZjoNCiAgICAgICAgICAgICAgICAgICAgICAgIGhlYWRlciA9IGYucmVhZCgxMCkNCiAgICAgICAgICAgICAgICAgICAgZm9yIG1hZ2ljLCBtYWpvciBpbiBtYWdpY19tYXAuaXRlbXMoKToNCiAgICAgICAgICAgICAgICAgICAgICAgIGlmIGhlYWRlci5zdGFydHN3aXRoKG1hZ2ljKToNCiAgICAgICAgICAgICAgICAgICAgICAgICAgICByZXR1cm4gbWFqb3INCiAgICAgICAgICAgICAgICBleGNlcHQgRXhjZXB0aW9uOg0KICAgICAgICAgICAgICAgICAgICBjb250aW51ZQ0KICAgIHJldHVybiBOb25lDQoNCg0KZGVmIGRldGVjdF9mcm9tX2V4ZWN1dGFibGUoZ2FtZV9kaXIpOg0KICAgICIiIg0KICAgIExvb2sgZm9yIHZlcnNpb24gY2x1ZXMgaW4gdGhlIGV4ZWN1dGFibGVzL2xpYnMgcHJlc2VudA0KICAgIGluIHRoZSBnYW1lIGZvbGRlciAoc3RyaW5ncyDigJw3LuKAnSBvciDigJw4LuKAnSBjbG9zZSB0byDigJxSZW4nUHnigJ0pLg0KICAgICIiIg0KICAgIGJhc2UgPSBvcy5wYXRoLmRpcm5hbWUoZ2FtZV9kaXIpICAjIHBhcmVudCBmb2xkZXIgb2YgdGhlIGdhbWUvIGZvbGRlcg0KICAgIHNlYXJjaF9kaXJzID0gW2Jhc2UsIGdhbWVfZGlyXQ0KICAgIHBhdHRlcm5zID0gWw0KICAgICAgICAocmUuY29tcGlsZShyIlJlbi4/UHlccysoXGQpXC5cZCIpLCBOb25lKSwNCiAgICAgICAgKHJlLmNvbXBpbGUociJyZW5weVtfXC1dKFxkKVwuXGQiKSwgcmUuSUdOT1JFQ0FTRSksDQogICAgXQ0KICAgIGZvciBzZGlyIGluIHNlYXJjaF9kaXJzOg0KICAgICAgICBmb3IgZm5hbWUgaW4gb3MubGlzdGRpcihzZGlyKToNCiAgICAgICAgICAgIGZwYXRoID0gb3MucGF0aC5qb2luKHNkaXIsIGZuYW1lKQ0KICAgICAgICAgICAgaWYgbm90IG9zLnBhdGguaXNmaWxlKGZwYXRoKToNCiAgICAgICAgICAgICAgICBjb250aW51ZQ0KICAgICAgICAgICAgIyBPbmx5IHNtYWxsIHRleHQgb3IgbG9nIGZpbGVzIGFyZSByZWFkLg0KICAgICAgICAgICAgaWYgZm5hbWUuZW5kc3dpdGgoKCIudHh0IiwgIi5sb2ciLCAiLmluaSIsICIuY2ZnIiwgIi5qc29uIikpOg0KICAgICAgICAgICAgICAgIHRyeToNCiAgICAgICAgICAgICAgICAgICAgd2l0aCBvcGVuKGZwYXRoLCAiciIpIGFzIGY6DQogICAgICAgICAgICAgICAgICAgICAgICBjb250ZW50ID0gZi5yZWFkKDQwOTYpDQogICAgICAgICAgICAgICAgICAgIGZvciBwYXQsIGZsYWdzIGluIHBhdHRlcm5zOg0KICAgICAgICAgICAgICAgICAgICAgICAgbSA9IHBhdC5zZWFyY2goY29udGVudCkNCiAgICAgICAgICAgICAgICAgICAgICAgIGlmIG06DQogICAgICAgICAgICAgICAgICAgICAgICAgICAgbWFqb3IgPSBpbnQobS5ncm91cCgxKSkNCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBpZiBtYWpvciBpbiAoNiwgNywgOCk6DQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHJldHVybiBtYWpvcg0KICAgICAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb246DQogICAgICAgICAgICAgICAgICAgIHBhc3MNCiAgICByZXR1cm4gTm9uZQ0KDQoNCmRlZiBkZXRlY3RfZnJvbV9hcmNoaXZlKGdhbWVfZGlyKToNCiAgICAiIiINCiAgICBJbnNwZWN0IHRoZSAucnBhIGFyY2hpdmVzIHRvIGRldGVjdCB0aGUgdmVyc2lvbi4NCiAgICBSUEEtMS4wIC0+IFJlbidQeSA2IGVhcmx5DQogICAgUlBBLTIuMCAtPiBSZW4nUHkgNg0KICAgIFJQQS0zLjAgLT4gUmVuJ1B5IDYvNw0KICAgIFJQQU4zLjAgLT4gUmVuJ1B5IDggKG5ldyBuZXV0cm9uIGFyY2hpdmUpDQogICAgWmlYLTEyQSAtPiBSZW4nUHkgOCAobmV3IG5ldXRyb24gYXJjaGl2ZSkNCiAgICBaaVgtMTJCIC0+IFJlbidQeSA4IChuZXcgbmV1dHJvbiBhcmNoaXZlKQ0KICAgICIiIg0KICAgIHJwYV9tYWpvcl9tYXAgPSB7DQogICAgICAgIGIiUlBBLTEuMCI6IDYsDQogICAgICAgIGIiUlBBLTIuMCI6IDYsDQogICAgICAgIGIiUlBBLTMuMCI6IDcsICAgIyBNYXliZSA2IGFzIHdlbGwsIGJ1dCB3ZSdsbCByZWZpbmUgaXQgbGF0ZXIuDQogICAgICAgIGIiUlBBTjMuMCI6IDgsDQogICAgICAgIGIiWmlYLTEyQSI6IDgsDQogICAgICAgIGIiWmlYLTEyQiI6IDgsDQogICAgfQ0KICAgIGZvdW5kID0gTm9uZQ0KICAgIGZvciBmbmFtZSBpbiBvcy5saXN0ZGlyKGdhbWVfZGlyKToNCiAgICAgICAgaWYgbm90IGZuYW1lLmVuZHN3aXRoKCIucnBhIik6DQogICAgICAgICAgICBjb250aW51ZQ0KICAgICAgICBmcGF0aCA9IG9zLnBhdGguam9pbihnYW1lX2RpciwgZm5hbWUpDQogICAgICAgIHRyeToNCiAgICAgICAgICAgIHdpdGggb3BlbihmcGF0aCwgInJiIikgYXMgZjoNCiAgICAgICAgICAgICAgICBoZWFkZXIgPSBmLnJlYWQoOCkNCiAgICAgICAgICAgIGZvciBtYWdpYywgbWFqb3IgaW4gcnBhX21ham9yX21hcC5pdGVtcygpOg0KICAgICAgICAgICAgICAgIGlmIGhlYWRlci5zdGFydHN3aXRoKG1hZ2ljKToNCiAgICAgICAgICAgICAgICAgICAgIyBXZSBrZWVwIHRoZSBoaWdoZXN0IG1ham9yIGZvdW5kLg0KICAgICAgICAgICAgICAgICAgICBpZiBmb3VuZCBpcyBOb25lIG9yIG1ham9yID4gZm91bmQ6DQogICAgICAgICAgICAgICAgICAgICAgICBmb3VuZCA9IG1ham9yDQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb246DQogICAgICAgICAgICBwYXNzDQogICAgcmV0dXJuIGZvdW5kDQoNCg0KZGVmIGRldGVjdF9yZW5weV9tYWpvcihnYW1lX3BhdGgpOg0KICAgICIiIg0KICAgIERldGVjdHMgdGhlIG1ham9yIFJlbidQeSB2ZXJzaW9uICg2LCA3LCBvciA4KSBmcm9tIHRoZSBnYW1lIHBhdGguDQogICAgZ2FtZV9wYXRoIGNhbiBiZSB0aGUgZ2FtZSdzIHJvb3QgZm9sZGVyIG9yIHRoZSDigJxnYW1lL+KAnSBzdWJmb2xkZXIuDQogICAgIiIiDQogICAgIyBOb3JtYWxpemU6IHdlIHdhbnQgdGhlIOKAnGdhbWUv4oCdIGZvbGRlcg0KICAgIGlmIG9zLnBhdGguYmFzZW5hbWUoZ2FtZV9wYXRoKSA9PSAiZ2FtZSI6DQogICAgICAgIGdhbWVfZGlyID0gZ2FtZV9wYXRoDQogICAgZWxzZToNCiAgICAgICAgY2FuZGlkYXRlID0gb3MucGF0aC5qb2luKGdhbWVfcGF0aCwgImdhbWUiKQ0KICAgICAgICBpZiBvcy5wYXRoLmlzZGlyKGNhbmRpZGF0ZSk6DQogICAgICAgICAgICBnYW1lX2RpciA9IGNhbmRpZGF0ZQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgZ2FtZV9kaXIgPSBnYW1lX3BhdGggICMgd2UgdHJ5IGRpcmVjdGx5DQoNCiAgICBpZiBub3Qgb3MucGF0aC5pc2RpcihnYW1lX2Rpcik6DQogICAgICAgIHByaW50KCJFUlJPUjogZGlyZWN0b3J5IG5vdCBmb3VuZDoge30iLmZvcm1hdChnYW1lX2RpcikpDQogICAgICAgIHN5cy5leGl0KDEpDQoNCiAgICAjIDEuIHNjcmlwdF92ZXJzaW9uLnR4dCAocHJpb3JpdHkgYnV0IG9wdGlvbmFsKQ0KICAgIG1ham9yID0gZGV0ZWN0X2Zyb21fc2NyaXB0X3ZlcnNpb24oZ2FtZV9kaXIpDQogICAgaWYgbWFqb3IgaXMgbm90IE5vbmU6DQogICAgICAgIHJldHVybiBtYWpvcg0KDQogICAgIyAyLiBBcmNoaXZlcyAucnBhIChSZWxpYWJsZSBzaWduYXR1cmVzIGZvciBSZW4nUHkgOCkNCiAgICBtYWpvciA9IGRldGVjdF9mcm9tX2FyY2hpdmUoZ2FtZV9kaXIpDQogICAgaWYgbWFqb3IgaXMgbm90IE5vbmU6DQogICAgICAgICMgUlBBLTMuMCBjYW4gYmUgNiBvciA3OyB3ZSByZWZpbmUgaXQgd2l0aCB0aGUgLnJweWMgZmlsZXMuDQogICAgICAgIGlmIG1ham9yID09IDc6DQogICAgICAgICAgICBycHljX21ham9yID0gZGV0ZWN0X2Zyb21fcnB5YyhnYW1lX2RpcikNCiAgICAgICAgICAgIGlmIHJweWNfbWFqb3IgaXMgbm90IE5vbmU6DQogICAgICAgICAgICAgICAgcmV0dXJuIHJweWNfbWFqb3INCiAgICAgICAgcmV0dXJuIG1ham9yDQoNCiAgICAjIDMuIC5ycHljIGZpbGVzICh2ZXJ5IHJlbGlhYmxlIGZvciBSZW4nUHkgNiBhbmQgN"
+    <nul set /p="ywgYnV0IGRvIG5vdCBkaXN0aW5ndWlzaCBiZXR3ZWVuIDcgYW5kIDgpOg0KICAgIG1ham9yID0gZGV0ZWN0X2Zyb21fcnB5YyhnYW1lX2RpcikNCiAgICBpZiBtYWpvciBpcyBub3QgTm9uZToNCiAgICAgICAgcmV0dXJuIG1ham9yDQoNCiAgICAjIDQuIFRleHQgZmlsZXMgaW4gdGhlIHJvb3QgZm9sZGVyIChtYXkgY29udGFpbiB2ZXJzaW9uIGluZm8sIGVzcGVjaWFsbHkgZm9yIFJlbidQeSA4KToNCiAgICBtYWpvciA9IGRldGVjdF9mcm9tX2V4ZWN1dGFibGUoZ2FtZV9kaXIpDQogICAgaWYgbWFqb3IgaXMgbm90IE5vbmU6DQogICAgICAgIHJldHVybiBtYWpvcg0KDQogICAgcmV0dXJuIE5vbmUNCg0KDQpkZWYgbWFpbigpOg0KICAgIGlmIGxlbihzeXMuYXJndikgPCAyOg0KICAgICAgICBwcmludCgiVXNhZ2U6IHt9IDxnYW1lX3BhdGg+Ii5mb3JtYXQoc3lzLmFyZ3ZbMF0pKQ0KICAgICAgICBzeXMuZXhpdCgxKQ0KDQogICAgZ2FtZV9wYXRoID0gc3lzLmFyZ3ZbMV0NCg0KICAgIG1ham9yID0gZGV0ZWN0X3JlbnB5X21ham9yKGdhbWVfcGF0aCkNCg0KICAgIGlmIG1ham9yIGlzIE5vbmU6DQogICAgICAgIHByaW50KCJFUlJPUjogaW1wb3NzaWJsZSB0byBkZXRlY3QgUmVuJ1B5IHZlcnNpb24gaW4gOiB7fSIuZm9ybWF0KGdhbWVfcGF0aCkpDQogICAgICAgIHN5cy5leGl0KDEpDQoNCiAgICBpZiBtYWpvciBub3QgaW4gKDYsIDcsIDgpOg0KICAgICAgICBwcmludCgiRVJST1I6IHVuZXhwZWN0ZWQgUmVuJ1B5IHZlcnNpb24gZGV0ZWN0ZWQgOiB7fSIuZm9ybWF0KG1ham9yKSkNCiAgICAgICAgc3lzLmV4aXQoMSkNCg0KICAgIHByaW50KG1ham9yKQ0KDQoNCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6DQogICAgbWFpbigpDQo="
 )
 
 call :pwsh_exp "!renpyvers2.%LNG%!..." "%detect_renpy_version%"
@@ -1092,12 +1174,12 @@ if not exist "%detect_renpy_version%" (
     call :elog .
     call :elog "!FCREATE.%LNG%! %YEL%%detect_renpy_version%%RES%. !UNACONT.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!...
+    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
 
     call :exitn 3
 ) else (
-    if %DEBUGLEVEL% GEQ 1 echo "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "%detect_renpy_version% "%WORKDIR%" >> "%UNRENLOG%"
-    "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "%detect_renpy_version%" "%WORKDIR%" > "%TEMP%\renpy_version.tmp"
+    if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%python.exe" %PYNOASSERT% "%detect_renpy_version% "%WORKDIR%" >> "%UNRENLOG%"
+    "%PYTHONHOME%python.exe" %PYNOASSERT% "%detect_renpy_version%" "%WORKDIR%" > "%TEMP%\renpy_version.tmp"
     set /p RENPYVERSION=<"%TEMP%\renpy_version.tmp"
     del "%TEMP%\renpy_version.tmp"
     if not defined RENPYVERSION (
@@ -1106,7 +1188,7 @@ if not exist "%detect_renpy_version%" (
         call :elog "    !renpyvers3.%LNG%!"
         call :elog "    !renpyvers4.%LNG%!. !UNACONT.%LNG%!"
         call :elog .
-        pause>nul|set/p=.      !ANYKEY.%LNG%!...
+        pause>nul|set /p=".      !ANYKEY.%LNG%!..."
 
         call :exitn 3
     ) else (
@@ -1183,13 +1265,13 @@ set "sscreen3.ru=Сделано с %RED%<3%YEL% для фанатов - JoeLurme
 set "sscreen3.zh=由 JoeLurmel @ f95zone.to 为粉丝制作 - %RED%<3%YEL%"
 
 if "%NOCLS%" == "0" cls
-REM call :center "%YEL%__________________________________________________________________________________%RES%"
-call :center "%YEL%╔═══════════════════════════════════════════════════════════════════════════════════╗%RES%"
-echo               %YEL%    __  __      ____                  __          __%RES%
-echo               %YEL%   / / / /___  / __ \___  ____       / /_  ____ _/ /_%RES%
-echo               %YEL%  / / / / __ \/ /_/ / _ \/ __ \     / __ \/ __ ^`/ __/%RES%
-echo               %YEL% / /_/ / / / / __  /  __/ / / / _  / /_/ / /_/ / /_%RES%
-echo               %YEL% \____/_/ /_/_/  \_\___/_/ /_/ (_) \_.__/\__^,_/\__/ - %NAME% %CYA%%VERSION%%RES%
+REM call :center "%ORA%__________________________________________________________________________________%RES%"
+call :center "%ORA%╔═══════════════════════════════════════════════════════════════════════════════════╗%RES%"
+echo               %ORA%    __  __      ____                  __          __%RES%
+echo               %ORA%   / / / /___  / __ \___  ____       / /_  ____ _/ /_%RES%
+echo               %ORA%  / / / / __ \/ /_/ / _ \/ __ \     / __ \/ __ ^`/ __/%RES%
+echo               %ORA% / /_/ / / / / __  /  __/ / / / _  / /_/ / /_/ / /_%RES%
+echo               %ORA% \____/_/ /_/_/  \_\___/_/ /_/ (_) \_.__/\__^,_/\__/ - %NAME% %CYA%%VERSION%%RES%
 echo.
 echo                 !sscreen1.%LNG%!
 echo                 !sscreen2.%LNG%!
@@ -1217,8 +1299,8 @@ if %rand% == 13 call :center "“ I am Groot. ” – Groot"
 if %rand% == 14 call :center "“ Do or do not. There is no try. ” – Yoda"
 if %rand% == 15 call :center "“ I know kung fu. ” – Neo"
 if %rand% == 16 call :center "“ You have been recruited by the Star League to defend the frontier. ” – The Last Starfighter"
-REM call :center "%YEL%__________________________________________________________________________________%RES%"
-call :center "%YEL%╚═══════════════════════════════════════════════════════════════════════════════════╝%RES%"
+REM call :center "%ORA%__________________________________________________________________________________%RES%"
+call :center "%ORA%╚═══════════════════════════════════════════════════════════════════════════════════╝%RES%"
 
 set "MTITLE.en=Working directory: "
 set "MTITLE.fr=Répertoire de travail : "
@@ -1285,28 +1367,28 @@ set "choiced.ru=Принудить все пропуски (Unseen Text, After C
 set "choiced.zh=强制全部跳过（未读文本、选择后、过渡）"
 
 set "choicee.en=Force enable rollback (scroll wheel)."
-set "choicee.fr=Activer le "Rollback" (molette de défilement)."
-set "choicee.es=Forzar la activación del "Rollback" (rueda de desplazamiento)."
-set "choicee.it=Forza l'attivazione del "Rollback" (rotella di scorrimento)."
-set "choicee.de=Aktivieren Sie "Rollback" (Scrollrad)."
-set "choicee.ru=Принудить активацию "Rollback" (колесо прокрутки)."
-set "choicee.zh=强制启用 "Rollback"（滚轮）"
+set "choicee.fr=Activer le 'Rollback' (molette de défilement)."
+set "choicee.es=Forzar la activación del 'Rollback' (rueda de desplazamiento)."
+set "choicee.it=Forza l'attivazione del 'Rollback' (rotella di scorrimento)."
+set "choicee.de=Aktivieren Sie 'Rollback' (Scrollrad)."
+set "choicee.ru=Принудить активацию 'Rollback' (колесо прокрутки)."
+set "choicee.zh=强制启用 'Rollback'（滚轮）"
 
-set "choicef.en=Enable "Quick Save" (Shift+S, F5) and "Quick Load" (Shift+L, F9)."
-set "choicef.fr=Activer "Quick Save" (Shift+S, F5) et "Quick Load" (Shift+L, F9)."
-set "choicef.es=Activar "Quick Save" (Shift+S, F5) y "Quick Load" (Shift+L, F9)."
-set "choicef.it=Attiva "Quick Save" (Shift+S, F5) e "Quick Load" (Shift+L, F9)."
-set "choicef.de=Aktivieren Sie "Quick Save" (Shift+S, F5) und "Quick Load" (Shift+L, F9)."
-set "choicef.ru=Включить "Quick Save" (Shift+S, F5) и "Quick Load" (Shift+L, F9)."
-set "choicef.zh=启用 "Quick Save" (Shift+S, F5) 和 "Quick Load" (Shift+L, F9)。"
+set "choicef.en=Enable 'Quick Save' (Shift+S, F5) and 'Quick Load' (Shift+L, F9)."
+set "choicef.fr=Activer 'Quick Save' (Shift+S, F5) et 'Quick Load' (Shift+L, F9)."
+set "choicef.es=Activar 'Quick Save' (Shift+S, F5) y 'Quick Load' (Shift+L, F9)."
+set "choicef.it=Attiva 'Quick Save' (Shift+S, F5) e 'Quick Load' (Shift+L, F9)."
+set "choicef.de=Aktivieren Sie 'Quick Save' (Shift+S, F5) und 'Quick Load' (Shift+L, F9)."
+set "choicef.ru=Включить 'Quick Save' (Shift+S, F5) и 'Quick Load' (Shift+L, F9)."
+set "choicef.zh=启用 'Quick Save' (Shift+S, F5) 和 'Quick Load' (Shift+L, F9)。"
 
-set "choiceg.en=Try forcing the "Quick Menu" to display."
-set "choiceg.fr=Essayer de forcer l'affichage du "Quick Menu"."
-set "choiceg.es=Intenta forzar la visualización del "Quick Menu"."
-set "choiceg.it=Prova a forzare la visualizzazione del "Quick Menu"."
-set "choiceg.de=Versuche, die Anzeige des "Quick Menu" zu erzwingen."
-set "choiceg.ru=Попробуй заставить отобразиться "Quick Menu"."
-set "choiceg.zh=尝试强制显示 "Quick Menu"。"
+set "choiceg.en=Try forcing the 'Quick Menu' to display."
+set "choiceg.fr=Essayer de forcer l'affichage du 'Quick Menu'."
+set "choiceg.es=Intenta forzar la visualización del 'Quick Menu'."
+set "choiceg.it=Prova a forzare la visualizzazione del 'Quick Menu'."
+set "choiceg.de=Versuche, die Anzeige des 'Quick Menu' zu erzwingen."
+set "choiceg.ru=Попробуй заставить отобразиться 'Quick Menu'."
+set "choiceg.zh=尝试强制显示 'Quick Menu'。"
 
 set "choiceh.en=Download and add Universal Gallery Unlocker ZLZK."
 set "choiceh.fr=Télécharger et ajouter le Universal Gallery Unlocker ZLZK."
@@ -1355,6 +1437,14 @@ set "choicem.it=Scelta multipla in un colpo solo"
 set "choicem.de=Mehrfachauswahl auf einmal"
 set "choicem.ru=Множественный выбор за один раз"
 set "choicem.zh=一次性应用多个选项"
+
+set "choicen.en=Remove the nasty sync folder in the %YEL%AppData subfolder%RES%."
+set "choicen.fr=Supprimer le dossier de synchronisation nuisible dans le %YEL%sous dossier AppData%RES%."
+set "choicen.es=Eliminar el carpeta de sincronización peligrosa en el %YEL%subcarpeta AppData%RES%."
+set "choicen.it=Rimuovi la cartella di sincronizzazione pericolosa nel %YEL%sotto cartella AppData%RES%."
+set "choicen.de=Entferne das schmutzige Synchronisationsverzeichnis im %YEL%Unterverzeichnis AppData%RES%."
+set "choicen.ru=Удалить нежелательную папку синхронизации в подпапке %YEL%AppData%RES%."
+set "choicen.zh=在 %YEL%AppData%RES% 子文件夹中删除那个不好的同步文件夹。"
 
 set "choicep.en=Add a custom add-on."
 set "choicep.fr=Ajouter un add-on personnalisé."
@@ -1428,13 +1518,13 @@ set "choice-.de=Einträge im Kontextmenü aus der Registrierung entfernen."
 set "choice-.ru=Удалить элемент контекстного меню из реестра."
 set "choice-.zh=从注册表中移除右键菜单项。"
 
-set "mquest.en=Your choice (1,2,a-m,p,r,s,t,u,+,-,x by default "
-set "mquest.fr=Votre choix (1, 2, a-m, p, r, s, t, u, +, -, x par défaut "
-set "mquest.es=Su elección (1,2,a-m,p,r,s,t,u,+,-,x por defecto "
-set "mquest.it=La tua scelta (1,2,a-m,p,r,s,t,u,+,-,x predefinito "
-set "mquest.de=Ihre Wahl (1,2,a-m,p,r,s,t,u,+,-,x für Standard "
-set "mquest.ru=Ваш выбор (1,2,a-m,p,r,s,t,u,+,-,x по умолчанию "
-set "mquest.zh=你的选择 (1, 2, a-m, p, r, s, t, u, +, -, 默认为 x): "
+set "mquest.en=Your choice (1,2,a-n,p,r,s,t,u,+,-,x by default "
+set "mquest.fr=Votre choix (1, 2, a-n, p, r, s, t, u, +, -, x par défaut "
+set "mquest.es=Su elección (1,2,a-n,p,r,s,t,u,+,-,x por defecto "
+set "mquest.it=La tua scelta (1,2,a-n,p,r,s,t,u,+,-,x predefinito "
+set "mquest.de=Ihre Wahl (1,2,a-n,p,r,s,t,u,+,-,x für Standard "
+set "mquest.ru=Ваш выбор (1,2,a-n,p,r,s,t,u,+,-,x по умолчанию "
+set "mquest.zh=你的选择 (1, 2, a-n, p, r, s, t, u, +, -, 默认为 x): "
 
 set "choicex.en=Exit"
 set "choicex.fr=Quitter"
@@ -1473,6 +1563,7 @@ echo        j) %CYA%!choicej.%LNG%!%RES%
 echo        k) %CYA%!choicek.%LNG%!%RES%
 echo        l) %CYA%!choicel.%LNG%!%RES%
 echo        m) %CYA%!choicem.%LNG%!%RES%
+echo        n) %CYA%!choicen.%LNG%!%RES%
 echo        p) %CYA%!choicep.%LNG%!%RES%
 echo        r) %YEL%!choicer.%LNG%!%RES%
 echo        s) %YEL%!choices.%LNG%!%RES%
@@ -1529,6 +1620,7 @@ if /i "%OPTION%" == "j" call :add_utbox
 if /i "%OPTION%" == "k" call :add_urm
 if /i "%OPTION%" == "l" call :replace_anyname
 if /i "%OPTION%" == "m" call :multiChoice
+if /i "%OPTION%" == "n" call :nasty_sync
 if /i "%OPTION%" == "p" call :add_custom_addon
 if /i "%OPTION%" == "r" call :restore_files
 if /i "%OPTION%" == "s" call :delete_backups
@@ -1544,8 +1636,9 @@ if /i "%OPTION%" == "x" goto exitn
 echo.
 <nul set /p="%RED%!uchoice.%LNG%! %YEL%%OPTION%%RES%"
 echo.
-timeout /t 2 %DEBUGREDIR%
+timeout /T 2 %DEBUGREDIR%
 goto :menu
+
 
 :: Drop our console/dev mode enabler into the game folder
 :console
@@ -1564,7 +1657,7 @@ if exist "%unren-console%" (
     call :elog .
 ) else (
     >"%unren-console%.b64" (
-        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KZGVmaW5lIDk5OSBjb25maWcuY29uc29sZSA9IFRydWUNCmRlZmluZSA5OTkgY29uZmlnLmRldmVsb3BlciA9IFRydWUNCg==
+        <nul set /p="IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KZGVmaW5lIDk5OSBjb25maWcuY29uc29sZSA9IFRydWUNCmRlZmluZSA5OTkgY29uZmlnLmRldmVsb3BlciA9IFRydWUNCg=="
     )
     call :elog .
     call :pwsh_exp "!choicea.%LNG%!.." "%unren-console%"
@@ -1596,7 +1689,7 @@ if exist "%unren-debug%" (
     call :elog .
 ) else (
     >"%unren-debug%.b64" (
-        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KZGVmaW5lIDk5OSBjb25maWcuZGVidWcgPSBUcnVlDQo=
+        <nul set /p="IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KZGVmaW5lIDk5OSBjb25maWcuZGVidWcgPSBUcnVlDQo="
     )
     call :elog .
     call :pwsh_exp "!choiceb.%LNG%!.." "%unren-debug%"
@@ -1628,7 +1721,7 @@ if exist "%unren-skip%" (
     call :elog .
 ) else (
     >"%unren-skip%.b64" (
-        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIF9wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCiAgICBfcHJlZmVyZW5jZXMuc2tpcF9hZnRlcl9jaG9pY2VzID0gVHJ1ZQ0KICAgIF9wcmVmZXJlbmNlcy5mYXN0X3NraXBwaW5nID0gVHJ1ZQ0KICAgIF9wcmVmZXJlbmNlcy5za2lwID0gWyAnS19MQ1RSTCcsICdLX1JDVFJMJyBdDQogICAgY29uZmlnLmFsbG93X3NraXBwaW5nID0gVHJ1ZQ0KICAgIHJlbnB5LmdhbWUucHJlZmVyZW5jZXMuc2tpcF91bnNlZW4gPSBUcnVlDQogICAgcmVucHkuZ2FtZS5wcmVmZXJlbmNlcy5za2lwX2FmdGVyX2Nob2ljZXMgPSBUcnVlDQogICAgcmVucHkuY29uZmlnLmZhc3Rfc2tpcHBpbmcgPSBUcnVlDQogICAgcGVyc2lzdGVudC5nYW1lX2NvbXBsZXRlZCA9IFRydWUgIyBGcm9tIEphc29uOiBDb21pbmcgb2YgYWdlDQogICAgdHJ5Og0KICAgICAgICBjb25maWcua2V5bWFwWydza2lwJ10gPSBbICdLX0xDVFJMJywgJ0tfUkNUUkwnIF0NCiAgICBleGNlcHQ6DQogICAgICAgIHBhc3MNCg==
+        <nul set /p="IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KDQogICAgIyBNYW5kYXRvcnkNCiAgICBfcHJlZmVyZW5jZXMuYWxsb3dfc2tpcHBpbmcgPSBUcnVlDQogICAgcmVucHkuY29uZmlnLmFsbG93X3NraXBwaW5nID0gVHJ1ZQ0KDQogICAgdHJ5Og0KICAgICAgICBjb25maWcua2V5bWFwWydza2lwJ10gPSBbICdLX0xDVFJMJywgJ0tfUkNUUkwnIF0NCiAgICBleGNlcHQ6DQogICAgICAgIHBhc3MNCg0KICAgICMgVW5zZWVuIFRleHQNCiAgICBfcHJlZmVyZW5jZXMuc2tpcF91bnNlZW4gPSBUcnVlDQogICAgcmVucHkuZ2FtZS5wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCg0KICAgICMgQWZ0ZXIgQ2hvaWNlcw0KICAgIF9wcmVmZXJlbmNlcy5za2lwX2FmdGVyX2Nob2ljZXMgPSBUcnVlDQogICAgcmVucHkuZ2FtZS5wcmVmZXJlbmNlcy5za2lwX2FmdGVyX2Nob2ljZXMgPSBUcnVlDQoNCiAgICAjIEFsbG93IEZhc3Qgc2tpcHBpbmcNCiAgICByZW5weS5jb25maWcuZmFzdF9za2lwcGluZyA9IFRydWUNCg0KICAgICMgRnJvbSBKYXNvbjogQ29taW5nIG9mIGFnZQ0KICAgIHBlcnNpc3RlbnQuZ2FtZV9jb21wbGV0ZWQgPSBUcnVlDQo="
     )
     call :elog .
     call :pwsh_exp "!choicec.%LNG%!.."  "%unren-skip%"
@@ -1660,7 +1753,7 @@ if exist "%unren-skipall%" (
     call :elog .
 ) else (
     >"%unren-skipall%.b64" (
-        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIF9wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCiAgICBjb25maWcuYWxsb3dfc2tpcHBpbmcgPSBUcnVlDQogICAgcmVucHkuZ2FtZS5wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCiAgICByZW5weS5nYW1lLnByZWZlcmVuY2VzLnNraXBfYWZ0ZXJfY2hvaWNlcyA9IFRydWUNCiAgICByZW5weS5jb25maWcuZmFzdF9za2lwcGluZyA9IFRydWUNCiAgICBwcmVmZXJlbmNlcy50cmFuc2l0aW9ucyA9IDANCiAgICB0cnk6DQogICAgICAgIGNvbmZpZy5rZXltYXBbJ3NraXAnXSA9IFsgJ0tfTENUUkwnLCAnS19SQ1RSTCcgXQ0KICAgIGV4Y2VwdDoNCiAgICAgICAgcGFzcw0K
+        <nul set /p="IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KDQogICAgIyBNYW5kYXRvcnkNCiAgICBfcHJlZmVyZW5jZXMuYWxsb3dfc2tpcHBpbmcgPSBUcnVlDQogICAgcmVucHkuY29uZmlnLmFsbG93X3NraXBwaW5nID0gVHJ1ZQ0KDQogICAgdHJ5Og0KICAgICAgICBjb25maWcua2V5bWFwWydza2lwJ10gPSBbICdLX0xDVFJMJywgJ0tfUkNUUkwnIF0NCiAgICBleGNlcHQ6DQogICAgICAgIHBhc3MNCg0KICAgICMgVW5zZWVuIFRleHQNCiAgICBfcHJlZmVyZW5jZXMuc2tpcF91bnNlZW4gPSBUcnVlDQogICAgcmVucHkuZ2FtZS5wcmVmZXJlbmNlcy5za2lwX3Vuc2VlbiA9IFRydWUNCg0KICAgICMgQWZ0ZXIgQ2hvaWNlcw0KICAgIF9wcmVmZXJlbmNlcy5za2lwX2FmdGVyX2Nob2ljZXMgPSBUcnVlDQogICAgcmVucHkuZ2FtZS5wcmVmZXJlbmNlcy5za2lwX2FmdGVyX2Nob2ljZXMgPSBUcnVlDQoNCiAgICAjIFRyYW5zaXRpb25zDQogICAgX3ByZWZlcmVuY2VzLnRyYW5zaXRpb25zID0gMA0KDQogICAgIyBBbGxvdyBGYXN0IHNraXBwaW5nDQogICAgcmVucHkuY29uZmlnLmZhc3Rfc2tpcHBpbmcgPSBUcnVlDQoNCiAgICAjIEZyb20gSmFzb246IENvbWluZyBvZiBhZ2UNCiAgICBwZXJzaXN0ZW50LmdhbWVfY29tcGxldGVkID0gVHJ1ZQ0K"
     )
     call :elog .
     call :pwsh_exp "!choiced.%LNG%!.." "%unren-skipall%"
@@ -1691,8 +1784,8 @@ if exist "%unren-rollback%" (
     call :elog "%SKIP%" "!APRESENT.%LNG%!%RES%"
     call :elog .
 ) else (
-    > "%unren-rollback%.b64" (
-        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIHJlbnB5LmNvbmZpZy5yb2xsYmFja19lbmFibGVkID0gVHJ1ZQ0KICAgIHJlbnB5LmNvbmZpZy5oYXJkX3JvbGxiYWNrX2xpbWl0ID0gMjU2DQogICAgcmVucHkuY29uZmlnLnJvbGxiYWNrX2xlbmd0aCA9IDI1Ng0KICAgIGRlZiB1bnJlbl9ub2Jsb2NrKCphcmdzLCAqKmt3YXJncyk6DQogICAgICAgIHJldHVybg0KICAgIHJlbnB5LmJsb2NrX3JvbGxiYWNrID0gdW5yZW5fbm9ibG9jaw0KICAgIHRyeToNCiAgICAgICAgY29uZmlnLmtleW1hcFsncm9sbGJhY2snXSA9IFsgJ0tfUEFHRVVQJywgJ3JlcGVhdF9LX1BBR0VVUCcsICdLX0FDX0JBQ0snLCAnbW91c2Vkb3duXzQnIF0NCiAgICBleGNlcHQ6DQogICAgICAgIHBhc3MNCg==
+    >"%unren-rollback%.b64" (
+        <nul set /p="IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIHJlbnB5LmNvbmZpZy5yb2xsYmFja19lbmFibGVkID0gVHJ1ZQ0KICAgIHJlbnB5LmNvbmZpZy5oYXJkX3JvbGxiYWNrX2xpbWl0ID0gMjU2DQogICAgcmVucHkuY29uZmlnLnJvbGxiYWNrX2xlbmd0aCA9IDI1Ng0KICAgIGRlZiB1bnJlbl9ub2Jsb2NrKCphcmdzLCAqKmt3YXJncyk6DQogICAgICAgIHJldHVybg0KICAgIHJlbnB5LmJsb2NrX3JvbGxiYWNrID0gdW5yZW5fbm9ibG9jaw0KICAgIHRyeToNCiAgICAgICAgY29uZmlnLmtleW1hcFsncm9sbGJhY2snXSA9IFsgJ0tfUEFHRVVQJywgJ3JlcGVhdF9LX1BBR0VVUCcsICdLX0FDX0JBQ0snLCAnbW91c2Vkb3duXzQnIF0NCiAgICBleGNlcHQ6DQogICAgICAgIHBhc3MNCg=="
     )
     call :elog .
     call :pwsh_exp "!choicee.%LNG%!.." "%unren-rollback%"
@@ -1724,7 +1817,7 @@ if exist "%unren-quick%" (
     call :elog .
 ) else (
     >"%unren-quick%.b64" (
-        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIHRyeToNCiAgICAgICAgY29uZmlnLnVuZGVybGF5WzBdLmtleW1hcFsncXVpY2tTYXZlJ10gPSBRdWlja1NhdmUoKQ0KICAgICAgICBjb25maWcua2V5bWFwWydxdWlja1NhdmUnXSA9ICdLX0Y1Jw0KICAgICAgICBjb25maWcudW5kZXJsYXlbMF0ua2V5bWFwWydxdWlja0xvYWQnXSA9IFF1aWNrTG9hZCgpDQogICAgICAgIGNvbmZpZy5rZXltYXBbJ3F1aWNrTG9hZCddID0gJ0tfRjknDQogICAgZXhjZXB0Og0KICAgICAgICBwYXNzDQo=
+        <nul set /p="IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIHRyeToNCiAgICAgICAgY29uZmlnLnVuZGVybGF5WzBdLmtleW1hcFsncXVpY2tTYXZlJ10gPSBRdWlja1NhdmUoKQ0KICAgICAgICBjb25maWcua2V5bWFwWydxdWlja1NhdmUnXSA9ICdLX0Y1Jw0KICAgICAgICBjb25maWcudW5kZXJsYXlbMF0ua2V5bWFwWydxdWlja0xvYWQnXSA9IFF1aWNrTG9hZCgpDQogICAgICAgIGNvbmZpZy5rZXltYXBbJ3F1aWNrTG9hZCddID0gJ0tfRjknDQogICAgZXhjZXB0Og0KICAgICAgICBwYXNzDQo="
     )
     call :elog .
     call :pwsh_exp "!choicef.%LNG%!.." "%unren-quick%"
@@ -1756,7 +1849,7 @@ if exist "%unren-qmenu%" (
     call :elog .
 ) else (
     >"%unren-qmenu%.b64" (
-        echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCBweXRob246DQogICAgZGVmIGFsd2F5c19lbmFibGVfcXVpY2tfbWVudSgpOg0KICAgICAgICBzdG9yZS5xdWlja19tZW51ID0gVHJ1ZQ0KICAgICAgICByZW5weS5zaG93X3NjcmVlbigicXVpY2tfbWVudSIpDQogICAgY29uZmlnLm92ZXJsYXlfZnVuY3Rpb25zLmFwcGVuZChhbHdheXNfZW5hYmxlX3F1aWNrX21lbnUpDQoNCiAgICBkZWYgZm9yY2VfcXVpY2tfbWVudV9vbl9pbnRlcmFjdCgpOg0KICAgICAgICBzdG9yZS5xdWlja19tZW51ID0gVHJ1ZQ0KICAgIGNvbmZpZy5pbnRlcmFjdF9jYWxsYmFja3MuYXBwZW5kKGZvcmNlX3F1aWNrX21lbnVfb25faW50ZXJhY3Qp
+        <nul set /p="IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCBweXRob246DQogICAgZGVmIGFsd2F5c19lbmFibGVfcXVpY2tfbWVudSgpOg0KICAgICAgICBzdG9yZS5xdWlja19tZW51ID0gVHJ1ZQ0KICAgICAgICByZW5weS5zaG93X3NjcmVlbigicXVpY2tfbWVudSIpDQogICAgY29uZmlnLm92ZXJsYXlfZnVuY3Rpb25zLmFwcGVuZChhbHdheXNfZW5hYmxlX3F1aWNrX21lbnUpDQoNCiAgICBkZWYgZm9yY2VfcXVpY2tfbWVudV9vbl9pbnRlcmFjdCgpOg0KICAgICAgICBzdG9yZS5xdWlja19tZW51ID0gVHJ1ZQ0KICAgIGNvbmZpZy5pbnRlcmFjdF9jYWxsYmFja3MuYXBwZW5kKGZvcmNlX3F1aWNrX21lbnVfb25faW50ZXJhY3Qp"
     )
     call :elog .
     call :pwsh_exp "!choiceg.%LNG%!.." "%unren-qmenu%"
@@ -1778,7 +1871,7 @@ set "url=https://attachments.f95zone.to/2024/01/3314515_Universal_Gallery_Unlock
 set "uguzip=%TEMP%\Universal_Gallery_Unlocker.zip"
 set "uguhardzip=%TEMP%\hard.zip"
 set "ugusoftzip=%TEMP%\soft.zip"
-set "ugudir=%WORKDIR%\game\_mods\"
+set "ugudir=%WORKDIR%\game\_mods"
 
 call :elog .
 call :elog "!INCASEOF.%LNG%! %RES%"
@@ -2047,7 +2140,7 @@ if not defined addon_path (
 set "addon_path=%addon_path:"=%"
 
 :: Check if it's a URL or local path
-echo %addon_path% | findstr /r "^https\?://" >nul
+echo %addon_path% | "%SystemRoot%\System32\findstr.exe" /r "^https\?://" >nul
 if %errorlevel% EQU 0 (
     :: It's a URL
     set "temp_zip=%TEMP%\custom_addon.zip"
@@ -2157,7 +2250,7 @@ set /p "newname=!renaname.%LNG%!"
 
 if "%newname%" == "" (
     call :elog .
-    call :elog "%NOK%" "!renaname2.%LNG%!%RES%""
+    call :elog "%NOK%" "!renaname2.%LNG%!%RES%"
     call :elog .
     goto :newname
 ) else (
@@ -2165,7 +2258,7 @@ if "%newname%" == "" (
 )
 
 >"%unr-unkonwn%.b64" (
-    echo IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIGltcG9ydCByZQ0KDQogICAgIyBQbGFjZWhvbGRlcnMgcmVwbGFjZWQgYnkgUG93ZXJTaGVsbCBiZWZvcmUgZXhlY3V0aW9uDQogICAgT0xEID0gIm9sZG5hbWUiDQogICAgTkVXID0gIm5ld25hbWUiDQoNCiAgICBkZWYgX2Nhc2VfbGlrZShzLCBtb2RlbCk6DQogICAgICAgICMgQWxpZ24gdGhlIGNhc2Ugb2YgcyB3aXRoIHRoYXQgb2YgbW9kZWwgKHVwcGVyLCBUaXRsZSwgbG93ZXIpDQogICAgICAgIGlmIG1vZGVsLmlzdXBwZXIoKToNCiAgICAgICAgICAgIHJldHVybiBzLnVwcGVyKCkNCiAgICAgICAgZWxpZiBtb2RlbFs6MV0uaXN1cHBlcigpIGFuZCBtb2RlbFsxOl0uaXNsb3dlcigpOg0KICAgICAgICAgICAgcmV0dXJuIHMuY2FwaXRhbGl6ZSgpDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICByZXR1cm4gcy5sb3dlcigpDQoNCiAgICBkZWYgcmVwbGFjZV90ZXh0KHQpOg0KICAgICAgICBvbGQgPSBPTEQNCiAgICAgICAgbmV3ID0gTkVXDQoNCiAgICAgICAgb19lc2MgPSByZS5lc2NhcGUob2xkKQ0KICAgICAgICBmX29sZCA9IG9sZFs6MV0NCiAgICAgICAgZl9uZXcgPSBuZXdbOjFdDQoNCiAgICAgICAgIyAxKSBSZXBsYWNlbWVudCBvZiB0aGUgZW50aXJlIHdvcmQgKGNhc2UtaW5zZW5zaXRpdmUpIHdpdGggY2FzZSByZXN0b3JhdGlvbg0KICAgICAgICBiYXNlX3BhdCA9IHJlLmNvbXBpbGUocmYiXGIoP2k6KHtvX2VzY30pKVxiIikNCiAgICAgICAgZGVmIGJhc2VfcmVwbChtKToNCiAgICAgICAgICAgIHJldHVybiBfY2FzZV9saWtlKG5ldywgbS5ncm91cCgxKSkNCiAgICAgICAgdCA9IGJhc2VfcGF0LnN1YihiYXNlX3JlcGwsIHQpDQoNCiAgICAgICAgIyAyKSBTdHV0dGVyaW5nIHR5cGU6IGMtY29ubm9yIOKGkiBqLWpvZSAoYW5kIGNhc2UgdmFyaWFudHMpDQogICAgICAgIHN0MV9wYXQgPSByZS5jb21waWxlKHJmIlxiKFt7Zl9vbGQubG93ZXIoKX17Zl9vbGQudXBwZXIoKX1dKS0oP2k6KHtvX2VzY30pKVxiIikNCiAgICAgICAgZGVmIHN0MV9yZXBsKG0pOg0KICAgICAgICAgICAgcHJlZiA9IG0uZ3JvdXAoMSkgICAgICAgIyBwcmVmaXggbGV0dGVyIChjL0MpDQogICAgICAgICAgICBvbGRfcGFydCA9IG0uZ3JvdXAoMikgICAjIHdvcmQgKGNvbm5vci9Db25ub3IvQ09OTk9SKQ0KICAgICAgICAgICAgbmV3X3dvcmQgPSBfY2FzZV9saWtlKG5ldywgb2xkX3BhcnQpDQogICAgICAgICAgICBuZXdfZmlyc3QgPSBmX25ldy51cHBlcigpIGlmIHByZWYuaXN1cHBlcigpIGVsc2UgZl9uZXcubG93ZXIoKQ0KICAgICAgICAgICAgcmV0dXJuIGYie25ld19maXJzdH0te25ld193b3JkfSINCiAgICAgICAgdCA9IHN0MV9wYXQuc3ViKHN0MV9yZXBsLCB0KQ0KDQogICAgICAgICMgMykgU3R1dHRlcmluZyB0eXBlOiBjby1jb25ub3Ig4oaSIGpvLWpvZSAoYW5kIGNhc2UgdmFyaWFudHMpDQogICAgICAgIHN0Ml9wYXQgPSByZS5jb21waWxlKHJmIlxiKFt7Zl9vbGQubG93ZXIoKX17Zl9vbGQudXBwZXIoKX1dKShbb09dKS0oP2k6KHtvX2VzY30pKVxiIikNCiAgICAgICAgZGVmIHN0Ml9yZXBsKG0pOg0KICAgICAgICAgICAgcHJlZiA9IG0uZ3JvdXAoMSkgICAgICAgIyBwcmVmaXggbGV0dGVyIChjL0MpDQogICAgICAgICAgICBvY2hhciA9IG0uZ3JvdXAoMikgICAgICAjICdvJyBvciAnTycNCiAgICAgICAgICAgIG9sZF9wYXJ0ID0gbS5ncm91cCgzKSAgICMgd29yZCAoY29ubm9yL0Nvbm5vci9DT05OT1IpDQogICAgICAgICAgICBuZXdfd29yZCA9IF9jYXNlX2xpa2UobmV3LCBvbGRfcGFydCkNCiAgICAgICAgICAgIG5ld19maXJzdCA9IGZfbmV3LnVwcGVyKCkgaWYgcHJlZi5pc3VwcGVyKCkgZWxzZSBmX25ldy5sb3dlcigpDQogICAgICAgICAgICAjIEtlZXAgdGhlIGNhc2Ugb2YgdGhlICdvJyBsZXR0ZXIgYXMgZW5jb3VudGVyZWQNCiAgICAgICAgICAgIHJldHVybiBmIntuZXdfZmlyc3R9e29jaGFyfS17bmV3X3dvcmR9Ig0KICAgICAgICB0ID0gc3QyX3BhdC5zdWIoc3QyX3JlcGwsIHQpDQoNCiAgICAgICAgcmV0dXJuIHQNCg0KICAgIGNvbmZpZy5yZXBsYWNlX3RleHQgPSByZXBsYWNlX3RleHQNCiAgICBkZWwgcmVwbGFjZV90ZXh0DQo=
+    <nul set /p="IyBNYWRlIGJ5IChTTSkgYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCg0KaW5pdCA5OTkgcHl0aG9uOg0KICAgIGltcG9ydCByZQ0KDQogICAgIyBQbGFjZWhvbGRlcnMgcmVwbGFjZWQgYnkgUG93ZXJTaGVsbCBiZWZvcmUgZXhlY3V0aW9uDQogICAgT0xEID0gIm9sZG5hbWUiDQogICAgTkVXID0gIm5ld25hbWUiDQoNCiAgICBkZWYgX2Nhc2VfbGlrZShzLCBtb2RlbCk6DQogICAgICAgICMgQWxpZ24gdGhlIGNhc2Ugb2YgcyB3aXRoIHRoYXQgb2YgbW9kZWwgKHVwcGVyLCBUaXRsZSwgbG93ZXIpDQogICAgICAgIGlmIG1vZGVsLmlzdXBwZXIoKToNCiAgICAgICAgICAgIHJldHVybiBzLnVwcGVyKCkNCiAgICAgICAgZWxpZiBtb2RlbFs6MV0uaXN1cHBlcigpIGFuZCBtb2RlbFsxOl0uaXNsb3dlcigpOg0KICAgICAgICAgICAgcmV0dXJuIHMuY2FwaXRhbGl6ZSgpDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICByZXR1cm4gcy5sb3dlcigpDQoNCiAgICBkZWYgcmVwbGFjZV90ZXh0KHQpOg0KICAgICAgICBvbGQgPSBPTEQNCiAgICAgICAgbmV3ID0gTkVXDQoNCiAgICAgICAgb19lc2MgPSByZS5lc2NhcGUob2xkKQ0KICAgICAgICBmX29sZCA9IG9sZFs6MV0NCiAgICAgICAgZl9uZXcgPSBuZXdbOjFdDQoNCiAgICAgICAgIyAxKSBSZXBsYWNlbWVudCBvZiB0aGUgZW50aXJlIHdvcmQgKGNhc2UtaW5zZW5zaXRpdmUpIHdpdGggY2FzZSByZXN0b3JhdGlvbg0KICAgICAgICBiYXNlX3BhdCA9IHJlLmNvbXBpbGUocmYiXGIoP2k6KHtvX2VzY30pKVxiIikNCiAgICAgICAgZGVmIGJhc2VfcmVwbChtKToNCiAgICAgICAgICAgIHJldHVybiBfY2FzZV9saWtlKG5ldywgbS5ncm91cCgxKSkNCiAgICAgICAgdCA9IGJhc2VfcGF0LnN1YihiYXNlX3JlcGwsIHQpDQoNCiAgICAgICAgIyAyKSBTdHV0dGVyaW5nIHR5cGU6IGMtY29ubm9yIOKGkiBqLWpvZSAoYW5kIGNhc2UgdmFyaWFudHMpDQogICAgICAgIHN0MV9wYXQgPSByZS5jb21waWxlKHJmIlxiKFt7Zl9vbGQubG93ZXIoKX17Zl9vbGQudXBwZXIoKX1dKS0oP2k6KHtvX2VzY30pKVxiIikNCiAgICAgICAgZGVmIHN0MV9yZXBsKG0pOg0KICAgICAgICAgICAgcHJlZiA9IG0uZ3JvdXAoMSkgICAgICAgIyBwcmVmaXggbGV0dGVyIChjL0MpDQogICAgICAgICAgICBvbGRfcGFydCA9IG0uZ3JvdXAoMikgICAjIHdvcmQgKGNvbm5vci9Db25ub3IvQ09OTk9SKQ0KICAgICAgICAgICAgbmV3X3dvcmQgPSBfY2FzZV9saWtlKG5ldywgb2xkX3BhcnQpDQogICAgICAgICAgICBuZXdfZmlyc3QgPSBmX25ldy51cHBlcigpIGlmIHByZWYuaXN1cHBlcigpIGVsc2UgZl9uZXcubG93ZXIoKQ0KICAgICAgICAgICAgcmV0dXJuIGYie25ld19maXJzdH0te25ld193b3JkfSINCiAgICAgICAgdCA9IHN0MV9wYXQuc3ViKHN0MV9yZXBsLCB0KQ0KDQogICAgICAgICMgMykgU3R1dHRlcmluZyB0eXBlOiBjby1jb25ub3Ig4oaSIGpvLWpvZSAoYW5kIGNhc2UgdmFyaWFudHMpDQogICAgICAgIHN0Ml9wYXQgPSByZS5jb21waWxlKHJmIlxiKFt7Zl9vbGQubG93ZXIoKX17Zl9vbGQudXBwZXIoKX1dKShbb09dKS0oP2k6KHtvX2VzY30pKVxiIikNCiAgICAgICAgZGVmIHN0Ml9yZXBsKG0pOg0KICAgICAgICAgICAgcHJlZiA9IG0uZ3JvdXAoMSkgICAgICAgIyBwcmVmaXggbGV0dGVyIChjL0MpDQogICAgICAgICAgICBvY2hhciA9IG0uZ3JvdXAoMikgICAgICAjICdvJyBvciAnTycNCiAgICAgICAgICAgIG9sZF9wYXJ0ID0gbS5ncm91cCgzKSAgICMgd29yZCAoY29ubm9yL0Nvbm5vci9DT05OT1IpDQogICAgICAgICAgICBuZXdfd29yZCA9IF9jYXNlX2xpa2UobmV3LCBvbGRfcGFydCkNCiAgICAgICAgICAgIG5ld19maXJzdCA9IGZfbmV3LnVwcGVyKCkgaWYgcHJlZi5pc3VwcGVyKCkgZWxzZSBmX25ldy5sb3dlcigpDQogICAgICAgICAgICAjIEtlZXAgdGhlIGNhc2Ugb2YgdGhlICdvJyBsZXR0ZXIgYXMgZW5jb3VudGVyZWQNCiAgICAgICAgICAgIHJldHVybiBmIntuZXdfZmlyc3R9e29jaGFyfS17bmV3X3dvcmR9Ig0KICAgICAgICB0ID0gc3QyX3BhdC5zdWIoc3QyX3JlcGwsIHQpDQoNCiAgICAgICAgcmV0dXJuIHQNCg0KICAgIGNvbmZpZy5yZXBsYWNlX3RleHQgPSByZXBsYWNlX3RleHQNCiAgICBkZWwgcmVwbGFjZV90ZXh0DQo="
 )
 call :elog .
 call :pwsh_exp "!choicel.%LNG%!.." "%unr-unkonwn%"
@@ -2180,7 +2273,7 @@ if not exist "%unr-unkonwn%" (
     if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-unkonwn%') -replace 'oldname', '%oldname%' | Set-Content '%unr-unkonwn%'" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-unkonwn%') -replace 'oldname', '%oldname%' | Set-Content '%unr-unkonwn%'" %DEBUGREDIR%
     if not exist "%unr-unkonwn%" (
-        call :elog "%NOK%" "" !FNOTFOUND.%LNG%! %YEL%!unr-unkonwn!%RES%"
+        call :elog "%NOK%" "!FNOTFOUND.%LNG%! %YEL%!unr-unkonwn!%RES%"
         call :elog .
         goto :anynameend
     ) else (
@@ -2203,14 +2296,57 @@ timeout /T 1 %DEBUGREDIR%
 goto :finish
 
 
+:: Remove nasty sync folder
+:nasty_sync
+set "unren-nsync=%WORKDIR%\game\unren-nsync.rpy"
+
+call :elog .
+call :elog "!TWADD.%LNG%! %YEL%%unren-nsync%.%RES%"
+call :elog .
+call :elog "!INCASEDEL.%LNG%!"
+call :elog "%YEL%%unren-nsync%%RES%"
+call :elog "%YEL%%unren-nsync%c%RES%"
+
+if exist "%unren-nsync%" (
+    call :elog .
+    call :elog "%SKIP%" "!APRESENT.%LNG%!"
+    call :elog .
+) else (
+    >"%unren-nsync%" (
+        echo # Made by ^(SM^) aka JoeLurmel @ f95zone.to
+        echo.
+        echo init 9999 python:
+        echo     renpy.config.has_sync = False
+        echo     renpy.config.extra_savedirs = []
+        echo.
+    )
+    call :elog .
+    call :elog -n "%EMPTY%" "!choicen.%LNG%!.."
+    if not exist "%unren-nsync%" (
+        call :elog "%NOK%" "!FCREATE.%LNG%! %YEL%%unren-nsync%%RES%"
+        call :elog .
+    ) else (
+        call :elog "%OK%"
+    )
+)
+timeout /T 1 %DEBUGREDIR%
+goto :eof
+
+
 :: Restore .org files into their original name
 :restore_files
+setlocal disabledelayedexpansion
+for /f "delims=" %%A in ("%WORKDIR%") do (
+    endlocal
+    cd /d "%%A"
+)
+
 call :elog .
 call :elog "!choicer.%LNG%!"
 
 set "file_found=0"
 set "prevDir="
-for /R . %%f in (*.rpa.org *.rpy.org *.rpyc.org) do (
+for /R ".\game" %%f in (*.rpa.org *.rpy.org *.rpyc.org) do (
     set "currDir=%%~dpf"
     set "orgfile=%%f"
     set "filename=%%~nxf"
@@ -2255,12 +2391,18 @@ goto :finish
 
 :: Delete .org files made by the script
 :delete_backups
+setlocal disabledelayedexpansion
+for /f "delims=" %%A in ("%WORKDIR%") do (
+    endlocal
+    cd /d "%%A"
+)
+
 call :elog .
 call :elog "!choices.%LNG%!"
 
 set "file_found=0"
 set "prevDir="
-for /R . %%f in (*.rpa.org *.rpy.org *.rpyc.org) do (
+for /R ".\game" %%f in (*.rpa.org *.rpy.org *.rpyc.org) do (
     set "orgfile=%%f"
     set "currDir=%%~dpf"
     set "filename=%%~nxf"
@@ -2378,9 +2520,11 @@ if "%LNG%" == "de"  set translation_lang=german
 if "%LNG%" == "ru"  set translation_lang=russian
 if "%LNG%" == "zh"  set translation_lang=chinese
 
-setlocal disableDelayedExpansion
-cd /d "%WORKDIR%"
-endlocal
+setlocal disabledelayedexpansion
+for /f "delims=" %%A in ("%WORKDIR%") do (
+    endlocal
+    cd /d "%%A"
+)
 
 set "etext1.en=Searching for game name"
 set "etext1.fr=Recherche du nom du jeu"
@@ -2390,13 +2534,13 @@ set "etext1.de=Suche nach dem Spieletitel"
 set "etext1.ru=Поиск названия игры"
 set "etext1.zh=正在搜索游戏名称"
 
-set "etext2.en=No game files found with .exe, .py or .sh extensions."
-set "etext2.fr=Aucun fichier de jeu trouvé avec les extensions .exe, .py ou .sh."
-set "etext2.es=No se encontraron archivos de juego con las extensiones .exe, .py o .sh."
-set "etext2.it=Nessun file di gioco trovato con le estensioni .exe, .py o .sh."
-set "etext2.de=Keine Spieldateien mit den Erweiterungen .exe, .py oder .sh gefunden."
-set "etext2.ru=Не найдено игровых файлов с расширениями .exe, .py или .sh."
-set "etext2.zh=未找到带有 .exe、.py 或 .sh 扩展名的游戏文件。"
+set "etext2.en=No game files found with .exe or .py extensions."
+set "etext2.fr=Aucun fichier de jeu trouvé avec les extensions .exe ou .py."
+set "etext2.es=No se encontraron archivos de juego con las extensiones .exe -o .py."
+set "etext2.it=Nessun file di gioco trovato con le estensioni .exe -o .py."
+set "etext2.de=Keine Spieldateien mit den Erweiterungen .exe oder .py gefunden."
+set "etext2.ru=Не найдено игровых файлов с расширениями .exe или .py."
+set "etext2.zh=未找到带有 .exe 或 .py 扩展名的游戏文件。"
 
 set "etext3.en=Enter the target translation language (%YEL%%translation_lang%%RES% by default): "
 set "etext3.fr=Entrez la langue de traduction cible (%YEL%%translation_lang%%RES% par défaut) : "
@@ -2438,18 +2582,18 @@ set "etext7.de=Bitte verwenden Sie zuerst Option 2, um das Spiel zudekompilieren
 set "etext7.ru=Пожалуйста, сначала используйте опцию 2, чтобы декомпилировать игру."
 set "etext7.zh=请先使用选项 2 来反编译游戏。"
 
-set "etext8.en=Please use option 1 to decompile the game first."
-set "etext8.fr=Veuillez utiliser l'option 1 pour décompiler le jeu d'abord."
-set "etext8.es=Por favor, use la opcion 1 para descompilar el juego primero."
-set "etext8.it=Si prega di utilizzare l'opzione 1 per decompilare il gioco prima."
-set "etext8.de=Bitte verwenden Sie zuerst Option 1, um das Spiel zudekompilieren."
-set "etext8.ru=Пожалуйста, сначала используйте опцию 1, чтобы декомпилировать игру."
-set "etext8.zh=请先使用选项 1 来反编译游戏。"
+set "etext8.en=Please use option 1 to unpack the game first."
+set "etext8.fr=Veuillez utiliser l'option 1 pour désarchiver le jeu d'abord."
+set "etext8.es=Por favor, use la opcion 1 para descomprimir el juego primero."
+set "etext8.it=Si prega di utilizzare l'opzione 1 per disarchivare il gioco prima."
+set "etext8.de=Bitte verwenden Sie zuerst Option 1, um das Spiel zu entpacken."
+set "etext8.ru=Пожалуйста, сначала используйте опцию 1, чтобы распаковать игру."
+set "etext8.zh=请先使用选项 1 来解压游戏。"
 
 :: Check if needed files for extraction are present
 set "RpysFound=0"
 for /r ".\game" %%F in (*.rpy) do (
-    echo %%F | findstr /i /c:"\\tl\\" >nul 2>&1
+    echo %%F | "%SystemRoot%\System32\findstr.exe" /i /c:"\\tl\\" >nul 2>&1
     if errorlevel 1 set /a RpysFound+=1
 )
 if %RpysFound% LEQ 3 (
@@ -2457,7 +2601,7 @@ if %RpysFound% LEQ 3 (
     call :elog "%NOK%" "!etext6.%LNG%!"
     set "RpycFound=0"
     for /r ".\game" %%F in (*.rpyc) do (
-        echo %%F | findstr /i /c:"\\tl\\" >nul 2>&1
+        echo %%F | "%SystemRoot%\System32\findstr.exe" /i /c:"\\tl\\" >nul 2>&1
         if errorlevel 1 set /a RpycFound+=1
     )
     if !RpycFound! GTR 0 (
@@ -2482,7 +2626,7 @@ for %%e in (exe py) do (
         set "tempfname=%%~nf"
 
         REM Check if this name has already been processed
-        echo !processed! |  "%SystemRoot%\System32\findstr.exe"  /i "\!tempfname!" >nul
+        echo !processed! | "%SystemRoot%\System32\findstr.exe" /i "\!tempfname!" >nul
         if errorlevel 1 (
             REM Count how many files with this name exist
             set /a count=0
@@ -2514,7 +2658,6 @@ if "%fname%" == "" (
     call :elog "%NOK%" "!etext2.%LNG%!"
     goto :input_name
 ) else (
-    REM set "fname=%fname:.=%"
     if not exist "%WORKDIR%\%fname%.exe" (
         call :elog "%NOK%" "!etext2.%LNG%!"
         goto :input_name
@@ -2536,7 +2679,11 @@ if not exist "%WORKDIR%\game\tl\" (
 call :elog .
 call :elog -n "%EMPTY%" "!choicet.%LNG%!..."
 
-cd /d "%WORKDIR%"
+setlocal disabledelayedexpansion
+for /f "delims=" %%A in ("%WORKDIR%") do (
+    endlocal
+    cd /d "%%A"
+)
 if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%python.exe" %PYNOASSERT% "%fname%.py" game translate "%translation_lang%" >> "%UNRENLOG%"
 "%PYTHONHOME%python.exe" %PYNOASSERT% "%fname%.py" game translate "%translation_lang%" %DEBUGREDIR%
 if %errorlevel% NEQ 0 (
@@ -2616,7 +2763,7 @@ if %OLDREG% EQU 1 (
     call :elog .
     call :elog "%YEL%!areg5.%LNG%!%RES%"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!...
+    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
     exit /b
 )
 
@@ -2627,17 +2774,17 @@ call :elog "!areg2a.%LNG%!%RES%"
 call :elog .
 call :elog -n "%EMPTY%" "!areg3.%LNG%!..."
 
-"%regexe%" add "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" /ve /d "!areg4.%LNG%!" /f  >> "%UNRENLOG%" 2>&1
+"%regexe%" add "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" /ve /d "!areg4.%LNG%!" /f %DEBUGREDIR%
 set error=%errorlevel%
-"%regexe%" add "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" /v "Icon" /d "%SystemRoot%\System32\shell32.dll,-154" /f >> "%UNRENLOG%" 2>&1
+"%regexe%" add "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" /v "Icon" /d "%SystemRoot%\System32\shell32.dll,-154" /f %DEBUGREDIR%
 set /a error=%error%+%errorlevel%
-"%regexe%" add "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%\command" /ve /d "%SystemRoot%\System32\cmd.exe /c cd /d \"%%V\" && \"%SCRIPTDIR%%SCRIPTNAME%\" \"%%V\"" /f >> "%UNRENLOG%" 2>&1
+"%regexe%" add "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%\command" /ve /d "%SystemRoot%\System32\cmd.exe /c cd /d \"%%V\" && \"%SCRIPTDIR%%SCRIPTNAME%\" \"%%V\"" /f %DEBUGREDIR%
 set /a error=%error%+%errorlevel%
-"%regexe%" add "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /ve /d "!areg4.%LNG%!" /f >> "%UNRENLOG%" 2>&1
+"%regexe%" add "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /ve /d "!areg4.%LNG%!" /f %DEBUGREDIR%
 set error=%errorlevel%
-"%regexe%" add "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /v "Icon" /d "%SystemRoot%\System32\shell32.dll,-154" /f >> "%UNRENLOG%" 2>&1
+"%regexe%" add "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /v "Icon" /d "%SystemRoot%\System32\shell32.dll,-154" /f %DEBUGREDIR%
 set /a error=%error%+%errorlevel%
-"%regexe%" add "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%\command" /ve /d "%SystemRoot%\System32\cmd.exe /c cd /d \"%%V\" && \"%SCRIPTDIR%%SCRIPTNAME%\" \"%%V\"" /f >> "%UNRENLOG%" 2>&1
+"%regexe%" add "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%\command" /ve /d "%SystemRoot%\System32\cmd.exe /c cd /d \"%%V\" && \"%SCRIPTDIR%%SCRIPTNAME%\" \"%%V\"" /f %DEBUGREDIR%
 set /a error=%error%+%errorlevel%
 if %error% EQU 0 (
 	call :elog "%OK%"
@@ -2686,37 +2833,37 @@ call :elog -n "%EMPTY%" "!rreg2.%LNG%!..."
 
 set error=0
 if %OLDREG% EQU 1 (
-    "!regexe!" query "HKLM\SOFTWARE\Classes\Directory\shell\RunUnrenForAll" >> "%UNRENLOG%" 2>&1
+    "!regexe!" query "HKLM\SOFTWARE\Classes\Directory\shell\RunUnrenForAll" %DEBUGREDIR%
     if !errorlevel! EQU 0 (
-        "!regexe!" delete "HKLM\SOFTWARE\Classes\Directory\shell\RunUnrenForAll" /f >> "%UNRENLOG%" 2>&1
+        "!regexe!" delete "HKLM\SOFTWARE\Classes\Directory\shell\RunUnrenForAll" /f %DEBUGREDIR%
         set error=!errorlevel!
     )
-    "!regexe!" query "HKLM\SOFTWARE\Classes\Directory\shell\Run%SCRIPTNAME%" >> "%UNRENLOG%" 2>&1
+    "!regexe!" query "HKLM\SOFTWARE\Classes\Directory\shell\Run%SCRIPTNAME%" %DEBUGREDIR%
     if !errorlevel! EQU 0 (
-        "!regexe!" delete "HKLM\SOFTWARE\Classes\Directory\shell\Run%SCRIPTNAME%" /f >> "%UNRENLOG%" 2>&1
+        "!regexe!" delete "HKLM\SOFTWARE\Classes\Directory\shell\Run%SCRIPTNAME%" /f %DEBUGREDIR%
         set /a error=!error!+!errorlevel!
     )
-    "!regexe!" query "HKLM\SOFTWARE\Classes\Directory\Background\shell\Run%SCRIPTNAME%" >> "%UNRENLOG%" 2>&1
+    "!regexe!" query "HKLM\SOFTWARE\Classes\Directory\Background\shell\Run%SCRIPTNAME%" %DEBUGREDIR%
     if !errorlevel! EQU 0 (
-        "!regexe!" delete "HKLM\SOFTWARE\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /f >> "%UNRENLOG%" 2>&1
+        "!regexe!" delete "HKLM\SOFTWARE\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /f %DEBUGREDIR%
         set /a error=!error!+!errorlevel!
     )
     if !error! NEQ 0 (
         call :elog "%NOK%" "!ARIGHT.%LNG%!"
         call :elog .
-        pause>nul|set/p=.      !ANYKEY.%LNG%!...
+        pause>nul|set /p=".      !ANYKEY.%LNG%!..."
 
         call :exitn 3
     )
 ) else (
-    "!regexe!" query "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" >> "%UNRENLOG%" 2>&1
+    "!regexe!" query "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" %DEBUGREDIR%
     if !errorlevel! EQU 0 (
-        "!regexe!" delete "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" /f >> "%UNRENLOG%" 2>&1
+        "!regexe!" delete "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" /f %DEBUGREDIR%
         set error=!errorlevel!
     )
-    "!regexe!" query "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" >> "%UNRENLOG%" 2>&1
+    "!regexe!" query "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" %DEBUGREDIR%
     if !errorlevel! EQU 0 (
-        "!regexe!" delete "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /f >> "%UNRENLOG%" 2>&1
+        "!regexe!" delete "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /f %DEBUGREDIR%
         set /a error=!error!+!errorlevel!
     )
     if !error! NEQ 0 (
@@ -2813,19 +2960,19 @@ if %errorlevel% EQU 0 (
 if "%batch_name%.bat" == "%running_batch%" goto :special_upd
 
 call :elog -n "%EMPTY%" "!updating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat%RES%"
-move /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old" >> "%UNRENLOG%" 2>&1
+move /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old" %DEBUGREDIR%
 if %errorlevel% NEQ 0 (
     call :elog "%NOK%" "!LOGCHK.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!...
+    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
 
     call :exitn 2
 )
-copy /y "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%.bat" >> "%UNRENLOG%" 2>&1
+copy /y "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%.bat" %DEBUGREDIR%
 if %errorlevel% NEQ 0 (
     call :elog "%NOK%" "!LOGCHK.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!...
+    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
 
     call :exitn 2
 ) else (
@@ -2837,19 +2984,19 @@ goto :eof
 
 :special_upd
 call :elog -n "%EMPTY%" "!rupdating.%LNG%! %YEL%%SCRIPTDIR%%batch_name%.bat %RES%"
-copy /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old"  >> "%UNRENLOG%" 2>&1
+copy /y "%SCRIPTDIR%%batch_name%.bat" "%SCRIPTDIR%%batch_name%.old" %DEBUGREDIR%
 if %errorlevel% NEQ 0 (
     call :elog "%NOK%" "!LOGCHK.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!...
+    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
 
     call :exitn 2
 )
-copy /y "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%-new.bat" >> "%UNRENLOG%" 2>&1
+copy /y "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%-new.bat" %DEBUGREDIR%
 if %errorlevel% NEQ 0 (
     call :elog "%NOK%" "!LOGCHK.%LNG%!"
     call :elog .
-    pause>nul|set/p=.      !ANYKEY.%LNG%!...
+    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
 
     call :exitn 2
 ) else (
@@ -2974,9 +3121,9 @@ if not exist "%TEMP%\%upd_link%.tmp" (
 ) else (
     REM First time
     if not exist "%SCRIPTDIR%%upd_link%.txt" (
-        copy nul "%SCRIPTDIR%%upd_link%.txt" %DEBUGREDIR%
+        copy /y nul "%SCRIPTDIR%%upd_link%.txt" %DEBUGREDIR%
     )
-    "%SystemRoot%\System32\fc.exe" "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" >> "%UNRENLOG%" 2>&1
+    "%SystemRoot%\System32\fc.exe" "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" %DEBUGREDIR%
     if !errorlevel! GEQ 1 (
         call :elog "%OK%" "%YEL%!cupd3.%LNG%!%RES%"
 
@@ -3026,7 +3173,7 @@ if %new_upd% EQU 1 (
 
         goto :eof
     ) else (
-        move /y "%TEMP%\%upd_file%.tmp" "%TEMP%\%upd_file%.zip" >> "%UNRENLOG%" 2>&1
+        move /y "%TEMP%\%upd_file%.tmp" "%TEMP%\%upd_file%.zip" %DEBUGREDIR%
         if not exist "%TEMP%\%upd_file%.zip" (
             call :elog "%NOK%" "%YEL%!cupd6.%LNG%!%RES%"
             call :elog .
@@ -3037,7 +3184,7 @@ if %new_upd% EQU 1 (
             if exist "%UPD_TDIR%" rd /s /q "%UPD_TDIR%" %DEBUGREDIR%
             mkdir "%UPD_TDIR%" %DEBUGREDIR%
             echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Path '%TEMP%\%upd_file%.zip' -DestinationPath '%UPD_TDIR%' -Force" >> "%UNRENLOG%"
-            "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Path '%TEMP%\%upd_file%.zip' -DestinationPath '%UPD_TDIR%' -Force" >> "%UNRENLOG%" 2>&1
+            "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Path '%TEMP%\%upd_file%.zip' -DestinationPath '%UPD_TDIR%' -Force" %DEBUGREDIR%
             if !errorlevel! NEQ 0 (
                 call :elog "%NOK%" "%YEL%!cupd6.%LNG%!%RES%"
                 call :elog .
@@ -3050,8 +3197,8 @@ if %new_upd% EQU 1 (
             for %%f in (forall legacy current) do (
                 call :update_file "UnRen-%%~f"
             )
-            copy /y "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" >> "%UNRENLOG%" 2>&1
-            rd /s /q "%UPD_TDIR%" >> "%UNRENLOG%" 2>&1
+            copy /y "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" %DEBUGREDIR%
+            rd /s /q "%UPD_TDIR%" %DEBUGREDIR%
             if !relaunch! EQU 1 (
                 call :elog .
                 timeout /T 1 %DEBUGREDIR%
@@ -3095,7 +3242,7 @@ for %%F in (legacy current forall) do (
         call :elog "!cdwnld.%LNG%! %RES%"
         call :elog "%MAG%%URL_REF% %RES%"
         call :elog .
-        pause>nul|set/p=.      !ANYKEY.%LNG%!...
+        pause>nul|set /p=".      !ANYKEY.%LNG%!..."
 
         call :exitn 3
     ) else (
@@ -3107,12 +3254,12 @@ for %%F in (legacy current forall) do (
 set "BASENAMENONEW=%BASENAME:-new=%"
 if exist "%SCRIPTDIR%%BASENAMENONEW%-new.bat" (
     if "%SCRIPTNAME%" == "%BASENAMENONEW%-new.bat" (
-        copy /y "%SCRIPTDIR%%BASENAMENONEW%-new.bat" "%SCRIPTDIR%%BASENAMENONEW%.bat" >> "%UNRENLOG%" 2>&1
+        copy /y "%SCRIPTDIR%%BASENAMENONEW%-new.bat" "%SCRIPTDIR%%BASENAMENONEW%.bat" %DEBUGREDIR%
     ) else (
-        del /f /q "%SCRIPTDIR%%BASENAME%-new.bat" >> "%UNRENLOG%" 2>&1
+        del /f /q "%SCRIPTDIR%%BASENAME%-new.bat" %DEBUGREDIR%
     )
 )
-del /f /q "%SCRIPTDIR%%BASENAMENONEW%.old" >> "%UNRENLOG%" 2>&1
+del /f /q "%SCRIPTDIR%%BASENAMENONEW%.old" %DEBUGREDIR%
 
 call :elog "%OK%"
 exit /b
@@ -3138,11 +3285,11 @@ goto :menu
 set "choiceEx=%TEMP%\choiceEx.py"
 if not exist "%choiceEx%" if not defined AlreadyCreated (
     >"%choiceEx%.b64" (
-        echo IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQojIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLQ0KDQppbXBvcnQgc3lzDQppbXBvcnQgdGltZQ0KaW1wb3J0IG1zdmNydA0KaW1wb3J0IGNvZGVjcw0KDQppZiBzeXMudmVyc2lvbl9pbmZvWzBdIDwgMzoNCiAgICBpbXBvcnQgY3R5cGVzDQogICAgIyBGb3JjZSBsYSBjb25zb2xlIFdpbmRvd3MgZW4gVVRGLTgNCiAgICBjdHlwZXMud2luZGxsLmtlcm5lbDMyLlNldENvbnNvbGVDUCg2NTAwMSkNCiAgICBjdHlwZXMud2luZGxsLmtlcm5lbDMyLlNldENvbnNvbGVPdXRwdXRDUCg2NTAwMSkNCg0KICAgICMgQ1JVQ0lBTDogRW52ZWxvcHBlIHN0ZG91dCBhdmVjIHVuIHdyaXRlciBVVEYtOA0KICAgIHN5cy5zdGRvdXQgPSBjb2RlY3MuZ2V0d3JpdGVyKCd1dGYtOCcpKHN5cy5zdGRvdXQpDQogICAgc3lzLnN0ZGVyciA9IGNvZGVjcy5nZXR3cml0ZXIoJ3V0Zi04Jykoc3lzLnN0ZGVycikNCg0KIyBHw6hyZSBsZXMgZGV1eCBQeXRob24gMiBldCAzDQppZiBzeXMudmVyc2lvbl9pbmZvWzBdIDwgMzoNCiAgICBtc2cgPSBzeXMuYXJndlsxXS5kZWNvZGUoJ2xhdGluLTEnKSBpZiBpc2luc3RhbmNlKHN5cy5hcmd2WzFdLCBzdHIpIGVsc2Ugc3lzLmFyZ3ZbMV0NCmVsc2U6DQogICAgbXNnID0gc3lzLmFyZ3ZbMV0NCg0KY2hvaWNlcyAgICAgPSBzeXMuYXJndlsyXQ0KZGVmYXVsdCAgICAgPSBzeXMuYXJndlszXQ0KdGltZW91dCAgICAgPSBpbnQoc3lzLmFyZ3ZbNF0pDQpyYXcgICAgICAgICA9IChsZW4oc3lzLmFyZ3YpID4gNSBhbmQgc3lzLmFyZ3ZbNV0gPT0gIi1yYXdNc2ciKQ0KDQppZiByYXc6DQogICAgZGlzcGxheSA9IG1zZw0KZWxzZToNCiAgICBkaXNwID0gWyJbJXNdIiAlIGMgaWYgYyA9PSBkZWZhdWx0IGVsc2UgYyBmb3IgYyBpbiBjaG9pY2VzXQ0KICAgIGRpc3BsYXkgPSAiJXMgKCVzLCB0aW1lb3V0ICVzcykgOiAiICUgKG1zZywgJy8nLmpvaW4oZGlzcCksIHRpbWVvdXQpDQoNCnN5cy5zdGRvdXQud3JpdGUoZGlzcGxheSkNCnN5cy5zdGRvdXQuZmx1c2goKQ0KDQplbmQgPSB0aW1lLnRpbWUoKSArIHRpbWVvdXQNCnJlc3VsdCA9IGRlZmF1bHQNCg0Kd2hpbGUgdGltZS50aW1lKCkgPCBlbmQ6DQogICAgaWYgbXN2Y3J0LmtiaGl0KCk6DQogICAgICAgIGtleSA9IG1zdmNydC5nZXR3Y2goKQ0KICAgICAgICBpZiBrZXkgPT0gIlxyIjogICMgRW50ZXINCiAgICAgICAgICAgIGJyZWFrDQogICAgICAgIGtleSA9IGtleS51cHBlcigpDQogICAgICAgIGlmIGtleSBpbiBjaG9pY2VzOg0KICAgICAgICAgICAgcmVzdWx0ID0ga2V5DQogICAgICAgICAgICBicmVhaw0KICAgIHRpbWUuc2xlZXAoMC4wNSkNCg0Kc3lzLnN0ZG91dC53cml0ZShyZXN1bHQpDQpzeXMuc3Rkb3V0LndyaXRlKCJcbiIpDQpzeXMuZXhpdChjaG9pY2VzLmluZGV4KHJlc3VsdCkgKyAxKQ==
+        <nul set /p="IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQojIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLQ0KDQppbXBvcnQgc3lzDQppbXBvcnQgdGltZQ0KaW1wb3J0IG1zdmNydA0KaW1wb3J0IGNvZGVjcw0KDQppZiBzeXMudmVyc2lvbl9pbmZvWzBdIDwgMzoNCiAgICBpbXBvcnQgY3R5cGVzDQogICAgIyBGb3JjZSBsYSBjb25zb2xlIFdpbmRvd3MgZW4gVVRGLTgNCiAgICBjdHlwZXMud2luZGxsLmtlcm5lbDMyLlNldENvbnNvbGVDUCg2NTAwMSkNCiAgICBjdHlwZXMud2luZGxsLmtlcm5lbDMyLlNldENvbnNvbGVPdXRwdXRDUCg2NTAwMSkNCg0KICAgICMgQ1JVQ0lBTDogRW52ZWxvcHBlIHN0ZG91dCBhdmVjIHVuIHdyaXRlciBVVEYtOA0KICAgIHN5cy5zdGRvdXQgPSBjb2RlY3MuZ2V0d3JpdGVyKCd1dGYtOCcpKHN5cy5zdGRvdXQpDQogICAgc3lzLnN0ZGVyciA9IGNvZGVjcy5nZXR3cml0ZXIoJ3V0Zi04Jykoc3lzLnN0ZGVycikNCg0KIyBHw6hyZSBsZXMgZGV1eCBQeXRob24gMiBldCAzDQppZiBzeXMudmVyc2lvbl9pbmZvWzBdIDwgMzoNCiAgICBtc2cgPSBzeXMuYXJndlsxXS5kZWNvZGUoJ2xhdGluLTEnKSBpZiBpc2luc3RhbmNlKHN5cy5hcmd2WzFdLCBzdHIpIGVsc2Ugc3lzLmFyZ3ZbMV0NCmVsc2U6DQogICAgbXNnID0gc3lzLmFyZ3ZbMV0NCg0KY2hvaWNlcyAgICAgPSBzeXMuYXJndlsyXQ0KZGVmYXVsdCAgICAgPSBzeXMuYXJndlszXQ0KdGltZW91dCAgICAgPSBpbnQoc3lzLmFyZ3ZbNF0pDQpyYXcgICAgICAgICA9IChsZW4oc3lzLmFyZ3YpID4gNSBhbmQgc3lzLmFyZ3ZbNV0gPT0gIi1yYXdNc2ciKQ0KDQppZiByYXc6DQogICAgZGlzcGxheSA9IG1zZw0KZWxzZToNCiAgICBkaXNwID0gWyJbJXNdIiAlIGMgaWYgYyA9PSBkZWZhdWx0IGVsc2UgYyBmb3IgYyBpbiBjaG9pY2VzXQ0KICAgIGRpc3BsYXkgPSAiJXMgKCVzLCB0aW1lb3V0ICVzcykgOiAiICUgKG1zZywgJy8nLmpvaW4oZGlzcCksIHRpbWVvdXQpDQoNCnN5cy5zdGRvdXQud3JpdGUoZGlzcGxheSkNCnN5cy5zdGRvdXQuZmx1c2goKQ0KDQplbmQgPSB0aW1lLnRpbWUoKSArIHRpbWVvdXQNCnJlc3VsdCA9IGRlZmF1bHQNCg0Kd2hpbGUgdGltZS50aW1lKCkgPCBlbmQ6DQogICAgaWYgbXN2Y3J0LmtiaGl0KCk6DQogICAgICAgIGtleSA9IG1zdmNydC5nZXR3Y2goKQ0KICAgICAgICBpZiBrZXkgPT0gIlxyIjogICMgRW50ZXINCiAgICAgICAgICAgIGJyZWFrDQogICAgICAgIGtleSA9IGtleS51cHBlcigpDQogICAgICAgIGlmIGtleSBpbiBjaG9pY2VzOg0KICAgICAgICAgICAgcmVzdWx0ID0ga2V5DQogICAgICAgICAgICBicmVhaw0KICAgIHRpbWUuc2xlZXAoMC4wNSkNCg0Kc3lzLnN0ZG91dC53cml0ZShyZXN1bHQpDQpzeXMuc3Rkb3V0LndyaXRlKCJcbiIpDQpzeXMuZXhpdChjaG9pY2VzLmluZGV4KHJlc3VsdCkgKyAxKQ=="
     )
     if defined PYTHONHOME (
-        if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%\python.exe" %PYNOASSERT% "%TEMP%\b64decode.py" "%choiceEx%.b64" "%choiceEx%.tmp" >> "%UNRENLOG%"
-        "%PYTHONHOME%\python.exe" %PYNOASSERT% "%TEMP%\b64decode.py" "%choiceEx%.b64" "%choiceEx%.tmp" %DEBUGREDIR%
+        if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%python.exe" %PYNOASSERT% "%TEMP%\b64decode.py" "%choiceEx%.b64" "%choiceEx%.tmp" >> "%UNRENLOG%"
+        "%PYTHONHOME%python.exe" %PYNOASSERT% "%TEMP%\b64decode.py" "%choiceEx%.b64" "%choiceEx%.tmp" %DEBUGREDIR%
     ) else (
         if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "& { [IO.File]::WriteAllBytes('%choiceEx%.tmp', [Convert]::FromBase64String([IO.File]::ReadAllText('%choiceEx%.b64')))}" >> "%UNRENLOG%"
         "%PWRSHELL%" -NoProfile -Command "& { [IO.File]::WriteAllBytes('%choiceEx%.tmp', [Convert]::FromBase64String([IO.File]::ReadAllText('%choiceEx%.b64')))}" %DEBUGREDIR%
@@ -3154,8 +3301,8 @@ if not exist "%choiceEx%" if not defined AlreadyCreated (
     set "AlreadyCreated=1"
 )
 
-if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%\python.exe" %PYNOASSERT% "%choiceEx%" "%~1" "%~2" "%~3" "%~4" "%~5" >> "%UNRENLOG%"
-"%PYTHONHOME%\python.exe" %PYNOASSERT% "%choiceEx%" "%~1" "%~2" "%~3" "%~4" "%~5"
+if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%python.exe" %PYNOASSERT% "%choiceEx%" "%~1" "%~2" "%~3" "%~4" "%~5" >> "%UNRENLOG%"
+"%PYTHONHOME%python.exe" %PYNOASSERT% "%choiceEx%" "%~1" "%~2" "%~3" "%~4" "%~5"
 
 exit /b %errorlevel%
 
@@ -3207,11 +3354,11 @@ if not exist "%f2expand%.b64" (
 ) else (
     set "f2ps=!f2expand:'=''!"
     if defined PYTHONHOME (
-        if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%\python.exe" %PYNOASSERT% "%TEMP%\b64decode.py" "!f2ps!.b64" "!f2ps!.tmp" >> "%UNRENLOG%"
-        "%PYTHONHOME%\python.exe" %PYNOASSERT% "%TEMP%\b64decode.py" "!f2ps!.b64" "!f2ps!.tmp"
+        if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%python.exe" %PYNOASSERT% "%TEMP%\b64decode.py" "!f2ps!.b64" "!f2ps!.tmp" >> "%UNRENLOG%"
+        "%PYTHONHOME%python.exe" %PYNOASSERT% "%TEMP%\b64decode.py" "!f2ps!.b64" "!f2ps!.tmp"
     ) else (
         if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "& { $src='!f2ps!.b64'; $dst='!f2ps!.tmp'; [IO.File]::WriteAllBytes($dst, [Convert]::FromBase64String([IO.File]::ReadAllText($src)))}" >> "%UNRENLOG%"
-        "%PWRSHELL%" -NoProfile -Command "& { $src='!f2ps!.b64'; $dst='!f2ps!.tmp'; [IO.File]::WriteAllBytes($dst, [Convert]::FromBase64String([IO.File]::ReadAllText($src)))}" >> "%UNRENLOG%" 2>&1
+        "%PWRSHELL%" -NoProfile -Command "& { $src='!f2ps!.b64'; $dst='!f2ps!.tmp'; [IO.File]::WriteAllBytes($dst, [Convert]::FromBase64String([IO.File]::ReadAllText($src)))}" %DEBUGREDIR%
     )
     if %DEBUGLEVEL% GEQ 1 echo del /f /q "!f2expand!.b64" >> "%UNRENLOG%"
     del /f /q "!f2expand!.b64" %DEBUGREDIR%
@@ -3224,7 +3371,7 @@ if not exist "%f2expand%.b64" (
     )
 )
 set "expmsg=" & set "f2expand=" & set "f2ps="
-::set /a DEBUGLEVEL-=1
+::set DEBUGLEVEL=0
 goto :eof
 
 
@@ -3279,7 +3426,7 @@ if defined PREVMOD (
 
 :: Strip ANSI codes from cleanmsg
 setlocal EnableDelayedExpansion
-for %%C in (GRY RED GRE YEL MAG CYA RES) do (
+for %%C in (GRY RED ORA GRE YEL MAG CYA RES) do (
     call set "cleanmsg=%%cleanmsg:!%%C!=%%"
 )
 
@@ -3326,7 +3473,7 @@ set "msg=%~1"
 
 :: Strip color variables for logging
 set "cleanmsg=%msg%"
-for %%C in (GRY RED GRE YEL MAG CYA RES) do (
+for %%C in (GRY RED ORA GRE YEL MAG CYA RES) do (
     call set "cleanmsg=%%cleanmsg:!%%C!=%%"
 )
 
