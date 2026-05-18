@@ -31,7 +31,7 @@ If you like my work: [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_
 ## 📦 Included Files
 
 - `UnRen-forall.bat` — Multilingual launcher (Version 0.77)
-- `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.7.5604)
+- `UnRen-legacy.bat` — For Ren'Py ≤ 7 (Version 9.7.60)
 - `UnRen-current.bat` — For Ren'Py ≥ 8 (Version 9.7.80)
 - `UnRen-cfg.txt` — To configure language and batch behavior
 - `UnRen-link.txt` — Contains the download link for the full package and a changelog for updates
