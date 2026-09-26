@@ -7,17 +7,18 @@
 :: Modified by VepsrP - https://f95zone.to/members/vepsrp.329951/
 :: https://f95zone.to/threads/unrengui-unren-forall-v9-4-unren-powershell-forall-v9-4-unren-old.92717/
 
+:: UnRen-current.bat - UnRen Script for Ren'Py >= 8
+:: heavily modified by (SM) aka JoeLurmel @ f95zone.to, https://f95zone.to/threads/92717/post-17110063/
+:: This script is licensed under GNU GPL v3 — see LICENSE for details
+
 :: Purpose:
 :: This script is designed to automate the process of extracting and decompiling Ren'Py games.
 
 :: Using:
 :: rpatool - https://github.com/Shizmob/rpatool
+:: rpatool2 - extract RPA via renpy.loader, Version 0.1 by JoeLurmel
 :: unrpyc - https://github.com/CensoredUsername/unrpyc
 :: altrpatool - Modified version of rpatool by JoeLurmel based on the version found in UnRen script by VepsrP.
-
-:: UnRen-current.bat - UnRen Script for Ren'Py >= 8
-:: heavily modified by (SM) aka JoeLurmel @ f95zone.to
-:: This script is licensed under GNU GPL v3 — see LICENSE for details
 
 
 :: Get the current code page
@@ -31,21 +32,81 @@ set "TEMPDIR=%~1"
 if "%~1" == "--norestart" set "TEMPDIR=%~2"
 if "%~1" == "--norelaunch" set "TEMPDIR=%~2"
 
+
 setlocal enabledelayedexpansion
 :: DO NOT MODIFY BELOW THIS LINE unless you know what you're doing
 :: Define various global names
 set "NAME=current"
-set "VERSION=v9.7.80 - 05/17/26"
+set "VERSION=v9.8.11 - 09/24/26"
 title UnRen-%NAME%.bat - %VERSION%
 set "URL_REF=https://f95zone.to/threads/92717/post-17110063/"
 set "SCRIPTDIR=%~dp0"
-set "UPD_TDIR=%TEMP%\UnRenUpdate"
 set "SCRIPTNAME=%~nx0"
 set "BASENAME=%SCRIPTNAME:.bat=%"
+set "UPD_TDIR=%TEMP%\UnRenUpdate"
 set "UNRENLOG=%TEMP%\%BASENAME%.log"
-set "PWRSHELL=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
-if exist "%UNRENLOG%" del /f /q "%UNRENLOG%" >nul 2>&1
+set "REGEXE=%SystemRoot%\System32\reg.exe"
 
+
+:: Initializing debug mode
+set "DEBUGREDIR=1>nul 2>>%UNRENLOG%"
+set "DEBUGLEVEL=0"
+set "NOCLS=0"
+if exist "%UNRENLOG%" del /f /q "%UNRENLOG%" >nul
+
+:: Definition of reusable texts not language dependent
+set "GRY=[90m"
+set "RED=[91m"
+set "ORG=[38;5;208m"
+set "GRE=[92m"
+set "YEL=[93m"
+set "MAG=[95m"
+set "CYA=[96m"
+set "RES=[0m"
+
+set "EMPTY=[      ]"
+set "NOK=[  %RED%NOK%RES% ]"
+set "OK=[  %GRE%OK%RES%  ]"
+set "SKIP=[ %CYA%SKIP%RES% ]"
+set "WARN=[ %ORG%WARN%RES% ]"
+
+
+:: Set default values
+set "MDEFS=acefg"
+set "MDEFS2=12acefg"
+set "CTIME=5"
+set "PROCESSALL=0"
+set "NOBACKUP=0"
+set "_7ZIPLOC=%ProgramFiles%\7-Zip\7z.exe"
+:: External configuration file for LNG, MDEFS, MDEFS2 and CTIME.
+set "UNREN_CFG=%SCRIPTDIR%UnRen-cfg.txt"
+set "OLD_UNREN_CFG=%SCRIPTDIR%UnRen-cfg.bat"
+if exist "%OLD_UNREN_CFG%" if not exist "%UNREN_CFG%" (
+    move /y "%OLD_UNREN_CFG%" "%UNREN_CFG%" "%DEBUGREDIR%"
+)
+:: Load external configuration
+if exist "%UNREN_CFG%" (
+    for /f "usebackq tokens=1,* delims== " %%A in ("%UNREN_CFG%") do (
+        if /i "%%A"=="set" (
+            set %%B
+        )
+    )
+)
+
+:: Defined from external configuration file
+if defined LNG goto :lngtest
+
+call :CheckLanguage
+
+if "%LOCALE%" == "fr-FR" if "%LNG%" == "zh" (
+    "%SystemRoot%\System32\chcp.com" 936 "%DEBUGREDIR%"
+) else if "%LNG%" == "zh" (
+    "%SystemRoot%\System32\chcp.com" "%OLD_CP%" "%DEBUGREDIR%"
+) else if "%LNG%" == "ru" (
+    "%SystemRoot%\System32\chcp.com" "%OLD_CP%" "%DEBUGREDIR%"
+)
+
+call :CheckPowershell
 
 :: Use wmic for older system or PowerShell for newer ones to get date and time
 set "datetime="
@@ -56,7 +117,7 @@ if exist "%WMICEXE%" (
         goto :dbreak
     )
 ) else (
-    for /f "delims=" %%a in ('"%PWRSHELL%" -NoProfile -Command "(Get-CimInstance Win32_OperatingSystem).LocalDateTime.ToString(\"yyyyMMddHHmmss\")"') do (
+    for /f "delims=" %%a in ('%PWRSHELL% -NoProfile -Command "(Get-Date -Format \"yyyyMMddHHmmss\")"') do (
          set "datetime=%%a"
          goto :dbreak
     )
@@ -79,80 +140,8 @@ echo UnRen-%NAME%.bat %VERSION%, started on %formatted_date% at %formatted_time%
 >> "%UNRENLOG%" echo.
 
 
-:: Set default values
-set "MDEFS=acefg"
-set "MDEFS2=12acefg"
-set "CTIME=5"
-set "_7ZIPLOC=%ProgramFiles%\7-Zip\7z.exe"
-:: External configuration file for LNG, MDEFS, MDEFS2 and CTIME.
-set "UNREN_CFG=%SCRIPTDIR%UnRen-cfg.txt"
-set "OLD_UNREN_CFG=%SCRIPTDIR%UnRen-cfg.bat"
-if exist "%OLD_UNREN_CFG%" if not exist "%UNREN_CFG%" (
-    move /y "%OLD_UNREN_CFG%" "%UNREN_CFG%" %DEBUGREDIR%
-)
-:: Load external configuration
-if exist "%UNREN_CFG%" (
-    for /f "usebackq tokens=1,* delims== " %%A in ("%UNREN_CFG%") do (
-        if /i "%%A"=="set" (
-            set %%B
-        )
-    )
-)
-
-:: Defined from external configuration file
-if defined LNG goto :lngtest
-
-:: Clean retrieval of language code via WMIC or PowerShell
-if exist "%WMICEXE%" (
-    for /f "skip=1 tokens=1" %%l in ('%WMICEXE% os get oslanguage') do (
-        set LNGID=%%l
-        goto :found_lcid
-    )
-) else (
-    for /f %%l in ('"%PWRSHELL%" -NoProfile -Command "Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object -ExpandProperty OSLanguage"') do (
-        set LNGID=%%l
-        goto :found_lcid
-    )
-)
-
-:: LCID correspondence
-:found_lcid
-if "%LNGID%" == "1033" set "LNG=en"
-if "%LNGID%" == "1036" set "LNG=fr"
-if "%LNGID%" == "3082" set "LNG=es"
-if "%LNGID%" == "1040" set "LNG=it"
-if "%LNGID%" == "1031" set "LNG=de"
-if "%LNGID%" == "1049" set "LNG=ru"
-if "%LNGID%" == "2052" set "LNG=zh"
-if not defined LNG set "LNG=en"
-
-:: Language support test
-:lngtest
-set "SUPPORTED= de es en fr it ru zh "
-set "FIND= %LNG% "
-echo "%SUPPORTED%" | "%SystemRoot%\System32\findstr.exe" /i "%FIND%" >nul
-if %errorlevel% NEQ 0 set "LNG=en"
-
-:: To be able to take screenshots for F95zone
-if not "%~2" == "" (
-    echo "%SUPPORTED%" | "%SystemRoot%\System32\findstr.exe" /i " %~2 " >nul
-    if %errorlevel% EQU 0 set "LNG=%~2"
-)
-
-if "%LNGID%" == "1036" if "%LNG%" == "zh" (
-    "%SystemRoot%\System32\chcp.com" 936 >nul
-)
-
-
-:: Definition of reusable texts not language dependent
-set "GRY=[90m"
-set "RED=[91m"
-set "ORA=[38;5;208m"
-set "GRE=[92m"
-set "YEL=[93m"
-set "MAG=[95m"
-set "CYA=[96m"
-set "RES=[0m"
+:: Specific check for Windows 7, as it does not support ANSI colors by default.
+::If Ansicon is not installed, display a warning message and exit the script.
 for /f "tokens=4-5 delims=. " %%i in ('ver') do set OSVERS=%%i.%%j
 if "%OSVERS%" == "6.1" (
     if exist "%SystemRoot%\ansicon.exe" (
@@ -188,7 +177,7 @@ if "%OSVERS%" == "6.1" (
         echo !ansmsg2.%LNG%!
         echo !ansmsg3.%LNG%!
         echo.
-        pause
+        pause>nul|set /p=".      !ANYKEY.%LNG%!..."
 
         call :exitn 3
     )
@@ -196,12 +185,6 @@ if "%OSVERS%" == "6.1" (
 
 
 :: Definition of reusable texts
-set "EMPTY=[      ]"
-set "NOK=[  %RED%NOK%RES% ]"
-set "OK=[  %GRE%OK%RES%  ]"
-set "SKIP=[ %CYA%SKIP%RES% ]"
-set "WARN=[ %ORA%WARN%RES% ]"
-
 :: language dependent here, defined for each supported language.
 :: The script will use the appropriate one based on the detected or selected language.
 set "ANYKEY.en=Press any key to exit"
@@ -366,17 +349,11 @@ set "UNIT.zh=字节"
 :: End of reusable texts
 
 
-:: Initializing debug mode
-set "DEBUGREDIR=>nul 2>>%UNRENLOG%"
-set "DEBUGLEVEL=0"
-set "NOCLS=0"
-
-
 :: Check if it's launched with Windows Terminal, and relaunch with correct size if not
 set "NEW_COLS=110"
 set "NEW_LINES=60"
 set /a "NEW_LINES_UP=%NEW_LINES%+5"
-if defined WT_SESSION if not "%~1" == "--norelaunch" (
+if defined WT_SESSION if not "%~1" == "--norelaunch" if not "%~1" == "--norestart" (
     REM To avoid infinite loop in case of wrong relaunch argument, we check if the second argument is --norelaunch and skip the relaunch if it's the case.
     for /f "delims=" %%A in ('%SYSTEMROOT%\System32\where wt.exe') do set WT_PATH=%%A
     wt.exe --size %NEW_COLS%,%NEW_LINES% "%SystemRoot%\System32\cmd.exe" /c "%~f0" --norelaunch
@@ -410,10 +387,32 @@ if not defined WT_SESSION (
 
 :: Run only one time
 :thanks
-set "regexe=%SystemRoot%\System32\reg.exe"
 
-::"%regexe%" delete "HKCU\Software\UnRen" /va /f %DEBUGREDIR%
-"%regexe%" query "HKCU\Software\UnRen" /v Thanks %DEBUGREDIR%
+::Force the Thanks dsplay for debug.
+::%REGEXE% delete "HKCU\Software\UnRen" /va /f %DEBUGREDIR%
+
+:: Install the fonts if it's not already done, and add registry entry for console to be able to use it.
+:: Delete the previous entry of UnRen, to force the Thanks display at the first launch after the installation, and not on every launch.
+%REGEXE% query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Console\TrueTypeFont" /f "Unifont Moyen" %DEBUGREDIR%
+if %errorlevel% neq 0 (
+    net session %DEBUGREDIR%
+    if !errorlevel! neq 0 (
+        echo Une police doit être installée pour afficher correctement le jeu.
+        echo Cliquez Oui à la demande administrateur qui va suivre.
+        pause
+        powershell -Command "Start-Process '%~f0' -Verb RunAs"
+        exit /b
+    )
+    copy /y "%SCRIPTDIR%\fonts\unifont-16.0.04.ttf" "%SystemRoot%\Fonts" %DEBUGREDIR%
+    %REGEXE% add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Console\TrueTypeFont" /v "000" /t REG_SZ /d "Unifont Moyen" /f %DEBUGREDIR%
+    powershell -Command "Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class FontInstaller {[DllImport(\"gdi32.dll\")]public static extern int AddFontResource(string lpFileName);[DllImport(\"user32.dll\")]public static extern int SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);}';[FontInstaller]::AddFontResource('%SystemRoot%\Fonts\unifont-16.0.04.ttf');[FontInstaller]::SendMessage([IntPtr]0xFFFF, 0x001D, [IntPtr]0, [IntPtr]0);"
+    echo Police installée, veuillez relancer le jeu.
+    pause
+    exit /b
+) else (
+    REM %REGEXE% delete "HKCU\Software\UnRen" /va /f %DEBUGREDIR%
+)
+%REGEXE% query "HKCU\Software\UnRen" /v Thanks %DEBUGREDIR%
 if %errorlevel% EQU 0 (
     goto :nothanks
 )
@@ -425,18 +424,18 @@ if "%~1" == "--norestart" (
 )
 
 :: Save cmd.exe parameters for later use
-for /f "tokens=2*" %%A in ('%regexe% query "HKCU\Console" /v FaceName 2^>nul') do set "OLD_FACE=%%B"
-for /f "tokens=2*" %%A in ('%regexe% query "HKCU\Console" /v FontSize 2^>nul') do set "OLD_SIZE=%%B"
-for /f "tokens=2*" %%A in ('%regexe% query "HKCU\Console" /v FontFamily 2^>nul') do set "OLD_FAMILY=%%B"
-for /f "tokens=2*" %%A in ('%regexe% query "HKCU\Console" /v FontWeight 2^>nul') do set "OLD_WEIGHT=%%B"
+for /f "tokens=2*" %%A in ('%REGEXE% query "HKCU\Console" /v FaceName 2^>nul') do set "OLD_FACE=%%B"
+for /f "tokens=2*" %%A in ('%REGEXE% query "HKCU\Console" /v FontSize 2^>nul') do set "OLD_SIZE=%%B"
+for /f "tokens=2*" %%A in ('%REGEXE% query "HKCU\Console" /v FontFamily 2^>nul') do set "OLD_FAMILY=%%B"
+for /f "tokens=2*" %%A in ('%REGEXE% query "HKCU\Console" /v FontWeight 2^>nul') do set "OLD_WEIGHT=%%B"
 
-:: Set Consolas font for better display of the message, and save old settings to restore them later.
+:: Set "DejaVu Sans Mono" font for better display of the message.
 :: This is done by adding registry entries. The script will be relaunched with the new settings,
 :: and the old settings will be restored at the end of the script.
-"%regexe%" add "HKCU\Console" /v FaceName /t REG_SZ /d "Consolas" /f >nul
-"%regexe%" add "HKCU\Console" /v FontSize /t REG_DWORD /d 0x000E0010 /f >nul
-"%regexe%" add "HKCU\Console" /v FontFamily /t REG_DWORD /d 0x00000040 /f >nul
-"%regexe%" add "HKCU\Console" /v FontWeight /t REG_DWORD /d 0x00000190 /f >nul
+%REGEXE% add "HKCU\Console" /v FaceName /t REG_SZ /d "Unifont Moyen" /f %DEBUGREDIR%
+%REGEXE% add "HKCU\Console" /v FontSize /t REG_DWORD /d 0x000E0010 /f %DEBUGREDIR%
+%REGEXE% add "HKCU\Console" /v FontFamily /t REG_DWORD /d 0x00000040 /f %DEBUGREDIR%
+%REGEXE% add "HKCU\Console" /v FontWeight /t REG_DWORD /d 0x00000190 /f %DEBUGREDIR%
 
 :: Not relaunched yet → relaunch
 setlocal disabledelayedexpansion
@@ -514,90 +513,38 @@ call :center "!thanks2.%LNG%!"
 echo.
 call :center "%CYA%Gen Urobuchi%RES%."
 
-timeout /T 5 %DEBUGREDIR%
+timeout /T 5 >nul
 color
 
 :: Restore cmd.exe parameters
 if defined OLD_FACE (
-   "%regexe%" add "HKCU\Console" /v FaceName /t REG_SZ /d "%OLD_FACE%" /f >nul
+   %REGEXE% add "HKCU\Console" /v FaceName /t REG_SZ /d "%OLD_FACE%" /f >nul
 ) else (
-   "%regexe%" delete "HKCU\Console" /v FaceName /f %DEBUGREDIR%
+   %REGEXE% delete "HKCU\Console" /v FaceName /f %DEBUGREDIR%
 )
 
 if defined OLD_SIZE (
-   "%regexe%" add "HKCU\Console" /v FontSize /t REG_DWORD /d %OLD_SIZE% /f >nul
+   %REGEXE% add "HKCU\Console" /v FontSize /t REG_DWORD /d %OLD_SIZE% /f >nul
 ) else (
-   "%regexe%" delete "HKCU\Console" /v FontSize /f %DEBUGREDIR%
+   %REGEXE% delete "HKCU\Console" /v FontSize /f %DEBUGREDIR%
 )
 
 if defined OLD_FAMILY (
-   "%regexe%" add "HKCU\Console" /v FontFamily /t REG_DWORD /d %OLD_FAMILY% /f >nul
+   %REGEXE% add "HKCU\Console" /v FontFamily /t REG_DWORD /d %OLD_FAMILY% /f >nul
 ) else (
-   "%regexe%" delete "HKCU\Console" /v FontFamily /f %DEBUGREDIR%
+   %REGEXE% delete "HKCU\Console" /v FontFamily /f %DEBUGREDIR%
 )
 
 if defined OLD_WEIGHT (
-   "%regexe%" add "HKCU\Console" /v FontWeight /t REG_DWORD /d %OLD_WEIGHT% /f >nul
+   %REGEXE% add "HKCU\Console" /v FontWeight /t REG_DWORD /d %OLD_WEIGHT% /f >nul
 ) else (
-   "%regexe%" delete "HKCU\Console" /v FontWeight /f %DEBUGREDIR%
+   %REGEXE% delete "HKCU\Console" /v FontWeight /f %DEBUGREDIR%
 )
 
-"%regexe%" add "HKCU\Software\UnRen" /v Thanks /t REG_DWORD /d 1 /f >nul
+%REGEXE% add "HKCU\Software\UnRen" /v Thanks /t REG_DWORD /d 1 /f >nul
 
 :nothanks
 cls
-
-
-:: We need PowerShell for later, make sure it exists
-set "pshell.en=Checking for availability of PowerShell"
-set "pshell.fr=Vérification de la disponibilité de PowerShell"
-set "pshell.es=Comprobando la disponibilidad de PowerShell"
-set "pshell.it=Verifica della disponibilità di PowerShell"
-set "pshell.de=Überprüfung der Verfügbarkeit von PowerShell"
-set "pshell.ru=Проверка доступности PowerShell"
-set "pshell.zh=检查 PowerShell 是否可用"
-
-call :elog -n "%EMPTY%" "!pshell.%LNG%!..."
-for /f "delims=" %%A in ('"%SystemRoot%\System32\where.exe" pwsh.exe 2^>nul') do (
-    if not "%%A" == "" set "PWRSHELL=%%A"
-)
-if not exist "%PWRSHELL%" (
-    set "pshell1.en=Powershell is required."
-    set "pshell1.fr=Erreur Powershell est requis."
-    set "pshell1.es=Error Se requiere Powershell."
-    set "pshell1.it=Errore Powershell è richiesto."
-    set "pshell1.de=Fehler Powershell ist erforderlich."
-    set "pshell1.ru=Ошибка требуется PowerShell."
-    set "pshell1.zh=需要 PowerShell。"
-
-    set "pshell2.en=This is included in Windows 7, 8 and 10. XP/Vista users can"
-    set "pshell2.fr=Ce programme est inclus dans Windows 7, 8 et 10. Les utilisateurs de XP/Vista peuvent"
-    set "pshell2.es=Esto está incluido en Windows 7, 8 y 10. Los usuarios de XP/Vista pueden"
-    set "pshell2.it=Questo programma è incluso in Windows 7, 8 e 10. Gli utenti di XP/Vista possono"
-    set "pshell2.de=Dieses Programm ist in Windows 7, 8 und 10 enthalten. XP/Vista-Benutzer können"
-    set "pshell2.ru=Это включено в Windows 7, 8 и 10. Пользователи XP/Vista могут"
-    set "pshell2.zh=Windows 7、8 和 10 包含此组件。XP/Vista 用户可以"
-
-    set "pshell3.en=download it here: %MAG%https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
-    set "pshell3.fr=le télécharger ici : %MAG%https://learn.microsoft.com/fr-fr/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
-    set "pshell3.es=descargarlo aquí: %MAG%https://learn.microsoft.com/es-es/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
-    set "pshell3.it=scaricarlo qui: %MAG%https://learn.microsoft.com/it-it/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
-    set "pshell3.de=es hier herunterladen: %MAG%https://learn.microsoft.com/de-de/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
-    set "pshell3.ru=скачать его здесь: %MAG%https://learn.microsoft.com/ru-ru/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
-    set "pshell3.zh=在此下载：%MAG%https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
-
-    call :elog "%NOK%"
-    call :elog .
-    call :elog "    !pshell1.%LNG%!. !UNACONT.%LNG%!"
-    call :elog "    !pshell2.%LNG%!"
-    call :elog "    !pshell3.%LNG%!"
-    call :elog .
-    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
-
-    call :exitn 3
-) else (
-    call :elog "%OK%"
-)
 
 
 :: Set the working directory
@@ -697,6 +644,13 @@ echo "%WORKDIR%" | "%SystemRoot%\System32\findstr.exe" /C:"&" >nul && (
         call set "HAS_BAD=%%HAS_BAD%%,&"
     )
 )
+if not "%WORKDIR%"=="%WORKDIR: =%" (
+    if not defined HAS_BAD (
+        call set "HAS_BAD= "
+    ) else (
+        call set "HAS_BAD=%%HAS_BAD%%, "
+    )
+)
 endlocal & set "HAS_BAD=%HAS_BAD%"
 for %%C in ("(" ")" "=" ";" "'" "`" "[" "]" "{" "}" "+" "~") do (
     echo "%WORKDIR%" | "%SystemRoot%\System32\findstr.exe" /C:"%%~C" >nul && (
@@ -744,7 +698,7 @@ if /i "%~3" == "-d" (
     set "DEBUGREDIR=>>%UNRENLOG% 2>&1"
     set "DEBUGLEVEL=1"
     set "NOCLS=1"
-    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(!NEW_COLS!,5000)" >> "%UNRENLOG%"
+    echo "%PWRSHELL%" -NoProfile -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(!NEW_COLS!,5000)" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(!NEW_COLS!,5000)" %DEBUGREDIR%
 )
 if /i "%~3" == "-dd" (
@@ -752,7 +706,7 @@ if /i "%~3" == "-dd" (
     set "DEBUGREDIR=>>%UNRENLOG% 2>&1"
     set "DEBUGLEVEL=2"
     set "NOCLS=1"
-    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(!NEW_COLS!,9000)" >> "%UNRENLOG%"
+    echo "%PWRSHELL%" -NoProfile -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(!NEW_COLS!,9000)" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(!NEW_COLS!,9000)" %DEBUGREDIR%
 )
 
@@ -814,7 +768,7 @@ if defined missing (
 
 :: Check if .\game is writable
 call :elog -n "%EMPTY%" "!wdir3.%LNG%!..."
-if %DEBUGLEVEL% GEQ 1 echo copy /y nul ".\game\test.txt" >> "%UNRENLOG%"
+echo copy /y nul ".\game\test.txt" >> "%UNRENLOG%"
 copy /y nul ".\game\test.txt" %DEBUGREDIR%
 if %errorlevel% NEQ 0 (
     call :elog "%NOK%"
@@ -825,7 +779,7 @@ if %errorlevel% NEQ 0 (
 
     call :exitn 3
 ) else (
-    if %DEBUGLEVEL% GEQ 1 echo del /f /q ".\game\test.txt" >> "%UNRENLOG%"
+    echo del /f /q ".\game\test.txt" >> "%UNRENLOG%"
     del /f /q ".\game\test.txt" %DEBUGREDIR%
     call :elog "%OK%"
 )
@@ -833,8 +787,8 @@ if %errorlevel% NEQ 0 (
 
 :: Set UNRENLOG for debugging purpose
 If exist "%TEMP%\%BASENAME%.log" (
-    if %DEBUGLEVEL% GEQ 1 echo move /y "%TEMP%\%BASENAME%.log" "%WORKDIR%\%BASENAME%.log" >> "%UNRENLOG%"
-    move /y "%TEMP%\%BASENAME%.log" "%WORKDIR%\%BASENAME%.log" >nul 2>&1
+    echo move /y "%TEMP%\%BASENAME%.log" "%WORKDIR%\%BASENAME%.log" >> "%UNRENLOG%"
+    move /y "%TEMP%\%BASENAME%.log" "%WORKDIR%\%BASENAME%.log" >nul
     if !errorlevel! NEQ 0 (
         call :elog "%NOK%" "!FMOVE.%LNG%! %YEL%%TEMP%\%BASENAME%.log%RES% !decm10a.%LNG%! %YEL%%WORKDIR%\%BASENAME%.log%RES%"
         call :elog .
@@ -846,252 +800,6 @@ If exist "%TEMP%\%BASENAME%.log" (
 set "UNRENLOG=%WORKDIR%\%BASENAME%.log"
 set "UNRENLOG=%UNRENLOG:"=%"
 
-
-:: Check for Python System
-set "PYTHONEXE="
-set "PYVERSION2="
-set "PYVERSION3="
-set "PYTHONSYSTEM="
-
-setlocal enabledelayedexpansion
-set "pysystem1.en=Checking for Python installation on the system"
-set "pysystem1.fr=Vérification de l'installation de Python sur le système"
-set "pysystem1.es=Comprobando la instalación de Python en el sistema"
-set "pysystem1.it=Controllo dell'installazione di Python sul sistema"
-set "pysystem1.de=Überprüfung der Python-Installation auf dem System"
-set "pysystem1.ru=Проверка установки Python на системе"
-set "pysystem1.zh=检查系统是否安装 Python"
-
-set "pysystem2.en=Python 2 and 3 are available on the system."
-set "pysystem2.fr=Python 2 et 3 sont disponibles sur le système."
-set "pysystem2.es=Python 2 y 3 están disponibles en el sistema."
-set "pysystem2.it=Python 2 e 3 sono disponibili sul sistema."
-set "pysystem2.de=Python 2 und 3 sind auf dem System verfügbar."
-set "pysystem2.ru=Python 2 и 3 доступны на системе."
-set "pysystem2.zh=系统上可用 Python 2 和 3。"
-
-set "pysystem3.en=Only Python 2 is available on the system."
-set "pysystem3.fr=Seul Python 2 est disponible sur le système."
-set "pysystem3.es=Solo Python 2 disponible en el sistema."
-set "pysystem3.it=Solo Python 2 è disponibile sul sistema."
-set "pysystem3.de=Nur Python 2 ist auf dem System verfügbar."
-set "pysystem3.ru=Только Python 2 доступен на системе."
-set "pysystem3.zh=只有 Python 2 可用于系统。"
-
-set "pysystem4.en=Only Python 3 is available on the system."
-set "pysystem4.fr=Seul Python 3 est disponible sur le système."
-set "pysystem4.es=Solo Python 3 disponible en el sistema."
-set "pysystem4.it=Solo Python 3 è disponibile sul sistema."
-set "pysystem4.de=Nur Python 3 ist auf dem System verfugbar."
-set "pysystem4.ru=Только Python 3 доступен на системе."
-set "pysystem4.zh=只有 Python 3 可用于系统。"
-
-set "pysystem5.en=Python is not available on the system."
-set "pysystem5.fr=Python n'est pas disponible sur le système."
-set "pysystem5.es=Python no disponible en el sistema."
-set "pysystem5.it=Python non disponibile sul sistema."
-set "pysystem5.de=Python ist auf dem System nicht verfugbar."
-set "pysystem5.ru=Python не доступен на системе."
-set "pysystem5.zh=系统上不可用 Python。"
-
-set "pythonv2="
-set "pythonv3="
-set "pythonexe="
-set "pythonsystem="
-call :elog -n "%EMPTY%" "!pysystem1.%LNG%!..."
-if exist "%SystemRoot%\py.exe" (
-    "%SystemRoot%\py.exe" --list >"%TEMP%\pylist.txt" 2>&1
-    for /f "tokens=1,2 delims=:" %%A in ('%SystemRoot%\System32\findstr.exe /i "V:" "%TEMP%\pylist.txt"') do (
-        :: %%B contains major.minor eg: "3.14", "3.9 *", "2.7"
-        for /f "tokens=1,2 delims=." %%M in ("%%B") do (
-            :: %%M = major (eg: "3"), %%N = minor with optional " *" (eg: "14", "9 *")
-            for /f "tokens=1 delims= " %%V in ("%%N") do (
-                :: %%V = minor clean (eg: "14", "9", "7")
-                if "%%M" == "2" (
-                    if "%%V" == "7" (
-                        set "pythonexe=%SystemRoot%\py.exe"
-                        set "pythonv2=-V:%%M.%%V"
-                        set "pythonsystem=-E"
-                    )
-                ) else if "%%M" == "3" (
-                    if %%V GEQ 9 (
-                        set "pythonexe=%SystemRoot%\py.exe"
-                        set "pythonv3=-V:%%M.%%V"
-                        set "pythonsystem=-E"
-                    )
-                )
-            )
-        )
-    )
-)
-del /f /q "%TEMP%\pylist.txt" %DEBUGREDIR%
-
-set "PATH=%SystemDrive%\Python27:%PATH%"
-for /f "delims=" %%A in ('"%SystemRoot%\System32\where.exe" python.exe 2^>nul') do (
-    if not "%%A" == "" (
-        echo "%%A" | "%SystemRoot%\System32\findstr.exe" /i "WindowsApps" >nul
-        if errorlevel 1 (
-            if exist "%%A" (
-                for /f "tokens=2 delims= " %%B in ('"%%A" -V 2^>^&1') do (
-                    for /f "tokens=1,2 delims=." %%M in ("%%B") do (
-                        if "%%M" == "2" (
-                            if not defined pythonexe (
-                                set "pythonexe=%%A"
-                                set "pythonsystem=-E"
-                            )
-                        ) else if "%%M" == "3" (
-                            if %%N GEQ 9 (
-                                if not defined pythonv3 (
-                                    set "pythonexe=%%A"
-                                    set "pythonsystem=-E"
-                                )
-                            )
-                        )
-                    )
-                )
-            )
-        )
-    )
-)
-
-if defined pythonv2 if defined pythonv3 (
-    call :elog "%OK%"
-    call :elog "         !pysystem2.%LNG%!"
-) else if defined pythonv2 if not defined pythonv3 (
-    call :elog "%OK%"
-    call :elog "         !pysystem3.%LNG%!"
-) else if not defined pythonv2 if defined pythonv3 (
-    call :elog "%OK%"
-    call :elog "         !pysystem4.%LNG%!"
-) else (
-    call :elog "%SKIP%"
-    call :elog "         !pysystem5.%LNG%!"
-)
-endlocal & set "PYTHONEXE=%pythonexe%" & set "PYVERSION2=%pythonv2%" & set "PYVERSION3=%pythonv3%" & set "PYTHONSYSTEM=%pythonsystem%"
-
-
-:: Check for Python Game
-set "python1.en=Checking if Python Game is available"
-set "python1.fr=Vérification de la disponibilité de Python Jeu"
-set "python1.es=Comprobando la disponibilidad de Python Juego"
-set "python1.it=Controllo della disponibilità di Python Gioco"
-set "python1.de=Python-Spiel verfugen"
-set "python1.ru=Проверка доступности Python-игры"
-set "python1.zh=检查 Python 游戏是否可用"
-
-set "python2.en=Python version:"
-set "python2.fr=Version de Python :"
-set "python2.es=Versión de Python :"
-set "python2.it=Versione di Python :"
-set "python2.de=Python-Version :"
-set "python2.ru=Версия Python :"
-set "python2.zh=Python 版本："
-
-set "python3.en=Cannot locate python directory."
-set "python3.fr=Impossible de localiser le répertoire python."
-set "python3.es=No se puede localizar el directorio de Python."
-set "python3.it=Impossibile localizzare la directory di Python."
-set "python3.de=Python-Verzeichnis kann nicht gefunden werden."
-set "python3.ru=Не удалось найти каталог Python."
-set "python3.zh=找不到 python 目录。"
-
-call :elog -n "%EMPTY%" "!python1.%LNG%!..."
-
-:: Doublecheck to avoid issues with Milfania games
-set "PYTHONHOME="
-set "PYTHONPATH="
-if exist "%WORKDIR%\lib\py3-windows-x86_64\pythonw.exe" if exist "%WORKDIR%\lib\py3-windows-x86_64\python.exe" (
-    if not "%PROCESSOR_ARCHITECTURE%" == "x86" (
-        <nul set /p=.
-        set "PYTHONHOME=%WORKDIR%\lib\py3-windows-x86_64\"
-    ) else if exist "%WORKDIR%\lib\py3-windows-i686\python.exe" (
-        <nul set /p=.
-        set "PYTHONHOME=%WORKDIR%\lib\py3-windows-i686\"
-    )
-) else if exist "%WORKDIR%\lib\py3-windows-i686\python.exe" (
-    <nul set /p=.
-    set "PYTHONHOME=%WORKDIR%\lib\py3-windows-i686\"
-)
-if exist "%WORKDIR%\lib\py2-windows-x86_64\python.exe" (
-    if not "%PROCESSOR_ARCHITECTURE%" == "x86" (
-        <nul set /p=.
-        set "PYTHONHOME=%WORKDIR%\lib\py2-windows-x86_64\"
-    ) else if exist "%WORKDIR%\lib\py2-windows-i686\python.exe" (
-        <nul set /p=.
-        set "PYTHONHOME=%WORKDIR%\lib\py2-windows-i686\"
-    )
-) else if exist "%WORKDIR%\lib\py2-windows-i686\python.exe" (
-    <nul set /p=.
-    set "PYTHONHOME=%WORKDIR%\lib\py2-windows-i686\"
-)
-if exist "%WORKDIR%\lib\windows-x86_64\python.exe" (
-    if not "%PROCESSOR_ARCHITECTURE%" == "x86" (
-        <nul set /p=.
-        set "PYTHONHOME=%WORKDIR%\lib\windows-x86_64\"
-    ) else if exist "%WORKDIR%\lib\windows-i686\python.exe" (
-        <nul set /p=.
-        set "PYTHONHOME=%WORKDIR%\lib\windows-i686\"
-    )
-) else if exist "%WORKDIR%\lib\windows-i686\python.exe" (
-    <nul set /p=.
-    set "PYTHONHOME=%WORKDIR%\lib\windows-i686\"
-)
-set "PYTHONPATH=%PYTHONHOME%"
-
-:: Set the PYNOASSERT according to "%PYTHONHOME%Lib".
-if exist "%PYTHONHOME%Lib" (
-    set "PYNOASSERT=-O"
-) else (
-    set "PYNOASSERT="
-)
-
-for /f "tokens=2 delims= " %%a in ('"%PYTHONHOME%python.exe" -V 2^>^&1') do set PYTHONVERS=%%a
-:: Extraction of major and minor versions
-for /f "tokens=1,2 delims=." %%b in ("%PYTHONVERS%") do (
-    set PYTHONMAJOR=%%b
-    set PYTHONMINOR=%%c
-)
-
-set "RPATOOL_NEW="
-set "UNRPYC_NEW="
-:: Priority to Python 3.x if present
-if %PYTHONMAJOR% GEQ 3 if exist "%WORKDIR%\lib\python%PYTHONMAJOR%.%PYTHONMINOR%" (
-    <nul set /p=.
-    set "PYTHONPATH=%WORKDIR%\lib\python%PYTHONMAJOR%.%PYTHONMINOR%"
-    set "RPATOOL_NEW=y"
-    set "UNRPYC_NEW=y"
-    goto :pyend
-)
-
-:: Searching for the latest version of Python 2.x
-if exist "%WORKDIR%\lib\pythonlib%PYTHONMAJOR%.%PYTHONMINOR%" (
-    <nul set /p=.
-    set "PYTHONPATH=%WORKDIR%\lib\pythonlib%PYTHONMAJOR%.%PYTHONMINOR%"
-    set "RPATOOL_NEW=n"
-    set "UNRPYC_NEW=n"
-) else if exist "%WORKDIR%\lib\python%PYTHONMAJOR%.%PYTHONMINOR%" (
-    <nul set /p=.
-    set "PYTHONPATH=%WORKDIR%\lib\python%PYTHONMAJOR%.%PYTHONMINOR%"
-    set "RPATOOL_NEW=n"
-    set "UNRPYC_NEW=n"
-)
-
-:pyend
-if not exist "%PYTHONPATH%" (
-    call :elog "%NOK%"
-    call :elog .
-    call :elog "    %RED%!python3.%LNG%!%RES%. !UNACONT.%LNG%!"
-    call :elog "    !wdir2.%LNG%!"
-    call :elog .
-    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
-
-    call :exitn 3
-) else (
-    call :elog "%OK%" "!python2.%LNG%! %YEL%%PYTHONVERS%%RES%"
-)
-if not defined PYTHONEXE (
-    set "PYTHONEXE=%PYTHONHOME%python.exe"
-)
 
 :: Used later for base64 decoding
 >"%TEMP%\b64decode.py" (
@@ -1134,115 +842,26 @@ if not defined PYTHONEXE (
     echo    sys.exit^(1^)
 )
 
-:: Check for Ren'Py version
-set "renpyvers1.en=Ren'Py version found:"
-set "renpyvers1.fr=Version Ren'Py trouvée :"
-set "renpyvers1.es=Versión de Ren'Py encontrada:"
-set "renpyvers1.it=Versione Ren'Py rilevata:"
-set "renpyvers1.de=Ren'Py-Version gefunden:"
-set "renpyvers1.ru=Найдена версия Ren'Py:"
-set "renpyvers1.zh=检测到的 Ren'Py 版本 :"
 
-set "renpyvers2.en=Checking Ren'Py version"
-set "renpyvers2.fr=Vérification de la version de Ren'Py"
-set "renpyvers2.es=Comprobando la versión de Ren'Py"
-set "renpyvers2.it=Controllo della versione di Ren'Py"
-set "renpyvers2.de=Überprüfung der Ren'Py-Version"
-set "renpyvers2.ru=Проверка версии Ren'Py"
-set "renpyvers2.zh=检查 Ren'Py 版本"
+::Check different Python available the system and select the best one and Ren'Py version
+call :CheckPythonSystem
+call :CheckPythonGame
+call :CheckRenPyVersion
 
-set "renpyvers3.en=Unable to detect Ren'Py version,"
-set "renpyvers3.fr=Impossible de détecter la version de Ren'Py,"
-set "renpyvers3.es=No se puede detectar la versión de Ren'Py,"
-set "renpyvers3.it=Impossibile rilevare la versione di Ren'Py,"
-set "renpyvers3.de=Unmöglich, die Ren'Py-Version zu erkennen, bitte sicherstellen,"
-set "renpyvers3.ru=Не удалось обнаружить версию Ren'Py, пожалуйста,"
-set "renpyvers3.zh=无法检测 Ren'Py 版本，"
 
-set "renpyvers4.en=please ensure the game is compatible with UnRen."
-set "renpyvers4.fr=es-tu sûr que le jeu est compatible avec UnRen ?"
-set "renpyvers4.es=asegúrese de que el juego sea compatible con UnRen."
-set "renpyvers4.it=assicurati che il gioco sia compatibile con UnRen."
-set "renpyvers4.de=dass das Spiel mit UnRen kompatibel ist."
-set "renpyvers4.ru=убедитесь, что игра совместима с UnRen."
-set "renpyvers4.zh=请确保游戏与 UnRen 兼容。"
-
-setlocal disabledelayedexpansion
-for /f "delims=" %%A in ("%WORKDIR%") do (
-    endlocal
-    cd /d "%%A"
+:: Use the correct Python system version based on the detected Ren'Py version
+:: or use the default Python game version
+set "PYTHONSYST="
+if %RENPYVERSION% GEQ 8 if defined PYTHONV3 (
+    set "PYTHONSYST=%PYTHONV3%"
+)
+if %RENPYVERSION% LEQ 7 if defined PYTHONV2 (
+    set "PYTHONSYST=%PYTHONV2%"
+)
+if not defined PYTHONSYST (
+    set "PYTHONSYST=%PYTHONGAME%"
 )
 
-set "detect_renpy_version=%WORKDIR%\detect_renpy_version.py"
->"%detect_renpy_version%.b64" (
-    <nul set /p="IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQojIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLQ0KaW1wb3J0IG9zDQppbXBvcnQgc3lzDQppbXBvcnQgcmUNCg0KIyAtLS0gMS4gU3RhbmRhcmQgbWV0aG9kOiBpbXBvcnQgcmVucHkgLS0tDQp0cnk6DQogICAgaW1wb3J0IHJlbnB5DQogICAgcHJpbnQocmVucHkudmVyc2lvbl90dXBsZVswXSkNCiAgICBzeXMuZXhpdCgwKQ0KZXhjZXB0IEV4Y2VwdGlvbjoNCiAgICBwYXNzICAjIGZhbGxiYWNrIGJlbG93DQoNCmRlZiBkZXRlY3RfZnJvbV9zY3JpcHRfdmVyc2lvbihnYW1lX2Rpcik6DQogICAgIyAxKSBSZW4nUHkgNy84IDogc2NyaXB0X3ZlcnNpb24udHh0DQogICAgcGF0aCA9IG9zLnBhdGguam9pbihnYW1lX2RpciwgInNjcmlwdF92ZXJzaW9uLnR4dCIpDQogICAgaWYgb3MucGF0aC5pc2ZpbGUocGF0aCk6DQogICAgICAgIHRyeToNCiAgICAgICAgICAgIHdpdGggb3BlbihwYXRoLCAiciIpIGFzIGY6DQogICAgICAgICAgICAgICAgY29udGVudCA9IGYucmVhZCgpLnN0cmlwKCkNCg0KICAgICAgICAgICAgIyBUdXBsZSBmb3JtYXQgOiAoOCwgMSwgMCkNCiAgICAgICAgICAgIG0gPSByZS5zZWFyY2gocidcKFxzKihcZCspXHMqLCcsIGNvbnRlbnQpDQogICAgICAgICAgICBpZiBtOg0KICAgICAgICAgICAgICAgIHJldHVybiBpbnQobS5ncm91cCgxKSkNCg0KICAgICAgICAgICAgIyBTaW1wbGUgZm9ybWF0IDogOC4xLjAgb3UgOA0KICAgICAgICAgICAgbSA9IHJlLm1hdGNoKHInXHMqKFxkKyknLCBjb250ZW50KQ0KICAgICAgICAgICAgaWYgbToNCiAgICAgICAgICAgICAgICByZXR1cm4gaW50KG0uZ3JvdXAoMSkpDQoNCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbjoNCiAgICAgICAgICAgIHBhc3MNCg0KICAgICMgMikgUmVuJ1B5IDYgOiByZW5weS92ZXJzaW9uLnB5DQogICAgdmVyc2lvbl9weSA9IG9zLnBhdGguam9pbihnYW1lX2RpciwgInJlbnB5IiwgInZlcnNpb24ucHkiKQ0KICAgIGlmIG9zLnBhdGguaXNmaWxlKHZlcnNpb25fcHkpOg0KICAgICAgICB0cnk6DQogICAgICAgICAgICB3aXRoIG9wZW4odmVyc2lvbl9weSwgInIiKSBhcyBmOg0KICAgICAgICAgICAgICAgIGNvbnRlbnQgPSBmLnJlYWQoKQ0KDQogICAgICAgICAgICAjIHZlcnNpb24gPSAiNi45OS4xNCINCiAgICAgICAgICAgIG0gPSByZS5zZWFyY2gocid2ZXJzaW9uXHMqPVxzKiIoXGQrKScsIGNvbnRlbnQpDQogICAgICAgICAgICBpZiBtOg0KICAgICAgICAgICAgICAgIHJldHVybiBpbnQobS5ncm91cCgxKSkNCg0KICAgICAgICBleGNlcHQgRXhjZXB0aW9uOg0KICAgICAgICAgICAgcGFzcw0KDQogICAgcmV0dXJuIE5vbmUNCg0KDQpkZWYgZGV0ZWN0X2Zyb21fcnB5YyhnYW1lX2Rpcik6DQogICAgIiIiDQogICAgUmVhZHMgdGhlIG1hZ2ljIG51bWJlciBvZiAucnB5YyAvIC5ycHltYyBmaWxlcy4NCiAgICBSZW4nUHkgNjogbWFnaWMg4oCcUkVOUFkgUlBDMeKAnSAgLT4gbWFqb3IgNiAoYW5kIHNvbWUgZWFybHkgNykNCiAgICBSZW4nUHkgNzogbWFnaWMg4oCcUkVOUFkgUlBDMuKAnSAgLT4gbWFqb3IgNw0KICAgIFJlbidQeSA4OiBtYWdpYyDigJxSRU5QWSBSUEMy4oCdICB3aXRoIFB5dGhvbiAzIChjYW5ub3QgYmUgZWFzaWx5IGRpc3Rpbmd1aXNoZWQNCiAgICAgICAgICAgICAgICBmcm9tIDcgdXNpbmcgbWFnaWMgYWxvbmUsIG90aGVyIG1ldGhvZHMgYXJlIHVzZWQgdG8gY29tcGxldGUgdGhlIHByb2Nlc3MpDQogICAgTm90ZTogc29tZSBlYXJseSBSZW4nUHkgNyBtYXkgc3RpbGwgdXNlIOKAnFJFTlBZIFJQQzHigJ0gbWFnaWMsIGJ1dCB0aGV5IGFyZSByYXJlIGFuZCB3ZSBwcmlvcml0aXplIHRoZSBtb3JlIGNvbW1vbiBjYXNlLg0KICAgICIiIg0KICAgIG1hZ2ljX21hcCA9IHsNCiAgICAgICAgYiJSRU5QWSBSUEMxIjogNiwNCiAgICAgICAgYiJSRU5QWSBSUEMyIjogNywgICMgY2FuIGFsc28gYmUgOA0KICAgIH0NCiAgICBmb3Igcm9vdCwgZGlycywgZmlsZXMgaW4gb3Mud2FsayhnYW1lX2Rpcik6DQogICAgICAgIGZvciBmbmFtZSBpbiBmaWxlczoNCiAgICAgICAgICAgIGlmIGZuYW1lLmVuZHN3aXRoKCIucnB5YyIpIG9yIGZuYW1lLmVuZHN3aXRoKCIucnB5bWMiKToNCiAgICAgICAgICAgICAgICBmcGF0aCA9IG9zLnBhdGguam9pbihyb290LCBmbmFtZSkNCiAgICAgICAgICAgICAgICB0cnk6DQogICAgICAgICAgICAgICAgICAgIHdpdGggb3BlbihmcGF0aCwgInJiIikgYXMgZjoNCiAgICAgICAgICAgICAgICAgICAgICAgIGhlYWRlciA9IGYucmVhZCgxMCkNCiAgICAgICAgICAgICAgICAgICAgZm9yIG1hZ2ljLCBtYWpvciBpbiBtYWdpY19tYXAuaXRlbXMoKToNCiAgICAgICAgICAgICAgICAgICAgICAgIGlmIGhlYWRlci5zdGFydHN3aXRoKG1hZ2ljKToNCiAgICAgICAgICAgICAgICAgICAgICAgICAgICByZXR1cm4gbWFqb3INCiAgICAgICAgICAgICAgICBleGNlcHQgRXhjZXB0aW9uOg0KICAgICAgICAgICAgICAgICAgICBjb250aW51ZQ0KICAgIHJldHVybiBOb25lDQoNCg0KZGVmIGRldGVjdF9mcm9tX2V4ZWN1dGFibGUoZ2FtZV9kaXIpOg0KICAgICIiIg0KICAgIExvb2sgZm9yIHZlcnNpb24gY2x1ZXMgaW4gdGhlIGV4ZWN1dGFibGVzL2xpYnMgcHJlc2VudA0KICAgIGluIHRoZSBnYW1lIGZvbGRlciAoc3RyaW5ncyDigJw3LuKAnSBvciDigJw4LuKAnSBjbG9zZSB0byDigJxSZW4nUHnigJ0pLg0KICAgICIiIg0KICAgIGJhc2UgPSBvcy5wYXRoLmRpcm5hbWUoZ2FtZV9kaXIpICAjIHBhcmVudCBmb2xkZXIgb2YgdGhlIGdhbWUvIGZvbGRlcg0KICAgIHNlYXJjaF9kaXJzID0gW2Jhc2UsIGdhbWVfZGlyXQ0KICAgIHBhdHRlcm5zID0gWw0KICAgICAgICAocmUuY29tcGlsZShyIlJlbi4/UHlccysoXGQpXC5cZCIpLCBOb25lKSwNCiAgICAgICAgKHJlLmNvbXBpbGUociJyZW5weVtfXC1dKFxkKVwuXGQiKSwgcmUuSUdOT1JFQ0FTRSksDQogICAgXQ0KICAgIGZvciBzZGlyIGluIHNlYXJjaF9kaXJzOg0KICAgICAgICBmb3IgZm5hbWUgaW4gb3MubGlzdGRpcihzZGlyKToNCiAgICAgICAgICAgIGZwYXRoID0gb3MucGF0aC5qb2luKHNkaXIsIGZuYW1lKQ0KICAgICAgICAgICAgaWYgbm90IG9zLnBhdGguaXNmaWxlKGZwYXRoKToNCiAgICAgICAgICAgICAgICBjb250aW51ZQ0KICAgICAgICAgICAgIyBPbmx5IHNtYWxsIHRleHQgb3IgbG9nIGZpbGVzIGFyZSByZWFkLg0KICAgICAgICAgICAgaWYgZm5hbWUuZW5kc3dpdGgoKCIudHh0IiwgIi5sb2ciLCAiLmluaSIsICIuY2ZnIiwgIi5qc29uIikpOg0KICAgICAgICAgICAgICAgIHRyeToNCiAgICAgICAgICAgICAgICAgICAgd2l0aCBvcGVuKGZwYXRoLCAiciIpIGFzIGY6DQogICAgICAgICAgICAgICAgICAgICAgICBjb250ZW50ID0gZi5yZWFkKDQwOTYpDQogICAgICAgICAgICAgICAgICAgIGZvciBwYXQsIGZsYWdzIGluIHBhdHRlcm5zOg0KICAgICAgICAgICAgICAgICAgICAgICAgbSA9IHBhdC5zZWFyY2goY29udGVudCkNCiAgICAgICAgICAgICAgICAgICAgICAgIGlmIG06DQogICAgICAgICAgICAgICAgICAgICAgICAgICAgbWFqb3IgPSBpbnQobS5ncm91cCgxKSkNCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBpZiBtYWpvciBpbiAoNiwgNywgOCk6DQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHJldHVybiBtYWpvcg0KICAgICAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb246DQogICAgICAgICAgICAgICAgICAgIHBhc3MNCiAgICByZXR1cm4gTm9uZQ0KDQoNCmRlZiBkZXRlY3RfZnJvbV9hcmNoaXZlKGdhbWVfZGlyKToNCiAgICAiIiINCiAgICBJbnNwZWN0IHRoZSAucnBhIGFyY2hpdmVzIHRvIGRldGVjdCB0aGUgdmVyc2lvbi4NCiAgICBSUEEtMS4wIC0+IFJlbidQeSA2IGVhcmx5DQogICAgUlBBLTIuMCAtPiBSZW4nUHkgNg0KICAgIFJQQS0zLjAgLT4gUmVuJ1B5IDYvNw0KICAgIFJQQU4zLjAgLT4gUmVuJ1B5IDggKG5ldyBuZXV0cm9uIGFyY2hpdmUpDQogICAgWmlYLTEyQSAtPiBSZW4nUHkgOCAobmV3IG5ldXRyb24gYXJjaGl2ZSkNCiAgICBaaVgtMTJCIC0+IFJlbidQeSA4IChuZXcgbmV1dHJvbiBhcmNoaXZlKQ0KICAgICIiIg0KICAgIHJwYV9tYWpvcl9tYXAgPSB7DQogICAgICAgIGIiUlBBLTEuMCI6IDYsDQogICAgICAgIGIiUlBBLTIuMCI6IDYsDQogICAgICAgIGIiUlBBLTMuMCI6IDcsICAgIyBNYXliZSA2IGFzIHdlbGwsIGJ1dCB3ZSdsbCByZWZpbmUgaXQgbGF0ZXIuDQogICAgICAgIGIiUlBBTjMuMCI6IDgsDQogICAgICAgIGIiWmlYLTEyQSI6IDgsDQogICAgICAgIGIiWmlYLTEyQiI6IDgsDQogICAgfQ0KICAgIGZvdW5kID0gTm9uZQ0KICAgIGZvciBmbmFtZSBpbiBvcy5saXN0ZGlyKGdhbWVfZGlyKToNCiAgICAgICAgaWYgbm90IGZuYW1lLmVuZHN3aXRoKCIucnBhIik6DQogICAgICAgICAgICBjb250aW51ZQ0KICAgICAgICBmcGF0aCA9IG9zLnBhdGguam9pbihnYW1lX2RpciwgZm5hbWUpDQogICAgICAgIHRyeToNCiAgICAgICAgICAgIHdpdGggb3BlbihmcGF0aCwgInJiIikgYXMgZjoNCiAgICAgICAgICAgICAgICBoZWFkZXIgPSBmLnJlYWQoOCkNCiAgICAgICAgICAgIGZvciBtYWdpYywgbWFqb3IgaW4gcnBhX21ham9yX21hcC5pdGVtcygpOg0KICAgICAgICAgICAgICAgIGlmIGhlYWRlci5zdGFydHN3aXRoKG1hZ2ljKToNCiAgICAgICAgICAgICAgICAgICAgIyBXZSBrZWVwIHRoZSBoaWdoZXN0IG1ham9yIGZvdW5kLg0KICAgICAgICAgICAgICAgICAgICBpZiBmb3VuZCBpcyBOb25lIG9yIG1ham9yID4gZm91bmQ6DQogICAgICAgICAgICAgICAgICAgICAgICBmb3VuZCA9IG1ham9yDQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb246DQogICAgICAgICAgICBwYXNzDQogICAgcmV0dXJuIGZvdW5kDQoNCg0KZGVmIGRldGVjdF9yZW5weV9tYWpvcihnYW1lX3BhdGgpOg0KICAgICIiIg0KICAgIERldGVjdHMgdGhlIG1ham9yIFJlbidQeSB2ZXJzaW9uICg2LCA3LCBvciA4KSBmcm9tIHRoZSBnYW1lIHBhdGguDQogICAgZ2FtZV9wYXRoIGNhbiBiZSB0aGUgZ2FtZSdzIHJvb3QgZm9sZGVyIG9yIHRoZSDigJxnYW1lL+KAnSBzdWJmb2xkZXIuDQogICAgIiIiDQogICAgIyBOb3JtYWxpemU6IHdlIHdhbnQgdGhlIOKAnGdhbWUv4oCdIGZvbGRlcg0KICAgIGlmIG9zLnBhdGguYmFzZW5hbWUoZ2FtZV9wYXRoKSA9PSAiZ2FtZSI6DQogICAgICAgIGdhbWVfZGlyID0gZ2FtZV9wYXRoDQogICAgZWxzZToNCiAgICAgICAgY2FuZGlkYXRlID0gb3MucGF0aC5qb2luKGdhbWVfcGF0aCwgImdhbWUiKQ0KICAgICAgICBpZiBvcy5wYXRoLmlzZGlyKGNhbmRpZGF0ZSk6DQogICAgICAgICAgICBnYW1lX2RpciA9IGNhbmRpZGF0ZQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgZ2FtZV9kaXIgPSBnYW1lX3BhdGggICMgd2UgdHJ5IGRpcmVjdGx5DQoNCiAgICBpZiBub3Qgb3MucGF0aC5pc2RpcihnYW1lX2Rpcik6DQogICAgICAgIHByaW50KCJFUlJPUjogZGlyZWN0b3J5IG5vdCBmb3VuZDoge30iLmZvcm1hdChnYW1lX2RpcikpDQogICAgICAgIHN5cy5leGl0KDEpDQoNCiAgICAjIDEuIHNjcmlwdF92ZXJzaW9uLnR4dCAocHJpb3JpdHkgYnV0IG9wdGlvbmFsKQ0KICAgIG1ham9yID0gZGV0ZWN0X2Zyb21fc2NyaXB0X3ZlcnNpb24oZ2FtZV9kaXIpDQogICAgaWYgbWFqb3IgaXMgbm90IE5vbmU6DQogICAgICAgIHJldHVybiBtYWpvcg0KDQogICAgIyAyLiBBcmNoaXZlcyAucnBhIChSZWxpYWJsZSBzaWduYXR1cmVzIGZvciBSZW4nUHkgOCkNCiAgICBtYWpvciA9IGRldGVjdF9mcm9tX2FyY2hpdmUoZ2FtZV9kaXIpDQogICAgaWYgbWFqb3IgaXMgbm90IE5vbmU6DQogICAgICAgICMgUlBBLTMuMCBjYW4gYmUgNiBvciA3OyB3ZSByZWZpbmUgaXQgd2l0aCB0aGUgLnJweWMgZmlsZXMuDQogICAgICAgIGlmIG1ham9yID09IDc6DQogICAgICAgICAgICBycHljX21ham9yID0gZGV0ZWN0X2Zyb21fcnB5YyhnYW1lX2RpcikNCiAgICAgICAgICAgIGlmIHJweWNfbWFqb3IgaXMgbm90IE5vbmU6DQogICAgICAgICAgICAgICAgcmV0dXJuIHJweWNfbWFqb3INCiAgICAgICAgcmV0dXJuIG1ham9yDQoNCiAgICAjIDMuIC5ycHljIGZpbGVzICh2ZXJ5IHJlbGlhYmxlIGZvciBSZW4nUHkgNiBhbmQgN"
-    <nul set /p="ywgYnV0IGRvIG5vdCBkaXN0aW5ndWlzaCBiZXR3ZWVuIDcgYW5kIDgpOg0KICAgIG1ham9yID0gZGV0ZWN0X2Zyb21fcnB5YyhnYW1lX2RpcikNCiAgICBpZiBtYWpvciBpcyBub3QgTm9uZToNCiAgICAgICAgcmV0dXJuIG1ham9yDQoNCiAgICAjIDQuIFRleHQgZmlsZXMgaW4gdGhlIHJvb3QgZm9sZGVyIChtYXkgY29udGFpbiB2ZXJzaW9uIGluZm8sIGVzcGVjaWFsbHkgZm9yIFJlbidQeSA4KToNCiAgICBtYWpvciA9IGRldGVjdF9mcm9tX2V4ZWN1dGFibGUoZ2FtZV9kaXIpDQogICAgaWYgbWFqb3IgaXMgbm90IE5vbmU6DQogICAgICAgIHJldHVybiBtYWpvcg0KDQogICAgcmV0dXJuIE5vbmUNCg0KDQpkZWYgbWFpbigpOg0KICAgIGlmIGxlbihzeXMuYXJndikgPCAyOg0KICAgICAgICBwcmludCgiVXNhZ2U6IHt9IDxnYW1lX3BhdGg+Ii5mb3JtYXQoc3lzLmFyZ3ZbMF0pKQ0KICAgICAgICBzeXMuZXhpdCgxKQ0KDQogICAgZ2FtZV9wYXRoID0gc3lzLmFyZ3ZbMV0NCg0KICAgIG1ham9yID0gZGV0ZWN0X3JlbnB5X21ham9yKGdhbWVfcGF0aCkNCg0KICAgIGlmIG1ham9yIGlzIE5vbmU6DQogICAgICAgIHByaW50KCJFUlJPUjogaW1wb3NzaWJsZSB0byBkZXRlY3QgUmVuJ1B5IHZlcnNpb24gaW4gOiB7fSIuZm9ybWF0KGdhbWVfcGF0aCkpDQogICAgICAgIHN5cy5leGl0KDEpDQoNCiAgICBpZiBtYWpvciBub3QgaW4gKDYsIDcsIDgpOg0KICAgICAgICBwcmludCgiRVJST1I6IHVuZXhwZWN0ZWQgUmVuJ1B5IHZlcnNpb24gZGV0ZWN0ZWQgOiB7fSIuZm9ybWF0KG1ham9yKSkNCiAgICAgICAgc3lzLmV4aXQoMSkNCg0KICAgIHByaW50KG1ham9yKQ0KDQoNCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6DQogICAgbWFpbigpDQo="
-)
-
-call :pwsh_exp "!renpyvers2.%LNG%!..." "%detect_renpy_version%"
-if not exist "%detect_renpy_version%" (
-    call :elog "%NOK%"
-    call :elog .
-    call :elog "!FCREATE.%LNG%! %YEL%%detect_renpy_version%%RES%. !UNACONT.%LNG%!"
-    call :elog .
-    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
-
-    call :exitn 3
-) else (
-    if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%python.exe" %PYNOASSERT% "%detect_renpy_version% "%WORKDIR%" >> "%UNRENLOG%"
-    "%PYTHONHOME%python.exe" %PYNOASSERT% "%detect_renpy_version%" "%WORKDIR%" > "%TEMP%\renpy_version.tmp"
-    set /p RENPYVERSION=<"%TEMP%\renpy_version.tmp"
-    del "%TEMP%\renpy_version.tmp"
-    if not defined RENPYVERSION (
-        call :elog "%NOK%"
-        call :elog .
-        call :elog "    !renpyvers3.%LNG%!"
-        call :elog "    !renpyvers4.%LNG%!. !UNACONT.%LNG%!"
-        call :elog .
-        pause>nul|set /p=".      !ANYKEY.%LNG%!..."
-
-        call :exitn 3
-    ) else (
-        call :elog "%OK%" "!renpyvers1.%LNG%! %YEL%!RENPYVERSION!%RES%"
-    )
-)
-if %DEBUGLEVEL% GEQ 1 echo del /f /q "%detect_renpy_version%" >> "%UNRENLOG%"
-del /f /q "%detect_renpy_version%" %DEBUGREDIR%
-
-set "renpyvers5.en=You have launched %SCRIPTNAME% but Ren'Py %RENPYVERSION% is found. Please use UnRen-legacy.bat instead."
-set "renpyvers5.fr=Vous avez lancé %SCRIPTNAME% mais Ren'Py %RENPYVERSION% a été trouvé. Veuillez utiliser UnRen-legacy.bat à la place."
-set "renpyvers5.es=Ha iniciado %SCRIPTNAME% pero se ha encontrado Ren'Py %RENPYVERSION%. Utilice UnRen-legacy.bat en su lugar."
-set "renpyvers5.it=Hai avviato %SCRIPTNAME% ma è stato trovato Ren'Py %RENPYVERSION%. Usa invece UnRen-legacy.bat."
-set "renpyvers5.de=Sie haben %SCRIPTNAME% gestartet, aber Ren'Py %RENPYVERSION% wurde gefunden. Bitte verwenden Sie stattdessen UnRen-legacy.bat."
-set "renpyvers5.ru=Вы запустили %SCRIPTNAME%, но найден Ren'Py %RENPYVERSION%. Пожалуйста, используйте UnRen-legacy.bat вместо этого."
-set "renpyvers5.zh=您已启动 %SCRIPTNAME% 但检测到 Ren'Py %RENPYVERSION%。请改用 UnRen-legacy.bat。"
-
-set "renpyvers6.en=You have launched %SCRIPTNAME% but Ren'Py %RENPYVERSION% is found. Please use UnRen-current.bat instead."
-set "renpyvers6.fr=Vous avez lancé %SCRIPTNAME% mais Ren'Py %RENPYVERSION% a été trouvé. Veuillez utiliser UnRen-current.bat à la place."
-set "renpyvers6.es=Ha iniciado %SCRIPTNAME% pero se ha encontrado Ren'Py %RENPYVERSION%. Utilice UnRen-current.bat en su lugar."
-set "renpyvers6.it=Hai avviato %SCRIPTNAME% ma è stato trovato Ren'Py %RENPYVERSION%. Usa invece UnRen-current.bat."
-set "renpyvers6.de=Sie haben %SCRIPTNAME% gestartet, aber Ren'Py %RENPYVERSION% wurde gefunden. Bitte verwenden Sie stattdessen UnRen-current.bat."
-set "renpyvers6.ru=Вы запустили %SCRIPTNAME%, но найден Ren'Py %RENPYVERSION%. Пожалуйста, используйте UnRen-current.bat вместо этого."
-set "renpyvers6.zh=您已启动 %SCRIPTNAME% 但检测到 Ren'Py %RENPYVERSION%。请改用 UnRen-current.bat。"
-:: Check to ensure you are using the correct UnRen version
-if %RENPYVERSION% LEQ 7 (
-    call :elog .
-    call :elog .
-    call :elog "!renpyvers5.%LNG%!"
-    call :elog .
-    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
-
-    call :exitn 3
-)
-
-:: Set the proper argument for py.exe according to the Ren'Py version detected
-set "PYVERSION="
-if %RENPYVERSION% GEQ 8 if defined PYVERSION3 (
-    set "PYVERSION=%PYVERSION3%"
-)
-if %RENPYVERSION% LEQ 7 if defined PYVERSION2 (
-    set "PYVERSION=%PYVERSION2%"
-)
 
 :: Display all the variables in the log for debugging purpose
 call :DisplayVars "Init phase"
@@ -1259,13 +878,13 @@ set "sscreen.ru=Сделано с %RED%<3%RES% для фанатов - JoeLurmel
 set "sscreen.zh=由 JoeLurmel @ f95zone.to 为粉丝制作 - %RED%<3%RES%"
 
 if "%NOCLS%" == "0" cls
-REM call :center "%ORA%__________________________________________________________________________________%RES%"
-call :center "%ORA%╔═══════════════════════════════════════════════════════════════════════════════════╗%RES%"
-echo               %ORA%    __  __      ____                  __          __%RES%
-echo               %ORA%   / / / /___  / __ \___  ____       / /_  ____ _/ /_%RES%
-echo               %ORA%  / / / / __ \/ /_/ / _ \/ __ \     / __ \/ __ ^`/ __/%RES%
-echo               %ORA% / /_/ / / / / __  /  __/ / / / _  / /_/ / /_/ / /_%RES%
-echo               %ORA% \____/_/ /_/_/  \_\___/_/ /_/ (_) \_.__/\__^,_/\__/ - %NAME% %CYA%%VERSION%%RES%
+:: call :center "%ORG%__________________________________________________________________________________%RES%"
+call :center "%ORG%╔═══════════════════════════════════════════════════════════════════════════════════╗%RES%"
+echo               %ORG%    __  __      ____                  __          __%RES%
+echo               %ORG%   / / / /___  / __ \___  ____       / /_  ____ _/ /_%RES%
+echo               %ORG%  / / / / __ \/ /_/ / _ \/ __ \     / __ \/ __ ^`/ __/%RES%
+echo               %ORG% / /_/ / / / / __  /  __/ / / / _  / /_/ / /_/ / /_%RES%
+echo               %ORG% \____/_/ /_/_/  \_\___/_/ /_/ (_) \_.__/\__^,_/\__/ - %NAME% %CYA%%VERSION%%RES%
 echo.
 call :center "Sam @ www.f95zone.to & Gideon"
 call :center "Modified by VepsrP @ www.f95zone.to"
@@ -1292,8 +911,8 @@ if %rand% == 13 call :center "“ I am Groot. ” – Groot"
 if %rand% == 14 call :center "“ Do or do not. There is no try. ” – Yoda"
 if %rand% == 15 call :center "“ I know kung fu. ” – Neo"
 if %rand% == 16 call :center "“ You have been recruited by the Star League to defend the frontier. ” – The Last Starfighter"
-REM call :center "%ORA%__________________________________________________________________________________%RES%"
-call :center "%ORA%╚═══════════════════════════════════════════════════════════════════════════════════╝%RES%"
+REM call :center "%ORG%__________________________________________________________________________________%RES%"
+call :center "%ORG%╚═══════════════════════════════════════════════════════════════════════════════════╝%RES%"
 
 set "MTITLE.en=Working directory: "
 set "MTITLE.fr=Répertoire de travail : "
@@ -1319,13 +938,13 @@ set "choice2.de=RPYC-Dateien dekompilieren."
 set "choice2.ru=Декомпилировать файлы RPYC."
 set "choice2.zh=反编译 RPYC 文件。"
 
-set "choice3.en=Deobfuscate when unpacking RPA files %YEL%(basic code used)."
-set "choice3.fr=Déobfusquer lors de la décompression des fichiers RPA %YEL%(code de base utilisé)."
-set "choice3.es=Desofuscar al descomprimir archivos RPA %YEL%(código básico utilizado)."
-set "choice3.it=Deoffuscare durante la decompressione dei file RPA %YEL%(codice di base utilizzato)."
-set "choice3.de=Deobfuscate beim Entpacken von RPA-Dateien %YEL%(Basiscode verwendet)."
-set "choice3.ru=Деобфусцировать при распаковке файлов RPA %YEL%(Использовать базовый код)."
-set "choice3.zh=解包 RPA 文件时进行反混淆 %YEL%（使用基础代码）"
+set "choice3.en=Unpack RPA packages, even if it's crypted."
+set "choice3.fr=Décompresser les paquets RPA, même s'ils sont cryptés."
+set "choice3.es=Descomprimir paquetes RPA, incluso si están cifrados."
+set "choice3.it=Decomprimere i pacchetti RPA, anche se sono crittografati."
+set "choice3.de=RPA-Pakete entpacken, auch wenn sie verschlüsselt sind."
+set "choice3.ru=Распаковать пакеты RPA, даже если они зашифрованы."
+set "choice3.zh=解包 RPA 包，即使它是加密的。"
 
 set "choice4.en=Deobfuscate when decompile RPYC files %YEL%(basic code used)."
 set "choice4.fr=Déobfusquer lors de la décompilation des fichiers RPYC %YEL%(code de base utilisé)."
@@ -1543,13 +1162,13 @@ set "choice-.de=Einträge im Kontextmenü aus der Registrierung entfernen."
 set "choice-.ru=Удалить элемент контекстного меню из реестра."
 set "choice-.zh=从注册表中移除右键菜单项。"
 
-set "mquest.en=Your choice (1-7,a-l,p,r,s,t,u,+,-,x by default [%YEL%%MDEFS2%%RES%]): "
-set "mquest.fr=Votre choix (1-7, a-l, p, r, s, t, u, +, -, x par défaut [%YEL%%MDEFS2%%RES%]) : "
-set "mquest.es=Su elección (1-7,a-l,p,r,s,t,u,+,-,x por defecto [%YEL%%MDEFS2%%RES%]): "
-set "mquest.it=La tua scelta (1-7,a-l,p,r,s,t,u,+,-,x predefinito [%YEL%%MDEFS2%%RES%]): "
-set "mquest.de=Ihre Wahl (1-7,a-l,r,p,s,t,u,+,-,x für Standard [%YEL%%MDEFS2%%RES%]): "
-set "mquest.ru=Ваш выбор (1-7,a-l,p,r,s,t,u,+,-,x по умолчанию [%YEL%%MDEFS2%%RES%]): "
-set "mquest.zh=您的选择（1-7, a-l, p, r, s, t, u, +, -，x 默认 [%YEL%%MDEFS2%%RES%]）："
+set "mquest.en=Your choice (1-7,a-l,n,p,r,s,t,u,+,-,x,z by default [%YEL%%MDEFS2%%RES%]): "
+set "mquest.fr=Votre choix (1-7, a-l, n, p, r, s, t, u, +, -, x, z par défaut [%YEL%%MDEFS2%%RES%]) : "
+set "mquest.es=Su elección (1-7,a-l,n,p,r,s,t,u,+,-,x,z por defecto [%YEL%%MDEFS2%%RES%]): "
+set "mquest.it=La tua scelta (1-7,a-l,n,p,r,s,t,u,+,-,x,z predefinito [%YEL%%MDEFS2%%RES%]): "
+set "mquest.de=Ihre Wahl (1-7,a-l,n,p,r,s,t,u,+,-,x,z für Standard [%YEL%%MDEFS2%%RES%]): "
+set "mquest.ru=Ваш выбор (1-7,a-l,n,p,r,s,t,u,+,-,x,z по умолчанию [%YEL%%MDEFS2%%RES%]): "
+set "mquest.zh=您的选择（1-7, a-l, n, p, r, s, t, u, +, -，x, z 默认 [%YEL%%MDEFS2%%RES%]）："
 
 set "choicex.en=Exit"
 set "choicex.fr=Quitter"
@@ -1558,6 +1177,14 @@ set "choicex.it=Esci"
 set "choicex.de=Beenden"
 set "choicex.ru=Выход"
 set "choicex.zh=退出"
+
+set "choicez.en=Suppress all your usernamme from logfile."
+set "choicez.fr=Supprimer tous vos noms d'utilisateur du fichier journal."
+set "choicez.es=Suprimir todos sus nombres de usuario del archivo de registro."
+set "choicez.it=Eliminare tutti i tuoi nomi utente dal file di log."
+set "choicez.de=Alle Benutzernamen aus dem Protokoll entfernen."
+set "choicez.ru=Удалить все имена пользователей из журнала."
+set "choicez.zh=从日志文件中删除所有用户名。"
 
 set "uchoice.en=Unknown choice:"
 set "uchoice.fr=Choix inconnu :"
@@ -1573,7 +1200,7 @@ call :center "!MTITLE.%LNG%!%YEL%%WORKDIR%%RES%"
 echo.
 echo        1) %GRE%!choice1.%LNG%!%RES%
 echo        2) %GRE%!choice2.%LNG%!%RES%
-echo        3) %GRY%!choice3.%LNG%!%RES%
+echo        3) %GRE%!choice3.%LNG%!%RES%
 echo        4) %GRE%!choice4.%LNG%!%RES%
 echo        5) %GRE%!choice5.%LNG%!%RES%
 echo        6) %GRE%!choice6.%LNG%!%RES%
@@ -1598,6 +1225,7 @@ echo        r) %YEL%!choicer.%LNG%!%RES%
 echo        s) %YEL%!choices.%LNG%!%RES%
 echo        t) %CYA%!choicet.%LNG%!%RES%
 echo        u) %CYA%!choiceu.%LNG%!%RES%
+echo        z) %ORG%!choicez.%LNG%!%RES%
 echo.
 set OLDREG=0
 call :check_old_reg
@@ -1620,12 +1248,12 @@ if not defined OPTIONS set "OPTIONS=!MDEFS2!"
 set "OPTIONS=%OPTIONS: =%"
 
 :: List of valid characters
-set "VALID=1234567abctdefghijklnprstu+-x"
+set "VALID=1234567abctdefghijklnprstuz+-x"
 
 :: Dispatch table: OPTION → LABEL
 set "ACT.1=extract_rpa"
 set "ACT.2=decompile"
-set "ACT.3=extract_wkey"
+set "ACT.3=extract_rpa"
 set "ACT.4=decompile"
 set "ACT.5=extract_rpa"
 set "ACT.6=extract_rpa"
@@ -1649,6 +1277,7 @@ set "ACT.r=restore_files"
 set "ACT.s=delete_backups"
 set "ACT.t=extract_text"
 set "ACT.u=check_update"
+set "ACT.z=remove_username"
 
 set "ACT.+=add_reg"
 set "ACT.-=remove_reg"
@@ -1661,10 +1290,10 @@ for /L %%I in (0,1,15) do (
     set "OPTION=!OPTIONS:~%%I,1!"
     if "!OPTION!"=="" goto :end_process
 
-    echo "!VALID!" |  "%SystemRoot%\System32\findstr.exe"  /IC:"!OPTION!" >nul || (
+    echo "!VALID!" | %SystemRoot%\System32\findstr.exe  /IC:"!OPTION!" >nul || (
         echo.
         echo %RED%!uchoice.%LNG%! %YEL%!OPTION!%RES%
-        timeout /T 2 %DEBUGREDIR%
+        timeout /T 2 >nul
         goto :end_process
     )
 
@@ -1680,7 +1309,7 @@ for /L %%I in (0,1,15) do (
 )
 
 :end_process
-timeout /T 2 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :menu
 
 
@@ -1840,7 +1469,7 @@ set "rpaExt="
 
 :: Create Python script to detect RPA extension
 call :elog .
-set "detect_rpa_ext=%TEMP%\detect_rpa_ext.py"
+set "detect_rpa_ext=%WORKDIR%\detect_rpa_ext.py"
 >"%detect_rpa_ext%.b64" (
     <nul set /p="IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQojIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLQ0KDQojIFdyaXR0ZW4gYnkgU00gYWthIEpvZUx1cm1lbCBAIGY5NXpvbmUudG8NCiMgVmVyc2lvbiAwLjQgLSAyMDI1LTEyLTI2DQoNCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgcHJpbnRfZnVuY3Rpb24NCmltcG9ydCBvcw0KaW1wb3J0IHN5cw0KDQoNCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tDQojIE5vcm1hbGl6ZSBpbnB1dCBwYXRoDQojIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQ0KZGVmIG5vcm1hbGl6ZV9wYXRoKGFyZyk6DQogICAgcCA9IGFyZy5zdHJpcCgpLnN0cmlwKCdcJyInKQ0KICAgIHJldHVybiBwDQoNCg0KaWYgbGVuKHN5cy5hcmd2KSA+IDE6DQogICAgcmF3ID0gc3lzLmFyZ3ZbMV0NCiAgICBnYW1lX2RpciA9IG5vcm1hbGl6ZV9wYXRoKHJhdykNCmVsc2U6DQogICAgZ2FtZV9kaXIgPSBvcy5nZXRjd2QoKQ0KDQpnYW1lX2RpciA9IG9zLnBhdGguYWJzcGF0aChnYW1lX2RpcikNCm9zLmNoZGlyKGdhbWVfZGlyKQ0KDQoNCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tDQojIFRyeSB0byBsb2FkIFJlbidQeSBhcmNoaXZlIGhhbmRsZXJzIHNhZmVseQ0KIyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0NCmRlZiB0cnlfcmVucHlfaGFuZGxlcnMoKToNCiAgICB0cnk6DQogICAgICAgIGltcG9ydCByZW5weS5vYmplY3QNCiAgICAgICAgaW1wb3J0IHJlbnB5LmxvYWRlcg0KDQogICAgICAgIHRyeToNCiAgICAgICAgICAgIGltcG9ydCByZW5weS5lcnJvcg0KICAgICAgICAgICAgaW1wb3J0IHJlbnB5LmNvbmZpZw0KICAgICAgICBleGNlcHQgRXhjZXB0aW9uOg0KICAgICAgICAgICAgcGFzcw0KDQogICAgICAgIHRyeToNCiAgICAgICAgICAgIGFoID0gcmVucHkubG9hZGVyLmFyY2hpdmVfaGFuZGxlcnMNCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbjoNCiAgICAgICAgICAgIHJldHVybiBOb25lDQoNCiAgICAgICAgaGFuZGxlcnMgPSBnZXRhdHRyKGFoLCAiaGFuZGxlcnMiLCBhaCkNCg0KICAgICAgICBleHRzID0gW10NCiAgICAgICAgdHJ5Og0KICAgICAgICAgICAgZm9yIGggaW4gaGFuZGxlcnM6DQogICAgICAgICAgICAgICAgaWYgaGFzYXR0cihoLCAiZ2V0X3N1cHBvcnRlZF9leHRlbnNpb25zIik6DQogICAgICAgICAgICAgICAgICAgIGV4dHMuZXh0ZW5kKGguZ2V0X3N1cHBvcnRlZF9leHRlbnNpb25zKCkpDQogICAgICAgICAgICAgICAgZWxpZiBoYXNhdHRyKGgsICJnZXRfc3VwcG9ydGVkX2V4dCIpOg0KICAgICAgICAgICAgICAgICAgICBleHRzLmV4dGVuZChoLmdldF9zdXBwb3J0ZWRfZXh0KCkpDQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb246DQogICAgICAgICAgICByZXR1cm4gTm9uZQ0KDQogICAgICAgIGV4dHMgPSBzb3J0ZWQoc2V0KGUgZm9yIGUgaW4gZXh0cyBpZiBpc2luc3RhbmNlKGUsIChzdHIsIGJ5dGVzKSkpKQ0KICAgICAgICByZXR1cm4gZXh0cyBvciBOb25lDQoNCiAgICBleGNlcHQgRXhjZXB0aW9uOg0KICAgICAgICByZXR1cm4gTm9uZQ0KDQoNCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tDQojIERldGVjdCByZWFsIFJQQSBhcmNoaXZlcyBieSByZWFkaW5nIHRoZSBoZWFkZXINCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tDQpkZWYgaXNfcnBhX2ZpbGUocGF0aCk6DQogICAgdHJ5Og0KICAgICAgICB3aXRoIG9wZW4ocGF0aCwgInJiIikgYXMgZjoNCiAgICAgICAgICAgIHNpZyA9IGYucmVhZCg4KQ0KICAgICAgICByZXR1cm4gc2lnLnN0YXJ0c3dpdGgoYiJSUEEtIikNCiAgICBleGNlcHQgRXhjZXB0aW9uOg0KICAgICAgICByZXR1cm4gRmFsc2UNCg0KDQpkZWYgc2Nhbl9wcmVzZW50X2FyY2hpdmVzKGJhc2VfZGlyKToNCiAgICBleHRzID0gc2V0KCkNCg0KICAgIGRlZiBzY2FuKGQpOg0KICAgICAgICB0cnk6DQogICAgICAgICAgICBmb3IgbmFtZSBpbiBvcy5saXN0ZGlyKGQpOg0KICAgICAgICAgICAgICAgIGZ1bGwgPSBvcy5wYXRoLmpvaW4oZCwgbmFtZSkNCiAgICAgICAgICAgICAgICBpZiBub3Qgb3MucGF0aC5pc2ZpbGUoZnVsbCk6DQogICAgICAgICAgICAgICAgICAgIGNvbnRpbnVlDQogICAgICAgICAgICAgICAgaWYgb3MucGF0aC5zcGxpdGV4dChuYW1lKVsxXS5sb3dlcigpID09ICcub3JnJzoNCiAgICAgICAgICAgICAgICAgICAgY29udGludWUNCiAgICAgICAgICAgICAgICBpZiBpc19ycGFfZmlsZShmdWxsKToNCiAgICAgICAgICAgICAgICAgICAgXywgZXh0ID0gb3MucGF0aC5zcGxpdGV4dChuYW1lKQ0KICAgICAgICAgICAgICAgICAgICBpZiBleHQ6DQogICAgICAgICAgICAgICAgICAgICAgICBleHRzLmFkZChleHQubG93ZXIoKSkNCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbjoNCiAgICAgICAgICAgIHBhc3MNCg0KICAgIHNjYW4oYmFzZV9kaXIpDQoNCiAgICBnYW1lX3N1YiA9IG9zLnBhdGguam9pbihiYXNlX2RpciwgImdhbWUiKQ0KICAgIGlmIG9zLnBhdGguaXNkaXIoZ2FtZV9zdWIpOg0KICAgICAgICBzY2FuKGdhbWVfc3ViKQ0KDQogICAgcmV0dXJuIHNvcnRlZChleHRzKQ0KDQoNCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tDQojIEh5YnJpZCBkZXRlY3Rpb24gc3RyYXRlZ3kNCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tDQpkZWYgZGV0ZWN0X2FyY2hpdmVfZXh0ZW5zaW9ucyhiYXNlX2Rpcik6DQogICAgZXh0cyA9IHRyeV9yZW5weV9oYW5kbGVycygpDQogICAgaWYgZXh0czoNCiAgICAgICAgcmV0dXJuIGV4dHMNCg0KICAgIGV4dHMgPSBzY2FuX3ByZXNlbnRfYXJjaGl2ZXMoYmFzZV9kaXIpDQogICAgaWYgZXh0czoNCiAgICAgICAgcmV0dXJuIGV4dHMNCg0KICAgIHJldHVybiBbIi5ycGEiXQ0KDQoNCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tDQojIE1haW4gZW50cnkgcG9pbnQNCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tDQpkZWYgbWFpbigpOg0KICAgIGV4dHMgPSBkZXRlY3RfYXJjaGl2ZV9leHRlbnNpb25zKGdhbWVfZGlyKQ0KDQogICAgdHJ5Og0KICAgICAgICBvdXQgPSBzeXMuc3Rkb3V0DQogICAgICAgIGlmIGhhc2F0dHIob3V0LCAiYnVmZmVyIik6DQogICAgICAgICAgICBvdXQuYnVmZmVyLndyaXRlKChyZXByKGV4dHMpICsgIlxuIikuZW5jb2RlKCJ1dGYtOCIsICJyZXBsYWNlIikpDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICBwcmludChyZXByKGV4dHMpKQ0KICAgIGV4Y2VwdCBFeGNlcHRpb246DQogICAgICAgIHByaW50KGV4dHMpDQoNCiAgICBzeXMuZXhpdCgwIGlmIGV4dHMgZWxzZSAxKQ0KDQoNCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6DQogICAgbWFpbigp"
 )
@@ -1855,8 +1484,8 @@ if not exist "!detect_rpa_ext!" (
 )
 
 :: Run the script and capture the output
-if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%python.exe" %PYNOASSERT% "%detect_rpa_ext%" "%WORKDIR%" >> %UNRENLOG%
-"%PYTHONHOME%python.exe" %PYNOASSERT% "%detect_rpa_ext%" "%WORKDIR%" > "%TEMP%\extlist.tmp"
+echo %PYTHONGAME% "%detect_rpa_ext%" "%WORKDIR%" >> "%UNRENLOG%"
+%PYTHONGAME% "%detect_rpa_ext%" "%WORKDIR%" > "%TEMP%\extlist.tmp"
 set /p EXTLINE=<"%TEMP%\extlist.tmp"
 del /f /q "%TEMP%\extlist.tmp" %DEBUGREDIR%
 del /f /q "%detect_rpa_ext%" %DEBUGREDIR%
@@ -1868,7 +1497,7 @@ if defined EXTLINE (
     set EXTLINE=!EXTLINE:'=!
     set EXTLINE=!EXTLINE:,= !
     set EXTLINE=!EXTLINE:.=!
-    echo "!EXTLINE!" |  "%SystemRoot%\System32\findstr.exe" /i "rpa" >nul
+    echo "!EXTLINE!" | %SystemRoot%\System32\findstr.exe /i "rpa" >nul
     if !errorlevel! GEQ 1 (
         set "rpaExt=!EXTLINE! rpa"
     ) else (
@@ -1878,8 +1507,8 @@ if defined EXTLINE (
     set "rpaExt=rpa"
 )
 
+echo.
 call :elog -n "%EMPTY%" "!extm8.%LNG%!..."
-
 :: Search first with known extensions
 set "file_found="
 for %%e in (!rpaExt!) do (
@@ -1899,24 +1528,29 @@ for %%e in (!rpaExt!) do (
 
 :: If no RPA found
 if not defined file_found (
-    call :elog "%SKIP%" "!extm11.%LNG%!"
+    call :elog "%SKIP%" "%YEL%!extm11.%LNG%!%RES%"
+    timeout /T 2 >nul
     call :elog .
     goto :rpa_cleanup
 )
 
 :found_ext
-call :elog .
-set "extans="
-call :choiceEx "!extm1.%LNG%!" "OSJYN" "N" "%CTIME%" "-rawMsg"
-if errorlevel 5 (
-    set "extans=n"
-) else if errorlevel 4 (
-    set "extans=y"
-) else if errorlevel 3 (
-    set "extans=y"
-) else if errorlevel 2 (
-    set "extans=y"
-) else if errorlevel 1 (
+if %NOBACKUP% EQU 0 (
+    call :elog .
+    set "extans="
+    call :choiceEx "!extm1.%LNG%!" "OSJYN" "N" "%CTIME%" "-rawMsg"
+    if errorlevel 5 (
+        set "extans=n"
+    ) else if errorlevel 4 (
+        set "extans=y"
+    ) else if errorlevel 3 (
+        set "extans=y"
+    ) else if errorlevel 2 (
+        set "extans=y"
+    ) else if errorlevel 1 (
+        set "extans=y"
+    )
+) else if %NOBACKUP% EQU 1 (
     set "extans=y"
 )
 set "extans=%extans: =%"
@@ -1930,18 +1564,22 @@ if /i "%extans%" == "n" (
 )
 
 :: Ask if we want to extract all RPA or select
-call :elog .
-set "extans="
-set "def=A"
-if "%LNG%" == "fr" set "def=T"
-if "%LNG%" == "es" set "def=T"
-if "%LNG%" == "it" set "def=T"
-call :choiceEx "!extm4.%LNG%! " "ATS" "%def%" "%CTIME%" "-rawMsg"
-if errorlevel 3 (
-    set "extans=s"
-) else if errorlevel 2 (
-    set "extans=a"
-) else if errorlevel 1 (
+if %PROCESSALL% EQU 0 (
+    call :elog .
+    set "extans="
+    set "def=A"
+    if "%LNG%" == "fr" set "def=T"
+    if "%LNG%" == "es" set "def=T"
+    if "%LNG%" == "it" set "def=T"
+    call :choiceEx "!extm4.%LNG%! " "ATS" "%def%" "%CTIME%" "-rawMsg"
+    if errorlevel 3 (
+        set "extans=s"
+    ) else if errorlevel 2 (
+        set "extans=a"
+    ) else if errorlevel 1 (
+        set "extans=a"
+    )
+) else if %PROCESSALL% EQU 1 (
     set "extans=a"
 )
 set "extans=%extans: =%"
@@ -1969,38 +1607,39 @@ if not exist "%detect_archive%" (
 )
 
 :: Creating rpatool and altrpatool from our base64 strings
-:: rpatool by Shizmob 9a58396 2019-02-22T17:31:07.000Z
-::  https://github.com/Shizmob/rpatool
-::  Version 0.8 wo pickle5 for Ren'Py <= 7
+:: rpatool2 by JoeLurmel v0.1 for Ren'Py <= 7
 set "rpatool=%WORKDIR%\rpatool.py"
 set "altrpatool=%WORKDIR%\altrpatool.py"
 if "%RPATOOL_NEW%" == "n" (
-    >"%rpatool%.b64" (
-        <nul set /p="IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQoNCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgcHJpbnRfZnVuY3Rpb24NCg0KaW1wb3J0IHN5cw0KaW1wb3J0IG9zDQppbXBvcnQgY29kZWNzDQppbXBvcnQgcGlja2xlDQppbXBvcnQgZXJybm8NCmltcG9ydCByYW5kb20NCg0KaWYgc3lzLnZlcnNpb25faW5mb1swXSA+PSAzOg0KICAgIGRlZiBfdW5pY29kZSh0ZXh0KToNCiAgICAgICAgcmV0dXJuIHRleHQNCg0KICAgIGRlZiBfcHJpbnRhYmxlKHRleHQpOg0KICAgICAgICByZXR1cm4gdGV4dA0KDQogICAgZGVmIF91bm1hbmdsZShkYXRhKToNCiAgICAgICAgcmV0dXJuIGRhdGEuZW5jb2RlKCdsYXRpbjEnKQ0KDQogICAgZGVmIF91bnBpY2tsZShkYXRhKToNCiAgICAgICAgIyBTcGVjaWZ5IGxhdGluMSBlbmNvZGluZyB0byBwcmV2ZW50IHJhdyBieXRlIHZhbHVlcyBmcm9tIGNhdXNpbmcgYW4gQVNDSUkgZGVjb2RlIGVycm9yLg0KICAgICAgICByZXR1cm4gcGlja2xlLmxvYWRzKGRhdGEsIGVuY29kaW5nPSdsYXRpbjEnKQ0KZWxpZiBzeXMudmVyc2lvbl9pbmZvWzBdID09IDI6DQogICAgZGVmIF91bmljb2RlKHRleHQpOg0KICAgICAgICBpZiBpc2luc3RhbmNlKHRleHQsIHVuaWNvZGUpOg0KICAgICAgICAgICAgcmV0dXJuIHRleHQNCiAgICAgICAgcmV0dXJuIHRleHQuZGVjb2RlKCd1dGYtOCcpDQoNCiAgICBkZWYgX3ByaW50YWJsZSh0ZXh0KToNCiAgICAgICAgcmV0dXJuIHRleHQuZW5jb2RlKCd1dGYtOCcpDQoNCiAgICBkZWYgX3VubWFuZ2xlKGRhdGEpOg0KICAgICAgICByZXR1cm4gZGF0YQ0KDQogICAgZGVmIF91bnBpY2tsZShkYXRhKToNCiAgICAgICAgcmV0dXJuIHBpY2tsZS5sb2FkcyhkYXRhKQ0KDQpjbGFzcyBSZW5QeUFyY2hpdmU6DQogICAgZmlsZSA9IE5vbmUNCiAgICBoYW5kbGUgPSBOb25lDQoNCiAgICBmaWxlcyA9IHt9DQogICAgaW5kZXhlcyA9IHt9DQoNCiAgICB2ZXJzaW9uID0gTm9uZQ0KICAgIHBhZGxlbmd0aCA9IDANCiAgICBrZXkgPSBOb25lDQogICAgdmVyYm9zZSA9IEZhbHNlDQoNCiAgICBSUEEyX01BR0lDID0gJ1JQQS0yLjAgJw0KICAgIFJQQTNfTUFHSUMgPSAnUlBBLTMuMCAnDQogICAgUlBBM18yX01BR0lDID0gJ1JQQS0zLjIgJw0KDQogICAgIyBGb3IgYmFja3dhcmQgY29tcGF0aWJpbGl0eSwgb3RoZXJ3aXNlIFB5dGhvbjMtcGFja2VkIGFyY2hpdmVzIHdvbid0IGJlIHJlYWQgYnkgUHl0aG9uMg0KICAgIFBJQ0tMRV9QUk9UT0NPTCA9IDINCg0KICAgIGRlZiBfX2luaXRfXyhzZWxmLCBmaWxlID0gTm9uZSwgdmVyc2lvbiA9IDMsIHBhZGxlbmd0aCA9IDAsIGtleSA9IDB4REVBREJFRUYsIHZlcmJvc2UgPSBGYWxzZSk6DQogICAgICAgIHNlbGYucGFkbGVuZ3RoID0gcGFkbGVuZ3RoDQogICAgICAgIHNlbGYua2V5ID0ga2V5DQogICAgICAgIHNlbGYudmVyYm9zZSA9IHZlcmJvc2UNCg0KICAgICAgICBpZiBmaWxlIGlzIG5vdCBOb25lOg0KICAgICAgICAgICAgc2VsZi5sb2FkKGZpbGUpDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICBzZWxmLnZlcnNpb24gPSB2ZXJzaW9uDQoNCiAgICBkZWYgX19kZWxfXyhzZWxmKToNCiAgICAgICAgaWYgc2VsZi5oYW5kbGUgaXMgbm90IE5vbmU6DQogICAgICAgICAgICBzZWxmLmhhbmRsZS5jbG9zZSgpDQoNCiAgICAjIERldGVybWluZSBhcmNoaXZlIHZlcnNpb24uDQogICAgZGVmIGdldF92ZXJzaW9uKHNlbGYpOg0KICAgICAgICBzZWxmLmhhbmRsZS5zZWVrKDApDQogICAgICAgIG1hZ2ljID0gc2VsZi5oYW5kbGUucmVhZGxpbmUoKS5kZWNvZGUoJ3V0Zi04JykNCg0KICAgICAgICBpZiBtYWdpYy5zdGFydHN3aXRoKHNlbGYuUlBBM18yX01BR0lDKToNCiAgICAgICAgICAgIHJldHVybiAzLjINCiAgICAgICAgZWxpZiBtYWdpYy5zdGFydHN3aXRoKHNlbGYuUlBBM19NQUdJQyk6DQogICAgICAgICAgICByZXR1cm4gMw0KICAgICAgICBlbGlmIG1hZ2ljLnN0YXJ0c3dpdGgoc2VsZi5SUEEyX01BR0lDKToNCiAgICAgICAgICAgIHJldHVybiAyDQogICAgICAgIGVsaWYgc2VsZi5maWxlLmVuZHN3aXRoKCcucnBpJyk6DQogICAgICAgICAgICByZXR1cm4gMQ0KDQogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoJ3RoZSBnaXZlbiBmaWxlIGlzIG5vdCBhIHZhbGlkIFJlblwnUHkgYXJjaGl2ZSwgb3IgYW4gdW5zdXBwb3J0ZWQgdmVyc2lvbicpDQoNCiAgICAjIEV4dHJhY3QgZmlsZSBpbmRleGVzIGZyb20gb3BlbmVkIGFyY2hpdmUuDQogICAgZGVmIGV4dHJhY3RfaW5kZXhlcyhzZWxmKToNCiAgICAgICAgc2VsZi5oYW5kbGUuc2VlaygwKQ0KICAgICAgICBpbmRleGVzID0gTm9uZQ0KDQogICAgICAgIGlmIHNlbGYudmVyc2lvbiBpbiBbMiwgMywgMy4yXToNCiAgICAgICAgICAgICMgRmV0Y2ggbWV0YWRhdGEuDQogICAgICAgICAgICBtZXRhZGF0YSA9IHNlbGYuaGFuZGxlLnJlYWRsaW5lKCkNCiAgICAgICAgICAgIHZhbHMgPSBtZXRhZGF0YS5zcGxpdCgpDQogICAgICAgICAgICBvZmZzZXQgPSBpbnQodmFsc1sxXSwgMTYpDQogICAgICAgICAgICBpZiBzZWxmLnZlcnNpb24gPT0gMzoNCiAgICAgICAgICAgICAgICBzZWxmLmtleSA9IDANCiAgICAgICAgICAgICAgICBmb3Igc3Via2V5IGluIHZhbHNbMjpdOg0KICAgICAgICAgICAgICAgICAgICBzZWxmLmtleSBePSBpbnQoc3Via2V5LCAxNikNCiAgICAgICAgICAgIGVsaWYgc2VsZi52ZXJzaW9uID09IDMuMjoNCiAgICAgICAgICAgICAgICBzZWxmLmtleSA9IDANCiAgICAgICAgICAgICAgICBmb3Igc3Via2V5IGluIHZhbHNbMzpdOg0KICAgICAgICAgICAgICAgICAgICBzZWxmLmtleSBePSBpbnQoc3Via2V5LCAxNikNCg0KICAgICAgICAgICAgIyBMb2FkIGluIGluZGV4ZXMuDQogICAgICAgICAgICBzZWxmLmhhbmRsZS5zZWVrKG9mZnNldCkNCiAgICAgICAgICAgIGNvbnRlbnRzID0gY29kZWNzLmRlY29kZShzZWxmLmhhbmRsZS5yZWFkKCksICd6bGliJykNCiAgICAgICAgICAgIGluZGV4ZXMgPSBfdW5waWNrbGUoY29udGVudHMpDQoNCiAgICAgICAgICAgICMgRGVvYmZ1c2NhdGUgaW5kZXhlcy4NCiAgICAgICAgICAgIGlmIHNlbGYudmVyc2lvbiBpbiBbMywgMy4yXToNCiAgICAgICAgICAgICAgICBvYmZ1c2NhdGVkX2luZGV4ZXMgPSBpbmRleGVzDQogICAgICAgICAgICAgICAgaW5kZXhlcyA9IHt9DQogICAgICAgICAgICAgICAgZm9yIGkgaW4gb2JmdXNjYXRlZF9pbmRleGVzLmtleXMoKToNCiAgICAgICAgICAgICAgICAgICAgaWYgbGVuKG9iZnVzY2F0ZWRfaW5kZXhlc1tpXVswXSkgPT0gMjoNCiAgICAgICAgICAgICAgICAgICAgICAgIGluZGV4ZXNbaV0gPSBbIChvZmZzZXQgXiBzZWxmLmtleSwgbGVuZ3RoIF4gc2VsZi5rZXkpIGZvciBvZmZzZXQsIGxlbmd0aCBpbiBvYmZ1c2NhdGVkX2luZGV4ZXNbaV0gXQ0KICAgICAgICAgICAgICAgICAgICBlbHNlOg0KICAgICAgICAgICAgICAgICAgICAgICAgaW5kZXhlc1tpXSA9IFsgKG9mZnNldCBeIHNlbGYua2V5LCBsZW5ndGggXiBzZWxmLmtleSwgcHJlZml4KSBmb3Igb2Zmc2V0LCBsZW5ndGgsIHByZWZpeCBpbiBvYmZ1c2NhdGVkX2luZGV4ZXNbaV0gXQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgaW5kZXhlcyA9IHBpY2tsZS5sb2Fkcyhjb2RlY3MuZGVjb2RlKHNlbGYuaGFuZGxlLnJlYWQoKSwgJ3psaWInKSkNCg0KICAgICAgICByZXR1cm4gaW5kZXhlcw0KDQogICAgIyBHZW5lcmF0ZSBwc2V1ZG9yYW5kb20gcGFkZGluZyAoZm9yIHdoYXRldmVyIHJlYXNvbikuDQogICAgZGVmIGdlbmVyYXRlX3BhZGRpbmcoc2VsZik6DQogICAgICAgIGxlbmd0aCA9IHJhbmRvbS5yYW5kaW50KDEsIHNlbGYucGFkbGVuZ3RoKQ0KDQogICAgICAgIHBhZGRpbmcgPSAnJw0KICAgICAgICB3aGlsZSBsZW5ndGggPiAwOg0KICAgICAgICAgICAgcGFkZGluZyArPSBjaHIocmFuZG9tLnJhbmRpbnQoMSwgMjU1KSkNCiAgICAgICAgICAgIGxlbmd0aCAtPSAxDQoNCiAgICAgICAgcmV0dXJuIHBhZGRpbmcNCg0KICAgICMgQ29udmVydHMgYSBmaWxlbmFtZSB0byBhcmNoaXZlIGZvcm1hdC4NCiAgICBkZWYgY29udmVydF9maWxlbmFtZShzZWxmLCBmaWxlbmFtZSk6DQogICAgICAgIChkcml2ZSwgZmlsZW5hbWUpID0gb3MucGF0aC5zcGxpdGRyaXZlKG9zLnBhdGgubm9ybXBhdGgoZmlsZW5hbWUpLnJlcGxhY2Uob3Muc2VwLCAnLycpKQ0KICAgICAgICByZXR1cm4gZmlsZW5hbWUNCg0KICAgICMgRGVidWcgKHZlcmJvc2UpIG1lc3NhZ2VzLg0KICAgIGRlZiB2ZXJib3NlX3ByaW50KHNlbGYsIG1lc3NhZ2UpOg0KICAgICAgICBpZiBzZWxmLnZlcmJvc2U6DQogICAgICAgICAgICBwcmludChtZXNzYWdlKQ0KDQoNCiAgICAjIExpc3QgZmlsZXMgaW4gYXJjaGl2ZSBhbmQgY3VycmVudCBpbnRlcm5hbCBzdG9yYWdlLg0KICAgIGRlZiBsaXN0KHNlbGYpOg0KICAgICAgICByZXR1cm4gbGlzdChzZWxmLmluZGV4ZXMua2V5cygpKSArIGxpc3Qoc2VsZi5maWxlcy5rZXlzKCkpDQoNCiAgICAjIENoZWNrIGlmIGEgZmlsZSBleGlzdHMgaW4gdGhlIGFyY2hpdmUuDQogICAgZGVmIGhhc19maWxlKHNlbGYsIGZpbGVuYW1lKToNCiAgICAgICAgZmlsZW5hbWUgPSBfdW5pY29kZShmaWxlbmFtZSkNCiAgICAgICAgcmV0dXJuIGZpbGVuYW1lIGluIHNlbGYuaW5kZXhlcy5rZXlzKCkgb3IgZmlsZW5hbWUgaW4gc2VsZi5maWxlcy5rZXlzKCkNCg0KICAgICMgUmVhZCBmaWxlIGZyb20gYXJjaGl2ZSBvciBpbnRlcm5hbCBzdG9yYWdlLg0KICAgIGRlZiByZWFkKHNlbGYsIGZpbGVuYW1lKToNCiAgICAgICAgZmlsZW5hbWUgPSBzZWxmLmNvbnZlcnRfZmlsZW5hbWUoX3VuaWNvZGUoZmlsZW5hbWUpKQ0KDQogICAgICAgICMgQ2hlY2sgaWYgdGhlIGZpbGUgZXhpc3RzIGluIG91ciBpbmRleGVzLg0KICAgICAgICBpZiBmaWxlbmFtZSBub3QgaW4gc2VsZi5maWxlcyBhbmQgZmlsZW5hbWUgbm90IGluIHNlbGYuaW5kZXhlczoNCiAgICAgICAgICAgIHJhaXNlIElPRXJyb3IoZXJybm8uRU5PRU5ULCAndGhlIHJlcXVlc3RlZCBmaWxlIHswfSBkb2VzIG5vdCBleGlzdCBpbiB0aGUgZ2l2ZW4gUmVuXCdQeSBhcmNoaXZlJy5mb3JtYXQoDQogICAgICAgICAgICAgICAgX3ByaW50YWJsZShmaWxlbmFtZSkpKQ0KDQogICAgICAgICMgSWYgaXQncyBpbiBvdXIgb3BlbmVkIGFyY2hpdmUgaW5kZXgsIGFuZCBvdXIgYXJjaGl2ZSBoYW5kbGUgaXNuJ3QgdmFsaWQsIHNvbWV0aGluZyBpcyBvYnZpb3VzbHkgd3JvbmcuDQogICAgICAgIGlmIGZpbGVuYW1lIG5vdCBpbiBzZWxmLmZpbGVzIGFuZCBmaWxlbmFtZSBpbiBzZWxmLmluZGV4ZXMgYW5kIHNlbGYuaGFuZGxlIGlzIE5vbmU6DQogICAgICAgICAgICByYWlzZSBJT0Vycm9yKGVycm5vLkVOT0VOVCwgJ3RoZSByZXF1ZXN0ZWQgZmlsZSB7MH0gZG9lcyBub3QgZXhpc3QgaW4gdGhlIGdpdmVuIFJlblwnUHkgYXJjaGl2ZScuZm9ybWF0KA0KICAgICAgICAgICAgICAgIF9wcmludGFibGUoZmlsZW5hbWUpKSkNCg0KICAgICAgICAjIENoZWNrIG91ciBzaW1wbGlmaWVkIGludGVybmFsIGluZGV4ZXMgZmlyc3QsIGluIGNhc2Ugc29tZW9uZSB3YW50cyB0byByZWFkIGEgZmlsZSB0aGV5IGFkZGVkIGJlZm9yZSB3aXRob3V0IHNhdmluZywgZm9yIHNvbWUgdW5ob2x5IHJlYXNvbi4NCiAgICAgICAgaWYgZmlsZW5hbWUgaW4gc2VsZi5maWxlczoNCiAgICAgICAgICAgIHNlbGYudmVyYm9zZV9wcmludCgnUmVhZGluZyBmaWxlIHswfSBmcm9tIGludGVybmFsIHN0b3JhZ2UuLi4nLmZvcm1hdChfcHJpbnRhYmxlKGZpbGVuYW1lKSkpDQogICAgICAgICAgICByZXR1cm4gc2VsZi5maWxlc1tmaWxlbmFtZV0NCiAgICAgICAgIyBXZSBuZWVkIHRvIHJlYWQgdGhlIGZpbGUgZnJvbSBvdXIgb3BlbiBhcmNoaXZlLg0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgIyBSZWFkIG9mZnNldCBhbmQgbGVuZ3RoLCBzZWVrIHRvIHRoZSBvZmZzZXQgYW5kIHJlYWQgdGhlIGZpbGUgY29udGVudHMuDQogICAgICAgICAgICBpZiBsZW4oc2VsZi5pbmRleGVzW2ZpbGVuYW1lXVswXSkgPT0gMzoNCiAgICAgICAgICAgICAgICAob2Zmc2V0LCBsZW5ndGgsIHByZWZpeCkgPSBzZWxmLmluZGV4ZXNbZmlsZW5hbWVdWzBdDQogICAgICAgICAgICBlbHNlOg0KICAgICAgICAgI"
-        <nul set /p="CAgICAgIChvZmZzZXQsIGxlbmd0aCkgPSBzZWxmLmluZGV4ZXNbZmlsZW5hbWVdWzBdDQogICAgICAgICAgICAgICAgcHJlZml4ID0gJycNCg0KICAgICAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdSZWFkaW5nIGZpbGUgezB9IGZyb20gZGF0YSBmaWxlIHsxfS4uLiAob2Zmc2V0ID0gezJ9LCBsZW5ndGggPSB7M30gYnl0ZXMpJy5mb3JtYXQoDQogICAgICAgICAgICAgICAgX3ByaW50YWJsZShmaWxlbmFtZSksIHNlbGYuZmlsZSwgb2Zmc2V0LCBsZW5ndGgpKQ0KICAgICAgICAgICAgc2VsZi5oYW5kbGUuc2VlayhvZmZzZXQpDQogICAgICAgICAgICByZXR1cm4gX3VubWFuZ2xlKHByZWZpeCkgKyBzZWxmLmhhbmRsZS5yZWFkKGxlbmd0aCAtIGxlbihwcmVmaXgpKQ0KDQogICAgIyBNb2RpZnkgYSBmaWxlIGluIGFyY2hpdmUgb3IgaW50ZXJuYWwgc3RvcmFnZS4NCiAgICBkZWYgY2hhbmdlKHNlbGYsIGZpbGVuYW1lLCBjb250ZW50cyk6DQogICAgICAgIGZpbGVuYW1lID0gX3VuaWNvZGUoZmlsZW5hbWUpDQoNCiAgICAgICAgIyBPdXIgJ2NoYW5nZScgaXMgYmFzaWNhbGx5IHJlbW92aW5nIHRoZSBmaWxlIGZyb20gb3VyIGluZGV4ZXMgZmlyc3QsIGFuZCB0aGVuIHJlLWFkZGluZyBpdC4NCiAgICAgICAgc2VsZi5yZW1vdmUoZmlsZW5hbWUpDQogICAgICAgIHNlbGYuYWRkKGZpbGVuYW1lLCBjb250ZW50cykNCg0KICAgICMgQWRkIGEgZmlsZSB0byB0aGUgaW50ZXJuYWwgc3RvcmFnZS4NCiAgICBkZWYgYWRkKHNlbGYsIGZpbGVuYW1lLCBjb250ZW50cyk6DQogICAgICAgIGZpbGVuYW1lID0gc2VsZi5jb252ZXJ0X2ZpbGVuYW1lKF91bmljb2RlKGZpbGVuYW1lKSkNCiAgICAgICAgaWYgZmlsZW5hbWUgaW4gc2VsZi5maWxlcyBvciBmaWxlbmFtZSBpbiBzZWxmLmluZGV4ZXM6DQogICAgICAgICAgICByYWlzZSBWYWx1ZUVycm9yKCdmaWxlIHswfSBhbHJlYWR5IGV4aXN0cyBpbiBhcmNoaXZlJy5mb3JtYXQoX3ByaW50YWJsZShmaWxlbmFtZSkpKQ0KDQogICAgICAgIHNlbGYudmVyYm9zZV9wcmludCgnQWRkaW5nIGZpbGUgezB9IHRvIGFyY2hpdmUuLi4gKGxlbmd0aCA9IHsxfSBieXRlcyknLmZvcm1hdCgNCiAgICAgICAgICAgIF9wcmludGFibGUoZmlsZW5hbWUpLCBsZW4oY29udGVudHMpKSkNCiAgICAgICAgc2VsZi5maWxlc1tmaWxlbmFtZV0gPSBjb250ZW50cw0KDQogICAgIyBSZW1vdmUgYSBmaWxlIGZyb20gYXJjaGl2ZSBvciBpbnRlcm5hbCBzdG9yYWdlLg0KICAgIGRlZiByZW1vdmUoc2VsZiwgZmlsZW5hbWUpOg0KICAgICAgICBmaWxlbmFtZSA9IF91bmljb2RlKGZpbGVuYW1lKQ0KICAgICAgICBpZiBmaWxlbmFtZSBpbiBzZWxmLmZpbGVzOg0KICAgICAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdSZW1vdmluZyBmaWxlIHswfSBmcm9tIGludGVybmFsIHN0b3JhZ2UuLi4nLmZvcm1hdChfcHJpbnRhYmxlKGZpbGVuYW1lKSkpDQogICAgICAgICAgICBkZWwgc2VsZi5maWxlc1tmaWxlbmFtZV0NCiAgICAgICAgZWxpZiBmaWxlbmFtZSBpbiBzZWxmLmluZGV4ZXM6DQogICAgICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1JlbW92aW5nIGZpbGUgezB9IGZyb20gYXJjaGl2ZSBpbmRleGVzLi4uJy5mb3JtYXQoX3ByaW50YWJsZShmaWxlbmFtZSkpKQ0KICAgICAgICAgICAgZGVsIHNlbGYuaW5kZXhlc1tmaWxlbmFtZV0NCiAgICAgICAgZWxzZToNCiAgICAgICAgICAgIHJhaXNlIElPRXJyb3IoZXJybm8uRU5PRU5ULCAndGhlIHJlcXVlc3RlZCBmaWxlIHswfSBkb2VzIG5vdCBleGlzdCBpbiB0aGlzIGFyY2hpdmUnLmZvcm1hdChfcHJpbnRhYmxlKGZpbGVuYW1lKSkpDQoNCiAgICAjIExvYWQgYXJjaGl2ZS4NCiAgICBkZWYgbG9hZChzZWxmLCBmaWxlbmFtZSk6DQogICAgICAgIGZpbGVuYW1lID0gX3VuaWNvZGUoZmlsZW5hbWUpDQoNCiAgICAgICAgaWYgc2VsZi5oYW5kbGUgaXMgbm90IE5vbmU6DQogICAgICAgICAgICBzZWxmLmhhbmRsZS5jbG9zZSgpDQogICAgICAgIHNlbGYuZmlsZSA9IGZpbGVuYW1lDQogICAgICAgIHNlbGYuZmlsZXMgPSB7fQ0KICAgICAgICBzZWxmLmhhbmRsZSA9IG9wZW4oc2VsZi5maWxlLCAncmInKQ0KICAgICAgICBzZWxmLnZlcnNpb24gPSBzZWxmLmdldF92ZXJzaW9uKCkNCiAgICAgICAgc2VsZi5pbmRleGVzID0gc2VsZi5leHRyYWN0X2luZGV4ZXMoKQ0KDQogICAgIyBTYXZlIGN1cnJlbnQgc3RhdGUgaW50byBhIG5ldyBmaWxlLCBtZXJnaW5nIGFyY2hpdmUgYW5kIGludGVybmFsIHN0b3JhZ2UsIHJlYnVpbGRpbmcgaW5kZXhlcywgYW5kIG9wdGlvbmFsbHkgc2F2aW5nIGluIGFub3RoZXIgZm9ybWF0IHZlcnNpb24uDQogICAgZGVmIHNhdmUoc2VsZiwgZmlsZW5hbWUgPSBOb25lKToNCiAgICAgICAgZmlsZW5hbWUgPSBfdW5pY29kZShmaWxlbmFtZSkNCg0KICAgICAgICBpZiBmaWxlbmFtZSBpcyBOb25lOg0KICAgICAgICAgICAgZmlsZW5hbWUgPSBzZWxmLmZpbGUNCiAgICAgICAgaWYgZmlsZW5hbWUgaXMgTm9uZToNCiAgICAgICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoJ25vIHRhcmdldCBmaWxlIGZvdW5kIGZvciBzYXZpbmcgYXJjaGl2ZScpDQogICAgICAgIGlmIHNlbGYudmVyc2lvbiAhPSAyIGFuZCBzZWxmLnZlcnNpb24gIT0gMzoNCiAgICAgICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoJ3NhdmluZyBpcyBvbmx5IHN1cHBvcnRlZCBmb3IgdmVyc2lvbiAyIGFuZCAzIGFyY2hpdmVzJykNCg0KICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1JlYnVpbGRpbmcgYXJjaGl2ZSBpbmRleC4uLicpDQogICAgICAgICMgRmlsbCBvdXIgb3duIGZpbGVzIHN0cnVjdHVyZSB3aXRoIHRoZSBmaWxlcyBhZGRlZCBvciBjaGFuZ2VkIGluIHRoaXMgc2Vzc2lvbi4NCiAgICAgICAgZmlsZXMgPSBzZWxmLmZpbGVzDQogICAgICAgICMgRmlyc3QsIHJlYWQgZmlsZXMgZnJvbSB0aGUgY3VycmVudCBhcmNoaXZlIGludG8gb3VyIGZpbGVzIHN0cnVjdHVyZS4NCiAgICAgICAgZm9yIGZpbGUgaW4gbGlzdChzZWxmLmluZGV4ZXMua2V5cygpKToNCiAgICAgICAgICAgIGNvbnRlbnQgPSBzZWxmLnJlYWQoZmlsZSkNCiAgICAgICAgICAgICMgUmVtb3ZlIGZyb20gaW5kZXhlcyBhcnJheSBvbmNlIHJlYWQsIGFkZCB0byBvdXIgb3duIGFycmF5Lg0KICAgICAgICAgICAgZGVsIHNlbGYuaW5kZXhlc1tmaWxlXQ0KICAgICAgICAgICAgZmlsZXNbZmlsZV0gPSBjb250ZW50DQoNCiAgICAgICAgIyBQcmVkaWN0IGhlYWRlciBsZW5ndGgsIHdlJ2xsIHdyaXRlIHRoYXQgb25lIGxhc3QuDQogICAgICAgIG9mZnNldCA9IDANCiAgICAgICAgaWYgc2VsZi52ZXJzaW9uID09IDM6DQogICAgICAgICAgICBvZmZzZXQgPSAzNA0KICAgICAgICBlbGlmIHNlbGYudmVyc2lvbiA9PSAyOg0KICAgICAgICAgICAgb2Zmc2V0ID0gMjUNCiAgICAgICAgYXJjaGl2ZSA9IG9wZW4oZmlsZW5hbWUsICd3YicpDQogICAgICAgIGFyY2hpdmUuc2VlayhvZmZzZXQpDQoNCiAgICAgICAgIyBCdWlsZCBvdXIgb3duIGluZGV4ZXMgd2hpbGUgd3JpdGluZyBmaWxlcyB0byB0aGUgYXJjaGl2ZS4NCiAgICAgICAgaW5kZXhlcyA9IHt9DQogICAgICAgIHNlbGYudmVyYm9zZV9wcmludCgnV3JpdGluZyBmaWxlcyB0byBhcmNoaXZlIGZpbGUuLi4nKQ0KICAgICAgICBmb3IgZmlsZSwgY29udGVudCBpbiBmaWxlcy5pdGVtcygpOg0KICAgICAgICAgICAgIyBHZW5lcmF0ZSByYW5kb20gcGFkZGluZywgZm9yIHdoYXRldmVyIHJlYXNvbi4NCiAgICAgICAgICAgIGlmIHNlbGYucGFkbGVuZ3RoID4gMDoNCiAgICAgICAgICAgICAgICBwYWRkaW5nID0gc2VsZi5nZW5lcmF0ZV9wYWRkaW5nKCkNCiAgICAgICAgICAgICAgICBhcmNoaXZlLndyaXRlKHBhZGRpbmcpDQogICAgICAgICAgICAgICAgb2Zmc2V0ICs9IGxlbihwYWRkaW5nKQ0KDQogICAgICAgICAgICBhcmNoaXZlLndyaXRlKGNvbnRlbnQpDQogICAgICAgICAgICAjIFVwZGF0ZSBpbmRleC4NCiAgICAgICAgICAgIGlmIHNlbGYudmVyc2lvbiA9PSAzOg0KICAgICAgICAgICAgICAgIGluZGV4ZXNbZmlsZV0gPSBbIChvZmZzZXQgXiBzZWxmLmtleSwgbGVuKGNvbnRlbnQpIF4gc2VsZi5rZXkpIF0NCiAgICAgICAgICAgIGVsaWYgc2VsZi52ZXJzaW9uID09IDI6DQogICAgICAgICAgICAgICAgaW5kZXhlc1tmaWxlXSA9IFsgKG9mZnNldCwgbGVuKGNvbnRlbnQpKSBdDQogICAgICAgICAgICBvZmZzZXQgKz0gbGVuKGNvbnRlbnQpDQoNCiAgICAgICAgIyBXcml0ZSB0aGUgaW5kZXhlcy4NCiAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdXcml0aW5nIGFyY2hpdmUgaW5kZXggdG8gYXJjaGl2ZSBmaWxlLi4uJykNCiAgICAgICAgYXJjaGl2ZS53cml0ZShjb2RlY3MuZW5jb2RlKHBpY2tsZS5kdW1wcyhpbmRleGVzLCBzZWxmLlBJQ0tMRV9QUk9UT0NPTCksICd6bGliJykpDQogICAgICAgICMgTm93IHdyaXRlIHRoZSBoZWFkZXIuDQogICAgICAgIHNlbGYudmVyYm9zZV9wcmludCgnV3JpdGluZyBoZWFkZXIgdG8gYXJjaGl2ZSBmaWxlLi4uICh2ZXJzaW9uID0gUlBBdnswfSknLmZvcm1hdChzZWxmLnZlcnNpb24pKQ0KICAgICAgICBhcmNoaXZlLnNlZWsoMCkNCiAgICAgICAgaWYgc2VsZi52ZXJzaW9uID09IDM6DQogICAgICAgICAgICBhcmNoaXZlLndyaXRlKGNvZGVjcy5lbmNvZGUoJ3t9ezowMTZ4fSB7OjA4eH1cbicuZm9ybWF0KHNlbGYuUlBBM19NQUdJQywgb2Zmc2V0LCBzZWxmLmtleSkpKQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgYXJjaGl2ZS53cml0ZShjb2RlY3MuZW5jb2RlKCd7fXs6MDE2eH1cbicuZm9ybWF0KHNlbGYuUlBBMl9NQUdJQywgb2Zmc2V0KSkpDQogICAgICAgICMgV2UncmUgZG9uZSwgY2xvc2UgaXQuDQogICAgICAgIGFyY2hpdmUuY2xvc2UoKQ0KDQogICAgICAgICMgUmVsb2FkIHRoZSBmaWxlIGluIG91ciBpbm5lciBkYXRhYmFzZS4NCiAgICAgICAgc2VsZi5sb2FkKGZpbGVuYW1lKQ0KDQppZiBfX25hbWVfXyA9PSAiX19tYWluX18iOg0KICAgIGltcG9ydCBhcmdwYXJzZQ0KDQogICAgcGFyc2VyID0gYXJncGFyc2UuQXJndW1lbnRQYXJzZXIoDQogICAgICAgIGRlc2NyaXB0aW9uPSdBIHRvb2wgZm9yIHdvcmtpbmcgd2l0aCBSZW5cJ1B5IGFyY2hpdmUgZmlsZXMuJywNCiAgICAgICAgZXBpbG9nPSdUaGUgRklMRSBhcmd1bWVudCBjYW4gb3B0aW9uYWxseSBiZSBpbiBBUkNISVZFPVJFQUwgZm9ybWF0LCBtYXBwaW5nIGEgZmlsZSBpbiB0aGUgYXJjaGl2ZSBmaWxlIHN5c3RlbSB0byBhIGZpbGUgb24geW91ciByZWFsIGZpbGUgc3lzdGVtLiBBbiBleGFtcGxlIG9mIHRoaXM6IHJwYXRvb2wgLXggdGVzdC5ycGEgc2NyaXB0LnJweWM9L2hvbWUvZm9vL3Rlc3QucnB5YycsDQogICAgICAgIGFkZF9oZWxwPUZhbHNlKQ0KDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnYXJjaGl2ZScsIG1ldGF2YXI9J0FSQ0hJVkUnLCBoZWxwPSdUaGUgUmVuXCdweSBhcmNoaXZlIGZpbGUgdG8gb3BlcmF0ZSBvbi4nKQ0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJ2ZpbGVzJywgbWV0YXZhcj0nRklMRScsIG5hcmdzPScqJywgYWN0aW9uPSdhcHBlbmQnLCBoZWxwPSdaZXJvIG9yIG1vcmUgZmlsZXMgdG8gb3BlcmF0ZSBvbi4nKQ0KDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWwnLCAnLS1saXN0JywgYWN0aW9uPSdzdG9yZV90cnVlJywgaGVscD0nTGlzdCBmaWxlcyBpbiBhcmNoaXZlIEFSQ0hJVkUuJykNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCcteCcsICctLWV4dHJhY3QnLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdFeHRyYWN0IEZJTEVzIGZyb20gQVJDSElWRS4nKQ0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1jJywgJy0tY3JlYXRlJywgYWN0aW9uPSdzdG9yZV90cnVlJywgaGVscD0nQ3JlYXRpdmUgQVJDSElWRSBmcm9tIEZJTEVzLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWQnLCAnLS1kZWxldGUnLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdEZWxldGUgRklMRXMgZnJvbSBBUkNISVZFLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWEnLCAnLS1hcHBlbmQnLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdBcHBlbmQgRklMRXMgdG8gQVJDSElWRS4nKQ0KDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLTInLC"
-        <nul set /p="AnLS10d28nLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdVc2UgdGhlIFJQQXYyIGZvcm1hdCBmb3IgY3JlYXRpbmcvYXBwZW5kaW5nIHRvIGFyY2hpdmVzLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLTMnLCAnLS10aHJlZScsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J1VzZSB0aGUgUlBBdjMgZm9ybWF0IGZvciBjcmVhdGluZy9hcHBlbmRpbmcgdG8gYXJjaGl2ZXMgKGRlZmF1bHQpLicpDQoNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctaycsICctLWtleScsIG1ldGF2YXI9J0tFWScsIGhlbHA9J1RoZSBvYmZ1c2NhdGlvbiBrZXkgdXNlZCBmb3IgY3JlYXRpbmcgUlBBdjMgYXJjaGl2ZXMsIGluIGhleGFkZWNpbWFsIChkZWZhdWx0OiAweERFQURCRUVGKS4nKQ0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1wJywgJy0tcGFkZGluZycsIG1ldGF2YXI9J0NPVU5UJywgaGVscD0nVGhlIG1heGltdW0gbnVtYmVyIG9mIGJ5dGVzIG9mIHBhZGRpbmcgdG8gYWRkIGJldHdlZW4gZmlsZXMgKGRlZmF1bHQ6IDApLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLW8nLCAnLS1vdXRmaWxlJywgaGVscD0nQW4gYWx0ZXJuYXRpdmUgb3V0cHV0IGFyY2hpdmUgZmlsZSB3aGVuIGFwcGVuZGluZyB0byBvciBkZWxldGluZyBmcm9tIGFyY2hpdmVzLCBvciBvdXRwdXQgZGlyZWN0b3J5IHdoZW4gZXh0cmFjdGluZy4nKQ0KDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWgnLCAnLS1oZWxwJywgYWN0aW9uPSdoZWxwJywgaGVscD0nUHJpbnQgdGhpcyBoZWxwIGFuZCBleGl0LicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLXYnLCAnLS12ZXJib3NlJywgYWN0aW9uPSdzdG9yZV90cnVlJywgaGVscD0nQmUgYSBiaXQgbW9yZSB2ZXJib3NlIHdoaWxlIHBlcmZvcm1pbmcgb3BlcmF0aW9ucy4nKQ0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1WJywgJy0tdmVyc2lvbicsIGFjdGlvbj0ndmVyc2lvbicsIHZlcnNpb249J3JwYXRvb2wgdjAuOCcsIGhlbHA9J1Nob3cgdmVyc2lvbiBpbmZvcm1hdGlvbi4nKQ0KICAgIGFyZ3VtZW50cyA9IHBhcnNlci5wYXJzZV9hcmdzKCkNCg0KICAgICMgRGV0ZXJtaW5lIFJQQSB2ZXJzaW9uLg0KICAgIGlmIGFyZ3VtZW50cy50d286DQogICAgICAgIHZlcnNpb24gPSAyDQogICAgZWxzZToNCiAgICAgICAgdmVyc2lvbiA9IDMNCg0KICAgICMgRGV0ZXJtaW5lIFJQQXYzIGtleS4NCiAgICBpZiAna2V5JyBpbiBhcmd1bWVudHMgYW5kIGFyZ3VtZW50cy5rZXkgaXMgbm90IE5vbmU6DQogICAgICAgIGtleSA9IGludChhcmd1bWVudHMua2V5LCAxNikNCiAgICBlbHNlOg0KICAgICAgICBrZXkgPSAweERFQURCRUVGDQoNCiAgICAjIERldGVybWluZSBwYWRkaW5nIGJ5dGVzLg0KICAgIGlmICdwYWRkaW5nJyBpbiBhcmd1bWVudHMgYW5kIGFyZ3VtZW50cy5wYWRkaW5nIGlzIG5vdCBOb25lOg0KICAgICAgICBwYWRkaW5nID0gaW50KGFyZ3VtZW50cy5wYWRkaW5nKQ0KICAgIGVsc2U6DQogICAgICAgIHBhZGRpbmcgPSAwDQoNCiAgICAjIERldGVybWluZSBvdXRwdXQgZmlsZS9kaXJlY3RvcnkgYW5kIGlucHV0IGFyY2hpdmUNCiAgICBpZiBhcmd1bWVudHMuY3JlYXRlOg0KICAgICAgICBhcmNoaXZlID0gTm9uZQ0KICAgICAgICBvdXRwdXQgPSBfdW5pY29kZShhcmd1bWVudHMuYXJjaGl2ZSkNCiAgICBlbHNlOg0KICAgICAgICBhcmNoaXZlID0gX3VuaWNvZGUoYXJndW1lbnRzLmFyY2hpdmUpDQogICAgICAgIGlmICdvdXRmaWxlJyBpbiBhcmd1bWVudHMgYW5kIGFyZ3VtZW50cy5vdXRmaWxlIGlzIG5vdCBOb25lOg0KICAgICAgICAgICAgb3V0cHV0ID0gX3VuaWNvZGUoYXJndW1lbnRzLm91dGZpbGUpDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICAjIERlZmF1bHQgb3V0cHV0IGRpcmVjdG9yeSBmb3IgZXh0cmFjdGlvbiBpcyB0aGUgY3VycmVudCBkaXJlY3RvcnkuDQogICAgICAgICAgICBpZiBhcmd1bWVudHMuZXh0cmFjdDoNCiAgICAgICAgICAgICAgICBvdXRwdXQgPSAnLicNCiAgICAgICAgICAgIGVsc2U6DQogICAgICAgICAgICAgICAgb3V0cHV0ID0gX3VuaWNvZGUoYXJndW1lbnRzLmFyY2hpdmUpDQoNCiAgICAjIE5vcm1hbGl6ZSBmaWxlcy4NCiAgICBpZiBsZW4oYXJndW1lbnRzLmZpbGVzKSA+IDAgYW5kIGlzaW5zdGFuY2UoYXJndW1lbnRzLmZpbGVzWzBdLCBsaXN0KToNCiAgICAgICAgYXJndW1lbnRzLmZpbGVzID0gYXJndW1lbnRzLmZpbGVzWzBdDQoNCiAgICB0cnk6DQogICAgICAgIGFyY2hpdmUgPSBSZW5QeUFyY2hpdmUoYXJjaGl2ZSwgcGFkbGVuZ3RoPXBhZGRpbmcsIGtleT1rZXksIHZlcnNpb249dmVyc2lvbiwgdmVyYm9zZT1hcmd1bWVudHMudmVyYm9zZSkNCiAgICBleGNlcHQgSU9FcnJvciBhcyBlOg0KICAgICAgICBwcmludCgnQ291bGQgbm90IG9wZW4gYXJjaGl2ZSBmaWxlIHswfSBmb3IgcmVhZGluZzogezF9Jy5mb3JtYXQoYXJjaGl2ZSwgZSksIGZpbGU9c3lzLnN0ZGVycikNCiAgICAgICAgc3lzLmV4aXQoMSkNCg0KICAgIGlmIGFyZ3VtZW50cy5jcmVhdGUgb3IgYXJndW1lbnRzLmFwcGVuZDoNCiAgICAgICAgIyBXZSBuZWVkIHRoaXMgc2VwZXJhdGUgZnVuY3Rpb24gdG8gcmVjdXJzaXZlbHkgcHJvY2VzcyBkaXJlY3Rvcmllcy4NCiAgICAgICAgZGVmIGFkZF9maWxlKGZpbGVuYW1lKToNCiAgICAgICAgICAgICMgSWYgdGhlIGFyY2hpdmUgcGF0aCBkaWZmZXJzIGZyb20gdGhlIGFjdHVhbCBmaWxlIHBhdGgsIGFzIGdpdmVuIGluIHRoZSBhcmd1bWVudCwNCiAgICAgICAgICAgICMgZXh0cmFjdCB0aGUgYXJjaGl2ZSBwYXRoIGFuZCBhY3R1YWwgZmlsZSBwYXRoLg0KICAgICAgICAgICAgaWYgZmlsZW5hbWUuZmluZCgnPScpICE9IC0xOg0KICAgICAgICAgICAgICAgIChvdXRmaWxlLCBmaWxlbmFtZSkgPSBmaWxlbmFtZS5zcGxpdCgnPScsIDIpDQogICAgICAgICAgICBlbHNlOg0KICAgICAgICAgICAgICAgIG91dGZpbGUgPSBmaWxlbmFtZQ0KDQogICAgICAgICAgICBpZiBvcy5wYXRoLmlzZGlyKGZpbGVuYW1lKToNCiAgICAgICAgICAgICAgICBmb3IgZmlsZSBpbiBvcy5saXN0ZGlyKGZpbGVuYW1lKToNCiAgICAgICAgICAgICAgICAgICAgIyBXZSBuZWVkIHRvIGRvIHRoaXMgaW4gb3JkZXIgdG8gbWFpbnRhaW4gYSBwb3NzaWJsZSBBUkNISVZFPVJFQUwgbWFwcGluZyBiZXR3ZWVuIGRpcmVjdG9yaWVzLg0KICAgICAgICAgICAgICAgICAgICBhZGRfZmlsZShvdXRmaWxlICsgb3Muc2VwICsgZmlsZSArICc9JyArIGZpbGVuYW1lICsgb3Muc2VwICsgZmlsZSkNCiAgICAgICAgICAgIGVsc2U6DQogICAgICAgICAgICAgICAgdHJ5Og0KICAgICAgICAgICAgICAgICAgICB3aXRoIG9wZW4oZmlsZW5hbWUsICdyYicpIGFzIGZpbGU6DQogICAgICAgICAgICAgICAgICAgICAgICBhcmNoaXZlLmFkZChvdXRmaWxlLCBmaWxlLnJlYWQoKSkNCiAgICAgICAgICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGU6DQogICAgICAgICAgICAgICAgICAgIHByaW50KCdDb3VsZCBub3QgYWRkIGZpbGUgezB9IHRvIGFyY2hpdmU6IHsxfScuZm9ybWF0KGZpbGVuYW1lLCBlKSwgZmlsZT1zeXMuc3RkZXJyKQ0KDQogICAgICAgICMgSXRlcmF0ZSBvdmVyIHRoZSBnaXZlbiBmaWxlcyB0byBhZGQgdG8gYXJjaGl2ZS4NCiAgICAgICAgZm9yIGZpbGVuYW1lIGluIGFyZ3VtZW50cy5maWxlczoNCiAgICAgICAgICAgIGFkZF9maWxlKF91bmljb2RlKGZpbGVuYW1lKSkNCg0KICAgICAgICAjIFNldCB2ZXJzaW9uIGZvciBzYXZpbmcsIGFuZCBzYXZlLg0KICAgICAgICBhcmNoaXZlLnZlcnNpb24gPSB2ZXJzaW9uDQogICAgICAgIHRyeToNCiAgICAgICAgICAgIGFyY2hpdmUuc2F2ZShvdXRwdXQpDQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToNCiAgICAgICAgICAgIHByaW50KCdDb3VsZCBub3Qgc2F2ZSBhcmNoaXZlIGZpbGU6IHswfScuZm9ybWF0KGUpLCBmaWxlPXN5cy5zdGRlcnIpDQogICAgZWxpZiBhcmd1bWVudHMuZGVsZXRlOg0KICAgICAgICAjIEl0ZXJhdGUgb3ZlciB0aGUgZ2l2ZW4gZmlsZXMgdG8gZGVsZXRlIGZyb20gdGhlIGFyY2hpdmUuDQogICAgICAgIGZvciBmaWxlbmFtZSBpbiBhcmd1bWVudHMuZmlsZXM6DQogICAgICAgICAgICB0cnk6DQogICAgICAgICAgICAgICAgYXJjaGl2ZS5yZW1vdmUoZmlsZW5hbWUpDQogICAgICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGU6DQogICAgICAgICAgICAgICAgcHJpbnQoJ0NvdWxkIG5vdCBkZWxldGUgZmlsZSB7MH0gZnJvbSBhcmNoaXZlOiB7MX0nLmZvcm1hdChmaWxlbmFtZSwgZSksIGZpbGU9c3lzLnN0ZGVycikNCg0KICAgICAgICAjIFNldCB2ZXJzaW9uIGZvciBzYXZpbmcsIGFuZCBzYXZlLg0KICAgICAgICBhcmNoaXZlLnZlcnNpb24gPSB2ZXJzaW9uDQogICAgICAgIHRyeToNCiAgICAgICAgICAgIGFyY2hpdmUuc2F2ZShvdXRwdXQpDQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToNCiAgICAgICAgICAgIHByaW50KCdDb3VsZCBub3Qgc2F2ZSBhcmNoaXZlIGZpbGU6IHswfScuZm9ybWF0KGUpLCBmaWxlPXN5cy5zdGRlcnIpDQogICAgZWxpZiBhcmd1bWVudHMuZXh0cmFjdDoNCiAgICAgICAgIyBFaXRoZXIgZXh0cmFjdCB0aGUgZ2l2ZW4gZmlsZXMsIG9yIGFsbCBmaWxlcyBpZiBubyBmaWxlcyBhcmUgZ2l2ZW4uDQogICAgICAgIGlmIGxlbihhcmd1bWVudHMuZmlsZXMpID4gMDoNCiAgICAgICAgICAgIGZpbGVzID0gYXJndW1lbnRzLmZpbGVzDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICBmaWxlcyA9IGFyY2hpdmUubGlzdCgpDQoNCiAgICAgICAgIyBDcmVhdGUgb3V0cHV0IGRpcmVjdG9yeSBpZiBub3QgcHJlc2VudC4NCiAgICAgICAgaWYgbm90IG9zLnBhdGguZXhpc3RzKG91dHB1dCk6DQogICAgICAgICAgICBvcy5tYWtlZGlycyhvdXRwdXQpDQoNCiAgICAgICAgIyBJdGVyYXRlIG92ZXIgZmlsZXMgdG8gZXh0cmFjdC4NCiAgICAgICAgZm9yIGZpbGVuYW1lIGluIGZpbGVzOg0KICAgICAgICAgICAgaWYgZmlsZW5hbWUuZmluZCgnPScpICE9IC0xOg0KICAgICAgICAgICAgICAgIChvdXRmaWxlLCBmaWxlbmFtZSkgPSBmaWxlbmFtZS5zcGxpdCgnPScsIDIpDQogICAgICAgICAgICBlbHNlOg0KICAgICAgICAgICAgICAgIG91dGZpbGUgPSBmaWxlbmFtZQ0KDQogICAgICAgICAgICB0cnk6DQogICAgICAgICAgICAgICAgY29udGVudHMgPSBhcmNoaXZlLnJlYWQoZmlsZW5hbWUpDQoNCiAgICAgICAgICAgICAgICAjIENyZWF0ZSBvdXRwdXQgZGlyZWN0b3J5IGZvciBmaWxlIGlmIG5vdCBwcmVzZW50Lg0KICAgICAgICAgICAgICAgIGlmIG5vdCBvcy5wYXRoLmV4aXN0cyhvcy5wYXRoLmRpcm5hbWUob3MucGF0aC5qb2luKG91dHB1dCwgb3V0ZmlsZSkpKToNCiAgICAgICAgICAgICAgICAgICAgb3MubWFrZWRpcnMob3MucGF0aC5kaXJuYW1lKG9zLnBhdGguam9pbihvdXRwdXQsIG91dGZpbGUpKSkNCg0KICAgICAgICAgICAgICAgIHdpdGggb3Blbihvcy5wYXRoLmpvaW4ob3V0cHV0LCBvdXRmaWxlKSwgJ3diJykgYXMgZmlsZToNCiAgICAgICAgICAgICAgICAgICAgZmlsZS53cml0ZShjb250ZW50cykNCiAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToNCiAgICAgICAgICAgICAgICBwcmludCgnQ291bGQgbm90IGV4dHJhY3QgZmlsZSB7MH0gZnJvbSBhcmNoaXZlOiB7MX0nLmZvcm1hdChmaWxlbmFtZSwgZSksIGZpbGU9c3lzLnN0ZGVycikNCiAgICBlbGlmIGFyZ3VtZW50cy5saXN0Og0KICAgICAgICAjIFByaW50IHRoZSBzb3J0ZWQgZmlsZSBsaXN0Lg0KICAgICAgICBsaXN0ID0gYXJjaGl2ZS5saXN0KCkNCiAgICAgICAgbGlzdC5zb3J0KCkNCiAgICAgICAgZm9yIGZpbGUgaW4gbGlzdDoNCiAgICAgICAgICAgIHByaW50KGZpbGUpDQogICAgZWxzZToNCiAgICAgICAgcHJpbnQoJ05vIG9wZXJhdGlvbiBnaXZlbiA6KCcpDQogICAgICAgIHByaW50KCdVc2UgezB9IC0taGVscCBmb3IgdXNhZ2UgZGV0YWlscy4nLmZvcm1hdChzeXMuYXJndlswXSkpDQoNCg=="
-    )
-
-    >"%altrpatool%.b64" (
-        <nul set /p="IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQoNCiMgTWFkZSBieSAoU00pIGFrYSBKb2VMdXJtZWwgQCBmOTV6b25lLnRvDQojIFRoaXMgc2NyaXB0IGlzIGxpY2Vuc2VkIHVuZGVyIEdOVSBHUEwgdjMg4oCUIHNlZSBMSUNFTlNFIGZvciBkZXRhaWxzDQoNCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgcHJpbnRfZnVuY3Rpb24NCmltcG9ydCBzeXMNCmltcG9ydCBvcw0KZnJvbSBwYXRobGliIGltcG9ydCBQYXRoDQppbXBvcnQgYXJncGFyc2UNCg0Kc3lzLnBhdGguYXBwZW5kKCcuLicpDQp0cnk6DQogICAgaW1wb3J0IG1haW4gICMgbm9xYTogRjQwMQ0KZXhjZXB0Og0KICAgIHBhc3MNCg0KaW1wb3J0IHJlbnB5Lm9iamVjdCAgIyBub3FhOiBGNDAxDQppbXBvcnQgcmVucHkuY29uZmlnDQppbXBvcnQgcmVucHkubG9hZGVyDQp0cnk6DQogICAgaW1wb3J0IHJlbnB5LnV0aWwgICMgbm9xYTogRjQwMQ0KZXhjZXB0Og0KICAgIHBhc3MNCg0KDQpjbGFzcyBSZW5QeUFyY2hpdmU6DQogICAgZGVmIF9faW5pdF9fKHNlbGYsIGZpbGVfcGF0aCwgaW5kZXg9MCk6DQogICAgICAgIHNlbGYuZmlsZSA9IHN0cihmaWxlX3BhdGgpDQogICAgICAgIHNlbGYuaW5kZXhlcyA9IHt9DQogICAgICAgIHNlbGYubG9hZChzZWxmLmZpbGUsIGluZGV4KQ0KDQogICAgZGVmIGNvbnZlcnRfZmlsZW5hbWUoc2VsZiwgZmlsZW5hbWUpOg0KICAgICAgICBkcml2ZSwgZmlsZW5hbWUgPSBvcy5wYXRoLnNwbGl0ZHJpdmUoDQogICAgICAgICAgICBvcy5wYXRoLm5vcm1wYXRoKGZpbGVuYW1lKS5yZXBsYWNlKG9zLnNlcCwgJy8nKQ0KICAgICAgICApDQogICAgICAgIHJldHVybiBmaWxlbmFtZQ0KDQogICAgZGVmIGxpc3Qoc2VsZik6DQogICAgICAgIHJldHVybiBsaXN0KHNlbGYuaW5kZXhlcykNCg0KICAgIGRlZiByZWFkKHNlbGYsIGZpbGVuYW1lKToNCiAgICAgICAgZmlsZW5hbWUgPSBzZWxmLmNvbnZlcnRfZmlsZW5hbWUoZmlsZW5hbWUpDQogICAgICAgIGlkeCA9IHNlbGYuaW5kZXhlcy5nZXQoZmlsZW5hbWUpDQogICAgICAgIGlmIGZpbGVuYW1lICE9ICcuJyBhbmQgaXNpbnN0YW5jZShpZHgsIGxpc3QpOg0KICAgICAgICAgICAgaWYgaGFzYXR0cihyZW5weS5sb2FkZXIsICJsb2FkX2Zyb21fYXJjaGl2ZSIpOg0KICAgICAgICAgICAgICAgIHN1YmZpbGUgPSByZW5weS5sb2FkZXIubG9hZF9mcm9tX2FyY2hpdmUoZmlsZW5hbWUpDQogICAgICAgICAgICBlbHNlOg0KICAgICAgICAgICAgICAgIHN1YmZpbGUgPSByZW5weS5sb2FkZXIubG9hZF9jb3JlKGZpbGVuYW1lKQ0KICAgICAgICAgICAgcmV0dXJuIHN1YmZpbGUucmVhZCgpDQogICAgICAgIHJldHVybiBOb25lDQoNCiAgICBkZWYgbG9hZChzZWxmLCBmaWxlbmFtZSwgaW5kZXgpOg0KICAgICAgICBzZWxmLmhhbmRsZSA9IG9wZW4oZmlsZW5hbWUsICdyYicpDQoNCiAgICAgICAgYmFzZSA9IG9zLnBhdGguc3BsaXRleHQob3MucGF0aC5iYXNlbmFtZShmaWxlbmFtZSkpWzBdDQoNCiAgICAgICAgaWYgYmFzZSBub3QgaW4gcmVucHkuY29uZmlnLmFyY2hpdmVzOg0KICAgICAgICAgICAgcmVucHkuY29uZmlnLmFyY2hpdmVzLmFwcGVuZChiYXNlKQ0KDQogICAgICAgIGFyY2hpdmVfZGlyID0gb3MucGF0aC5kaXJuYW1lKG9zLnBhdGgucmVhbHBhdGgoZmlsZW5hbWUpKQ0KICAgICAgICByZW5weS5jb25maWcuc2VhcmNocGF0aCA9IFthcmNoaXZlX2Rpcl0NCiAgICAgICAgcmVucHkuY29uZmlnLmJhc2VkaXIgPSBvcy5wYXRoLmRpcm5hbWUocmVucHkuY29uZmlnLnNlYXJjaHBhdGhbMF0pDQogICAgICAgIHJlbnB5LmxvYWRlci5pbmRleF9hcmNoaXZlcygpDQoNCiAgICAgICAgaXRlbXMgPSByZW5weS5sb2FkZXIuYXJjaGl2ZXNbaW5kZXhdWzFdLml0ZW1zKCkNCg0KICAgICAgICBmb3IgZiwgaWR4IGluIGl0ZW1zOg0KICAgICAgICAgICAgc2VsZi5pbmRleGVzW2ZdID0gaWR4DQoNCg0KIyAtLS0gaWRlbnRpY2FsIGhlbHBlciBmdW5jdGlvbnMgKHNhbWUgYXMgUlA4IHZlcnNpb24pIC0tLQ0KIyBkaXNjb3Zlcl9leHRlbnNpb25zKCkNCiMgZGlzY292ZXJfYXJjaGl2ZXMoKQ0KIyBleHRyYWN0X2FyY2hpdmUoKQ0KDQojIChJIGtlZXAgdGhlbSBpZGVudGljYWwgZm9yIHBlcmZlY3QgaGFybW9uaXNhdGlvbikNCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0NCg0KZGVmIGRpc2NvdmVyX2V4dGVuc2lvbnMoKToNCiAgICBleHRzID0gW10NCiAgICBpZiBoYXNhdHRyKHJlbnB5LmxvYWRlciwgImFyY2hpdmVfaGFuZGxlcnMiKToNCiAgICAgICAgZm9yIGhhbmRsZXIgaW4gcmVucHkubG9hZGVyLmFyY2hpdmVfaGFuZGxlcnM6DQogICAgICAgICAgICBpZiBoYXNhdHRyKGhhbmRsZXIsICJnZXRfc3VwcG9ydGVkX2V4dGVuc2lvbnMiKToNCiAgICAgICAgICAgICAgICBleHRzLmV4dGVuZChoYW5kbGVyLmdldF9zdXBwb3J0ZWRfZXh0ZW5zaW9ucygpKQ0KICAgICAgICAgICAgaWYgaGFzYXR0cihoYW5kbGVyLCAiZ2V0X3N1cHBvcnRlZF9leHQiKToNCiAgICAgICAgICAgICAgICBleHRzLmV4dGVuZChoYW5kbGVyLmdldF9zdXBwb3J0ZWRfZXh0KCkpDQogICAgZWxzZToNCiAgICAgICAgZXh0cy5hcHBlbmQoJy5ycGEnKQ0KDQogICAgaWYgJy5ycGMnIG5vdCBpbiBleHRzOg0KICAgICAgICBleHRzLmFwcGVuZCgnLnJwYycpDQoNCiAgICByZXR1cm4gc29ydGVkKHNldChlLmxvd2VyKCkgZm9yIGUgaW4gZXh0cykpDQoNCg0KZGVmIGRpc2NvdmVyX2FyY2hpdmVzKHNlYXJjaF9kaXIsIGV4dGVuc2lvbnMpOg0KICAgIGFyY2hpdmVzID0gW10NCiAgICBmb3Igcm9vdCwgZGlycywgZmlsZXMgaW4gb3Mud2FsayhzdHIoc2VhcmNoX2RpcikpOg0KICAgICAgICBmb3IgZmlsZSBpbiBmaWxlczoNCiAgICAgICAgICAgIHRyeToNCiAgICAgICAgICAgICAgICBiYXNlLCBleHQgPSBmaWxlLnJzcGxpdCgnLicsIDEpDQogICAgICAgICAgICAgICAgZXh0ID0gJy4nICsgZXh0Lmxvd2VyKCkNCiAgICAgICAgICAgICAgICBpZiBleHQgaW4gZXh0ZW5zaW9ucyBhbmQgJyUnIG5vdCBpbiBmaWxlOg0KICAgICAgICAgICAgICAgICAgICBhcmNoaXZlcy5hcHBlbmQoUGF0aChyb290KSAvIGZpbGUpDQogICAgICAgICAgICBleGNlcHQgVmFsdWVFcnJvcjoNCiAgICAgICAgICAgICAgICBjb250aW51ZQ0KICAgIHJldHVybiBhcmNoaXZlcw0KDQoNCmRlZiBleHRyYWN0X2FyY2hpdmUoYXJjaF9wYXRoLCBvdXRwdXQsIGFyY2hpdmVfY2xhc3MpOg0KICAgIHByaW50KGYnICBVbnBhY2tpbmcgInthcmNoX3BhdGh9IicpDQogICAgYXJjaGl2ZSA9IGFyY2hpdmVfY2xhc3MoYXJjaF9wYXRoLCAwKQ0KICAgIGZpbGVzID0gYXJjaGl2ZS5saXN0KCkNCg0KICAgIG91dHB1dC5ta2RpcihwYXJlbnRzPVRydWUsIGV4aXN0X29rPVRydWUpDQoNCiAgICBmb3IgZmlsZW5hbWUgaW4gZmlsZXM6DQogICAgICAgIGNvbnRlbnRzID0gYXJjaGl2ZS5yZWFkKGZpbGVuYW1lKQ0KICAgICAgICBpZiBjb250ZW50cyBpcyBub3QgTm9uZToNCiAgICAgICAgICAgIG91dGZpbGUgPSBvdXRwdXQgLyBmaWxlbmFtZQ0KICAgICAgICAgICAgb3V0ZmlsZS5wYXJlbnQubWtkaXIocGFyZW50cz1UcnVlLCBleGlzdF9vaz1UcnVlKQ0KICAgICAgICAgICAgd2l0aCBvcGVuKG91dGZpbGUsICd3YicpIGFzIGY6DQogICAgICAgICAgICAgICAgZi53cml0ZShjb250ZW50cykNCg0KDQpkZWYgbWFpbigpOg0KICAgIHBhcnNlciA9IGFyZ3BhcnNlLkFyZ3VtZW50UGFyc2VyKCkNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctcicsIGFjdGlvbj0ic3RvcmVfdHJ1ZSIsIGRlc3Q9J3JlbW92ZScpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLXgnLCBkZXN0PSdhcmNoaXZlJywgdHlwZT1zdHIpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLW8nLCBkZXN0PSdvdXRwdXQnLCB0eXBlPXN0ciwgZGVmYXVsdD0nLicpDQogICAgYXJncyA9IHBhcnNlci5wYXJzZV9hcmdzKCkNCg0KICAgIG91dHB1dCA9IFBhdGgoYXJncy5vdXRwdXQpLnJlc29sdmUoKQ0KICAgIGFyY2hpdmVfZmlsdGVyID0gYXJncy5hcmNoaXZlDQogICAgcmVtb3ZlID0gYXJncy5yZW1vdmUNCg0KICAgIGV4dGVuc2lvbnMgPSBkaXNjb3Zlcl9leHRlbnNpb25zKCkNCg0KICAgICMgTW9kZSAteA0KICAgIGlmIGFyY2hpdmVfZmlsdGVyOg0KICAgICAgICB0YXJnZXQgPSBQYXRoKGFyY2hpdmVfZmlsdGVyKS5yZXNvbHZlKCkNCiAgICAgICAgaWYgbm90IHRhcmdldC5leGlzdHMoKToNCiAgICAgICAgICAgIGJhc2VuYW1lID0gb3MucGF0aC5iYXNlbmFtZShhcmNoaXZlX2ZpbHRlcikNCiAgICAgICAgICAgIGZvdW5kID0gTm9uZQ0KICAgICAgICAgICAgZm9yIHJvb3QsIGRpcnMsIGZpbGVzIGluIG9zLndhbGsoJy4nKToNCiAgICAgICAgICAgICAgICBpZiBiYXNlbmFtZSBpbiBmaWxlczoNCiAgICAgICAgICAgICAgICAgICAgZm91bmQgPSBQYXRoKHJvb3QpIC8gYmFzZW5hbWUNCiAgICAgICAgICAgICAgICAgICAgYnJlYWsNCiAgICAgICAgICAgIGlmIGZvdW5kIGlzIE5vbmU6DQogICAgICAgICAgICAgICAgcHJpbnQoZidBcmNoaXZlICJ7YXJjaGl2ZV9maWx0ZXJ9IiBub3QgZm91bmQuJykNCiAgICAgICAgICAgICAgICBzeXMuZXhpdCgxKQ0KICAgICAgICAgICAgdGFyZ2V0ID0gZm91bmQucmVzb2x2ZSgpDQoNCiAgICAgICAgZXh0cmFjdF9hcmNoaXZlKHRhcmdldCwgb3V0cHV0LCBSZW5QeUFyY2hpdmUpDQoNCiAgICAgICAgaWYgcmVtb3ZlOg0KICAgICAgICAgICAgb3MucmVtb3ZlKHN0cih0YXJnZXQpKQ0KICAgICAgICByZXR1cm4NCg0KICAgICMgTW9kZSBkw6lmYXV0DQogICAgYXJjaGl2ZXMgPSBkaXNjb3Zlcl9hcmNoaXZlcyhQYXRoKCcuJyksIGV4dGVuc2lvbnMpDQoNCiAgICBpZiBub3QgYXJjaGl2ZXM6DQogICAgICAgIHByaW50KCJObyBhcmNoaXZlcyBmb3VuZC4iKQ0KICAgICAgICByZXR1cm4NCg0KICAgIGZvciBhcmNoIGluIGFyY2hpdmVzOg0KICAgICAgICBleHRyYWN0X2FyY2hpdmUoYXJjaCwgb3V0cHV0LCBSZW5QeUFyY2hpdmUpDQoNCiAgICBpZiByZW1vdmU6DQogICAgICAgIGZvciBhcmNoIGluIGFyY2hpdmVzOg0KICAgICAgICAgICAgb3MucmVtb3ZlKHN0cihhcmNoKSkNCg0KDQppZiBfX25hbWVfXyA9PSAiX19tYWluX18iOg0KICAgIG1haW4oKQ0K"
+    if "%OPTION%" == "1" (
+        >"%rpatool%.b64" (
+            <nul set /p="IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQoNCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgcHJpbnRfZnVuY3Rpb24NCg0KaW1wb3J0IHN5cw0KaW1wb3J0IG9zDQppbXBvcnQgY29kZWNzDQppbXBvcnQgcGlja2xlDQppbXBvcnQgZXJybm8NCmltcG9ydCByYW5kb20NCg0KaWYgc3lzLnZlcnNpb25faW5mb1swXSA+PSAzOg0KICAgIGRlZiBfdW5pY29kZSh0ZXh0KToNCiAgICAgICAgcmV0dXJuIHRleHQNCg0KICAgIGRlZiBfcHJpbnRhYmxlKHRleHQpOg0KICAgICAgICByZXR1cm4gdGV4dA0KDQogICAgZGVmIF91bm1hbmdsZShkYXRhKToNCiAgICAgICAgcmV0dXJuIGRhdGEuZW5jb2RlKCdsYXRpbjEnKQ0KDQogICAgZGVmIF91bnBpY2tsZShkYXRhKToNCiAgICAgICAgIyBTcGVjaWZ5IGxhdGluMSBlbmNvZGluZyB0byBwcmV2ZW50IHJhdyBieXRlIHZhbHVlcyBmcm9tIGNhdXNpbmcgYW4gQVNDSUkgZGVjb2RlIGVycm9yLg0KICAgICAgICByZXR1cm4gcGlja2xlLmxvYWRzKGRhdGEsIGVuY29kaW5nPSdsYXRpbjEnKQ0KZWxpZiBzeXMudmVyc2lvbl9pbmZvWzBdID09IDI6DQogICAgZGVmIF91bmljb2RlKHRleHQpOg0KICAgICAgICBpZiBpc2luc3RhbmNlKHRleHQsIHVuaWNvZGUpOg0KICAgICAgICAgICAgcmV0dXJuIHRleHQNCiAgICAgICAgcmV0dXJuIHRleHQuZGVjb2RlKCd1dGYtOCcpDQoNCiAgICBkZWYgX3ByaW50YWJsZSh0ZXh0KToNCiAgICAgICAgcmV0dXJuIHRleHQuZW5jb2RlKCd1dGYtOCcpDQoNCiAgICBkZWYgX3VubWFuZ2xlKGRhdGEpOg0KICAgICAgICByZXR1cm4gZGF0YQ0KDQogICAgZGVmIF91bnBpY2tsZShkYXRhKToNCiAgICAgICAgcmV0dXJuIHBpY2tsZS5sb2FkcyhkYXRhKQ0KDQpjbGFzcyBSZW5QeUFyY2hpdmU6DQogICAgZmlsZSA9IE5vbmUNCiAgICBoYW5kbGUgPSBOb25lDQoNCiAgICBmaWxlcyA9IHt9DQogICAgaW5kZXhlcyA9IHt9DQoNCiAgICB2ZXJzaW9uID0gTm9uZQ0KICAgIHBhZGxlbmd0aCA9IDANCiAgICBrZXkgPSBOb25lDQogICAgdmVyYm9zZSA9IEZhbHNlDQoNCiAgICBSUEEyX01BR0lDID0gJ1JQQS0yLjAgJw0KICAgIFJQQTNfTUFHSUMgPSAnUlBBLTMuMCAnDQogICAgUlBBM18yX01BR0lDID0gJ1JQQS0zLjIgJw0KDQogICAgIyBGb3IgYmFja3dhcmQgY29tcGF0aWJpbGl0eSwgb3RoZXJ3aXNlIFB5dGhvbjMtcGFja2VkIGFyY2hpdmVzIHdvbid0IGJlIHJlYWQgYnkgUHl0aG9uMg0KICAgIFBJQ0tMRV9QUk9UT0NPTCA9IDINCg0KICAgIGRlZiBfX2luaXRfXyhzZWxmLCBmaWxlID0gTm9uZSwgdmVyc2lvbiA9IDMsIHBhZGxlbmd0aCA9IDAsIGtleSA9IDB4REVBREJFRUYsIHZlcmJvc2UgPSBGYWxzZSk6DQogICAgICAgIHNlbGYucGFkbGVuZ3RoID0gcGFkbGVuZ3RoDQogICAgICAgIHNlbGYua2V5ID0ga2V5DQogICAgICAgIHNlbGYudmVyYm9zZSA9IHZlcmJvc2UNCg0KICAgICAgICBpZiBmaWxlIGlzIG5vdCBOb25lOg0KICAgICAgICAgICAgc2VsZi5sb2FkKGZpbGUpDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICBzZWxmLnZlcnNpb24gPSB2ZXJzaW9uDQoNCiAgICBkZWYgX19kZWxfXyhzZWxmKToNCiAgICAgICAgaWYgc2VsZi5oYW5kbGUgaXMgbm90IE5vbmU6DQogICAgICAgICAgICBzZWxmLmhhbmRsZS5jbG9zZSgpDQoNCiAgICAjIERldGVybWluZSBhcmNoaXZlIHZlcnNpb24uDQogICAgZGVmIGdldF92ZXJzaW9uKHNlbGYpOg0KICAgICAgICBzZWxmLmhhbmRsZS5zZWVrKDApDQogICAgICAgIG1hZ2ljID0gc2VsZi5oYW5kbGUucmVhZGxpbmUoKS5kZWNvZGUoJ3V0Zi04JykNCg0KICAgICAgICBpZiBtYWdpYy5zdGFydHN3aXRoKHNlbGYuUlBBM18yX01BR0lDKToNCiAgICAgICAgICAgIHJldHVybiAzLjINCiAgICAgICAgZWxpZiBtYWdpYy5zdGFydHN3aXRoKHNlbGYuUlBBM19NQUdJQyk6DQogICAgICAgICAgICByZXR1cm4gMw0KICAgICAgICBlbGlmIG1hZ2ljLnN0YXJ0c3dpdGgoc2VsZi5SUEEyX01BR0lDKToNCiAgICAgICAgICAgIHJldHVybiAyDQogICAgICAgIGVsaWYgc2VsZi5maWxlLmVuZHN3aXRoKCcucnBpJyk6DQogICAgICAgICAgICByZXR1cm4gMQ0KDQogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoJ3RoZSBnaXZlbiBmaWxlIGlzIG5vdCBhIHZhbGlkIFJlblwnUHkgYXJjaGl2ZSwgb3IgYW4gdW5zdXBwb3J0ZWQgdmVyc2lvbicpDQoNCiAgICAjIEV4dHJhY3QgZmlsZSBpbmRleGVzIGZyb20gb3BlbmVkIGFyY2hpdmUuDQogICAgZGVmIGV4dHJhY3RfaW5kZXhlcyhzZWxmKToNCiAgICAgICAgc2VsZi5oYW5kbGUuc2VlaygwKQ0KICAgICAgICBpbmRleGVzID0gTm9uZQ0KDQogICAgICAgIGlmIHNlbGYudmVyc2lvbiBpbiBbMiwgMywgMy4yXToNCiAgICAgICAgICAgICMgRmV0Y2ggbWV0YWRhdGEuDQogICAgICAgICAgICBtZXRhZGF0YSA9IHNlbGYuaGFuZGxlLnJlYWRsaW5lKCkNCiAgICAgICAgICAgIHZhbHMgPSBtZXRhZGF0YS5zcGxpdCgpDQogICAgICAgICAgICBvZmZzZXQgPSBpbnQodmFsc1sxXSwgMTYpDQogICAgICAgICAgICBpZiBzZWxmLnZlcnNpb24gPT0gMzoNCiAgICAgICAgICAgICAgICBzZWxmLmtleSA9IDANCiAgICAgICAgICAgICAgICBmb3Igc3Via2V5IGluIHZhbHNbMjpdOg0KICAgICAgICAgICAgICAgICAgICBzZWxmLmtleSBePSBpbnQoc3Via2V5LCAxNikNCiAgICAgICAgICAgIGVsaWYgc2VsZi52ZXJzaW9uID09IDMuMjoNCiAgICAgICAgICAgICAgICBzZWxmLmtleSA9IDANCiAgICAgICAgICAgICAgICBmb3Igc3Via2V5IGluIHZhbHNbMzpdOg0KICAgICAgICAgICAgICAgICAgICBzZWxmLmtleSBePSBpbnQoc3Via2V5LCAxNikNCg0KICAgICAgICAgICAgIyBMb2FkIGluIGluZGV4ZXMuDQogICAgICAgICAgICBzZWxmLmhhbmRsZS5zZWVrKG9mZnNldCkNCiAgICAgICAgICAgIGNvbnRlbnRzID0gY29kZWNzLmRlY29kZShzZWxmLmhhbmRsZS5yZWFkKCksICd6bGliJykNCiAgICAgICAgICAgIGluZGV4ZXMgPSBfdW5waWNrbGUoY29udGVudHMpDQoNCiAgICAgICAgICAgICMgRGVvYmZ1c2NhdGUgaW5kZXhlcy4NCiAgICAgICAgICAgIGlmIHNlbGYudmVyc2lvbiBpbiBbMywgMy4yXToNCiAgICAgICAgICAgICAgICBvYmZ1c2NhdGVkX2luZGV4ZXMgPSBpbmRleGVzDQogICAgICAgICAgICAgICAgaW5kZXhlcyA9IHt9DQogICAgICAgICAgICAgICAgZm9yIGkgaW4gb2JmdXNjYXRlZF9pbmRleGVzLmtleXMoKToNCiAgICAgICAgICAgICAgICAgICAgaWYgbGVuKG9iZnVzY2F0ZWRfaW5kZXhlc1tpXVswXSkgPT0gMjoNCiAgICAgICAgICAgICAgICAgICAgICAgIGluZGV4ZXNbaV0gPSBbIChvZmZzZXQgXiBzZWxmLmtleSwgbGVuZ3RoIF4gc2VsZi5rZXkpIGZvciBvZmZzZXQsIGxlbmd0aCBpbiBvYmZ1c2NhdGVkX2luZGV4ZXNbaV0gXQ0KICAgICAgICAgICAgICAgICAgICBlbHNlOg0KICAgICAgICAgICAgICAgICAgICAgICAgaW5kZXhlc1tpXSA9IFsgKG9mZnNldCBeIHNlbGYua2V5LCBsZW5ndGggXiBzZWxmLmtleSwgcHJlZml4KSBmb3Igb2Zmc2V0LCBsZW5ndGgsIHByZWZpeCBpbiBvYmZ1c2NhdGVkX2luZGV4ZXNbaV0gXQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgaW5kZXhlcyA9IHBpY2tsZS5sb2Fkcyhjb2RlY3MuZGVjb2RlKHNlbGYuaGFuZGxlLnJlYWQoKSwgJ3psaWInKSkNCg0KICAgICAgICByZXR1cm4gaW5kZXhlcw0KDQogICAgIyBHZW5lcmF0ZSBwc2V1ZG9yYW5kb20gcGFkZGluZyAoZm9yIHdoYXRldmVyIHJlYXNvbikuDQogICAgZGVmIGdlbmVyYXRlX3BhZGRpbmcoc2VsZik6DQogICAgICAgIGxlbmd0aCA9IHJhbmRvbS5yYW5kaW50KDEsIHNlbGYucGFkbGVuZ3RoKQ0KDQogICAgICAgIHBhZGRpbmcgPSAnJw0KICAgICAgICB3aGlsZSBsZW5ndGggPiAwOg0KICAgICAgICAgICAgcGFkZGluZyArPSBjaHIocmFuZG9tLnJhbmRpbnQoMSwgMjU1KSkNCiAgICAgICAgICAgIGxlbmd0aCAtPSAxDQoNCiAgICAgICAgcmV0dXJuIHBhZGRpbmcNCg0KICAgICMgQ29udmVydHMgYSBmaWxlbmFtZSB0byBhcmNoaXZlIGZvcm1hdC4NCiAgICBkZWYgY29udmVydF9maWxlbmFtZShzZWxmLCBmaWxlbmFtZSk6DQogICAgICAgIChkcml2ZSwgZmlsZW5hbWUpID0gb3MucGF0aC5zcGxpdGRyaXZlKG9zLnBhdGgubm9ybXBhdGgoZmlsZW5hbWUpLnJlcGxhY2Uob3Muc2VwLCAnLycpKQ0KICAgICAgICByZXR1cm4gZmlsZW5hbWUNCg0KICAgICMgRGVidWcgKHZlcmJvc2UpIG1lc3NhZ2VzLg0KICAgIGRlZiB2ZXJib3NlX3ByaW50KHNlbGYsIG1lc3NhZ2UpOg0KICAgICAgICBpZiBzZWxmLnZlcmJvc2U6DQogICAgICAgICAgICBwcmludChtZXNzYWdlKQ0KDQoNCiAgICAjIExpc3QgZmlsZXMgaW4gYXJjaGl2ZSBhbmQgY3VycmVudCBpbnRlcm5hbCBzdG9yYWdlLg0KICAgIGRlZiBsaXN0KHNlbGYpOg0KICAgICAgICByZXR1cm4gbGlzdChzZWxmLmluZGV4ZXMua2V5cygpKSArIGxpc3Qoc2VsZi5maWxlcy5rZXlzKCkpDQoNCiAgICAjIENoZWNrIGlmIGEgZmlsZSBleGlzdHMgaW4gdGhlIGFyY2hpdmUuDQogICAgZGVmIGhhc19maWxlKHNlbGYsIGZpbGVuYW1lKToNCiAgICAgICAgZmlsZW5hbWUgPSBfdW5pY29kZShmaWxlbmFtZSkNCiAgICAgICAgcmV0dXJuIGZpbGVuYW1lIGluIHNlbGYuaW5kZXhlcy5rZXlzKCkgb3IgZmlsZW5hbWUgaW4gc2VsZi5maWxlcy5rZXlzKCkNCg0KICAgICMgUmVhZCBmaWxlIGZyb20gYXJjaGl2ZSBvciBpbnRlcm5hbCBzdG9yYWdlLg0KICAgIGRlZiByZWFkKHNlbGYsIGZpbGVuYW1lKToNCiAgICAgICAgZmlsZW5hbWUgPSBzZWxmLmNvbnZlcnRfZmlsZW5hbWUoX3VuaWNvZGUoZmlsZW5hbWUpKQ0KDQogICAgICAgICMgQ2hlY2sgaWYgdGhlIGZpbGUgZXhpc3RzIGluIG91ciBpbmRleGVzLg0KICAgICAgICBpZiBmaWxlbmFtZSBub3QgaW4gc2VsZi5maWxlcyBhbmQgZmlsZW5hbWUgbm90IGluIHNlbGYuaW5kZXhlczoNCiAgICAgICAgICAgIHJhaXNlIElPRXJyb3IoZXJybm8uRU5PRU5ULCAndGhlIHJlcXVlc3RlZCBmaWxlIHswfSBkb2VzIG5vdCBleGlzdCBpbiB0aGUgZ2l2ZW4gUmVuXCdQeSBhcmNoaXZlJy5mb3JtYXQoDQogICAgICAgICAgICAgICAgX3ByaW50YWJsZShmaWxlbmFtZSkpKQ0KDQogICAgICAgICMgSWYgaXQncyBpbiBvdXIgb3BlbmVkIGFyY2hpdmUgaW5kZXgsIGFuZCBvdXIgYXJjaGl2ZSBoYW5kbGUgaXNuJ3QgdmFsaWQsIHNvbWV0aGluZyBpcyBvYnZpb3VzbHkgd3JvbmcuDQogICAgICAgIGlmIGZpbGVuYW1lIG5vdCBpbiBzZWxmLmZpbGVzIGFuZCBmaWxlbmFtZSBpbiBzZWxmLmluZGV4ZXMgYW5kIHNlbGYuaGFuZGxlIGlzIE5vbmU6DQogICAgICAgICAgICByYWlzZSBJT0Vycm9yKGVycm5vLkVOT0VOVCwgJ3RoZSByZXF1ZXN0ZWQgZmlsZSB7MH0gZG9lcyBub3QgZXhpc3QgaW4gdGhlIGdpdmVuIFJlblwnUHkgYXJjaGl2ZScuZm9ybWF0KA0KICAgICAgICAgICAgICAgIF9wcmludGFibGUoZmlsZW5hbWUpKSkNCg0KICAgICAgICAjIENoZWNrIG91ciBzaW1wbGlmaWVkIGludGVybmFsIGluZGV4ZXMgZmlyc3QsIGluIGNhc2Ugc29tZW9uZSB3YW50cyB0byByZWFkIGEgZmlsZSB0aGV5IGFkZGVkIGJlZm9yZSB3aXRob3V0IHNhdmluZywgZm9yIHNvbWUgdW5ob2x5IHJlYXNvbi4NCiAgICAgICAgaWYgZmlsZW5hbWUgaW4gc2VsZi5maWxlczoNCiAgICAgICAgICAgIHNlbGYudmVyYm9zZV9wcmludCgnUmVhZGluZyBmaWxlIHswfSBmcm9tIGludGVybmFsIHN0b3JhZ2UuLi4nLmZvcm1hdChfcHJpbnRhYmxlKGZpbGVuYW1lKSkpDQogICAgICAgICAgICByZXR1cm4gc2VsZi5maWxlc1tmaWxlbmFtZV0NCiAgICAgICAgIyBXZSBuZWVkIHRvIHJlYWQgdGhlIGZpbGUgZnJvbSBvdXIgb3BlbiBhcmNoaXZlLg0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgIyBSZWFkIG9mZnNldCBhbmQgbGVuZ3RoLCBzZWVrIHRvIHRoZSBvZmZzZXQgYW5kIHJlYWQgdGhlIGZpbGUgY29udGVudHMuDQogICAgICAgICAgICBpZiBsZW4oc2VsZi5pbmRleGVzW2ZpbGVuYW1lXVswXSkgPT0gMzoNCiAgICAgICAgICAgICAgICAob2Zmc2V0LCBsZW5ndGgsIHByZWZpeCkgPSBzZWxmLmluZGV4ZXNbZmlsZW5hbWVdWzBdDQogICAgICAgICAgICBlbHNlOg0KICAgICAgICAgI"
+            <nul set /p="CAgICAgIChvZmZzZXQsIGxlbmd0aCkgPSBzZWxmLmluZGV4ZXNbZmlsZW5hbWVdWzBdDQogICAgICAgICAgICAgICAgcHJlZml4ID0gJycNCg0KICAgICAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdSZWFkaW5nIGZpbGUgezB9IGZyb20gZGF0YSBmaWxlIHsxfS4uLiAob2Zmc2V0ID0gezJ9LCBsZW5ndGggPSB7M30gYnl0ZXMpJy5mb3JtYXQoDQogICAgICAgICAgICAgICAgX3ByaW50YWJsZShmaWxlbmFtZSksIHNlbGYuZmlsZSwgb2Zmc2V0LCBsZW5ndGgpKQ0KICAgICAgICAgICAgc2VsZi5oYW5kbGUuc2VlayhvZmZzZXQpDQogICAgICAgICAgICByZXR1cm4gX3VubWFuZ2xlKHByZWZpeCkgKyBzZWxmLmhhbmRsZS5yZWFkKGxlbmd0aCAtIGxlbihwcmVmaXgpKQ0KDQogICAgIyBNb2RpZnkgYSBmaWxlIGluIGFyY2hpdmUgb3IgaW50ZXJuYWwgc3RvcmFnZS4NCiAgICBkZWYgY2hhbmdlKHNlbGYsIGZpbGVuYW1lLCBjb250ZW50cyk6DQogICAgICAgIGZpbGVuYW1lID0gX3VuaWNvZGUoZmlsZW5hbWUpDQoNCiAgICAgICAgIyBPdXIgJ2NoYW5nZScgaXMgYmFzaWNhbGx5IHJlbW92aW5nIHRoZSBmaWxlIGZyb20gb3VyIGluZGV4ZXMgZmlyc3QsIGFuZCB0aGVuIHJlLWFkZGluZyBpdC4NCiAgICAgICAgc2VsZi5yZW1vdmUoZmlsZW5hbWUpDQogICAgICAgIHNlbGYuYWRkKGZpbGVuYW1lLCBjb250ZW50cykNCg0KICAgICMgQWRkIGEgZmlsZSB0byB0aGUgaW50ZXJuYWwgc3RvcmFnZS4NCiAgICBkZWYgYWRkKHNlbGYsIGZpbGVuYW1lLCBjb250ZW50cyk6DQogICAgICAgIGZpbGVuYW1lID0gc2VsZi5jb252ZXJ0X2ZpbGVuYW1lKF91bmljb2RlKGZpbGVuYW1lKSkNCiAgICAgICAgaWYgZmlsZW5hbWUgaW4gc2VsZi5maWxlcyBvciBmaWxlbmFtZSBpbiBzZWxmLmluZGV4ZXM6DQogICAgICAgICAgICByYWlzZSBWYWx1ZUVycm9yKCdmaWxlIHswfSBhbHJlYWR5IGV4aXN0cyBpbiBhcmNoaXZlJy5mb3JtYXQoX3ByaW50YWJsZShmaWxlbmFtZSkpKQ0KDQogICAgICAgIHNlbGYudmVyYm9zZV9wcmludCgnQWRkaW5nIGZpbGUgezB9IHRvIGFyY2hpdmUuLi4gKGxlbmd0aCA9IHsxfSBieXRlcyknLmZvcm1hdCgNCiAgICAgICAgICAgIF9wcmludGFibGUoZmlsZW5hbWUpLCBsZW4oY29udGVudHMpKSkNCiAgICAgICAgc2VsZi5maWxlc1tmaWxlbmFtZV0gPSBjb250ZW50cw0KDQogICAgIyBSZW1vdmUgYSBmaWxlIGZyb20gYXJjaGl2ZSBvciBpbnRlcm5hbCBzdG9yYWdlLg0KICAgIGRlZiByZW1vdmUoc2VsZiwgZmlsZW5hbWUpOg0KICAgICAgICBmaWxlbmFtZSA9IF91bmljb2RlKGZpbGVuYW1lKQ0KICAgICAgICBpZiBmaWxlbmFtZSBpbiBzZWxmLmZpbGVzOg0KICAgICAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdSZW1vdmluZyBmaWxlIHswfSBmcm9tIGludGVybmFsIHN0b3JhZ2UuLi4nLmZvcm1hdChfcHJpbnRhYmxlKGZpbGVuYW1lKSkpDQogICAgICAgICAgICBkZWwgc2VsZi5maWxlc1tmaWxlbmFtZV0NCiAgICAgICAgZWxpZiBmaWxlbmFtZSBpbiBzZWxmLmluZGV4ZXM6DQogICAgICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1JlbW92aW5nIGZpbGUgezB9IGZyb20gYXJjaGl2ZSBpbmRleGVzLi4uJy5mb3JtYXQoX3ByaW50YWJsZShmaWxlbmFtZSkpKQ0KICAgICAgICAgICAgZGVsIHNlbGYuaW5kZXhlc1tmaWxlbmFtZV0NCiAgICAgICAgZWxzZToNCiAgICAgICAgICAgIHJhaXNlIElPRXJyb3IoZXJybm8uRU5PRU5ULCAndGhlIHJlcXVlc3RlZCBmaWxlIHswfSBkb2VzIG5vdCBleGlzdCBpbiB0aGlzIGFyY2hpdmUnLmZvcm1hdChfcHJpbnRhYmxlKGZpbGVuYW1lKSkpDQoNCiAgICAjIExvYWQgYXJjaGl2ZS4NCiAgICBkZWYgbG9hZChzZWxmLCBmaWxlbmFtZSk6DQogICAgICAgIGZpbGVuYW1lID0gX3VuaWNvZGUoZmlsZW5hbWUpDQoNCiAgICAgICAgaWYgc2VsZi5oYW5kbGUgaXMgbm90IE5vbmU6DQogICAgICAgICAgICBzZWxmLmhhbmRsZS5jbG9zZSgpDQogICAgICAgIHNlbGYuZmlsZSA9IGZpbGVuYW1lDQogICAgICAgIHNlbGYuZmlsZXMgPSB7fQ0KICAgICAgICBzZWxmLmhhbmRsZSA9IG9wZW4oc2VsZi5maWxlLCAncmInKQ0KICAgICAgICBzZWxmLnZlcnNpb24gPSBzZWxmLmdldF92ZXJzaW9uKCkNCiAgICAgICAgc2VsZi5pbmRleGVzID0gc2VsZi5leHRyYWN0X2luZGV4ZXMoKQ0KDQogICAgIyBTYXZlIGN1cnJlbnQgc3RhdGUgaW50byBhIG5ldyBmaWxlLCBtZXJnaW5nIGFyY2hpdmUgYW5kIGludGVybmFsIHN0b3JhZ2UsIHJlYnVpbGRpbmcgaW5kZXhlcywgYW5kIG9wdGlvbmFsbHkgc2F2aW5nIGluIGFub3RoZXIgZm9ybWF0IHZlcnNpb24uDQogICAgZGVmIHNhdmUoc2VsZiwgZmlsZW5hbWUgPSBOb25lKToNCiAgICAgICAgZmlsZW5hbWUgPSBfdW5pY29kZShmaWxlbmFtZSkNCg0KICAgICAgICBpZiBmaWxlbmFtZSBpcyBOb25lOg0KICAgICAgICAgICAgZmlsZW5hbWUgPSBzZWxmLmZpbGUNCiAgICAgICAgaWYgZmlsZW5hbWUgaXMgTm9uZToNCiAgICAgICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoJ25vIHRhcmdldCBmaWxlIGZvdW5kIGZvciBzYXZpbmcgYXJjaGl2ZScpDQogICAgICAgIGlmIHNlbGYudmVyc2lvbiAhPSAyIGFuZCBzZWxmLnZlcnNpb24gIT0gMzoNCiAgICAgICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoJ3NhdmluZyBpcyBvbmx5IHN1cHBvcnRlZCBmb3IgdmVyc2lvbiAyIGFuZCAzIGFyY2hpdmVzJykNCg0KICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1JlYnVpbGRpbmcgYXJjaGl2ZSBpbmRleC4uLicpDQogICAgICAgICMgRmlsbCBvdXIgb3duIGZpbGVzIHN0cnVjdHVyZSB3aXRoIHRoZSBmaWxlcyBhZGRlZCBvciBjaGFuZ2VkIGluIHRoaXMgc2Vzc2lvbi4NCiAgICAgICAgZmlsZXMgPSBzZWxmLmZpbGVzDQogICAgICAgICMgRmlyc3QsIHJlYWQgZmlsZXMgZnJvbSB0aGUgY3VycmVudCBhcmNoaXZlIGludG8gb3VyIGZpbGVzIHN0cnVjdHVyZS4NCiAgICAgICAgZm9yIGZpbGUgaW4gbGlzdChzZWxmLmluZGV4ZXMua2V5cygpKToNCiAgICAgICAgICAgIGNvbnRlbnQgPSBzZWxmLnJlYWQoZmlsZSkNCiAgICAgICAgICAgICMgUmVtb3ZlIGZyb20gaW5kZXhlcyBhcnJheSBvbmNlIHJlYWQsIGFkZCB0byBvdXIgb3duIGFycmF5Lg0KICAgICAgICAgICAgZGVsIHNlbGYuaW5kZXhlc1tmaWxlXQ0KICAgICAgICAgICAgZmlsZXNbZmlsZV0gPSBjb250ZW50DQoNCiAgICAgICAgIyBQcmVkaWN0IGhlYWRlciBsZW5ndGgsIHdlJ2xsIHdyaXRlIHRoYXQgb25lIGxhc3QuDQogICAgICAgIG9mZnNldCA9IDANCiAgICAgICAgaWYgc2VsZi52ZXJzaW9uID09IDM6DQogICAgICAgICAgICBvZmZzZXQgPSAzNA0KICAgICAgICBlbGlmIHNlbGYudmVyc2lvbiA9PSAyOg0KICAgICAgICAgICAgb2Zmc2V0ID0gMjUNCiAgICAgICAgYXJjaGl2ZSA9IG9wZW4oZmlsZW5hbWUsICd3YicpDQogICAgICAgIGFyY2hpdmUuc2VlayhvZmZzZXQpDQoNCiAgICAgICAgIyBCdWlsZCBvdXIgb3duIGluZGV4ZXMgd2hpbGUgd3JpdGluZyBmaWxlcyB0byB0aGUgYXJjaGl2ZS4NCiAgICAgICAgaW5kZXhlcyA9IHt9DQogICAgICAgIHNlbGYudmVyYm9zZV9wcmludCgnV3JpdGluZyBmaWxlcyB0byBhcmNoaXZlIGZpbGUuLi4nKQ0KICAgICAgICBmb3IgZmlsZSwgY29udGVudCBpbiBmaWxlcy5pdGVtcygpOg0KICAgICAgICAgICAgIyBHZW5lcmF0ZSByYW5kb20gcGFkZGluZywgZm9yIHdoYXRldmVyIHJlYXNvbi4NCiAgICAgICAgICAgIGlmIHNlbGYucGFkbGVuZ3RoID4gMDoNCiAgICAgICAgICAgICAgICBwYWRkaW5nID0gc2VsZi5nZW5lcmF0ZV9wYWRkaW5nKCkNCiAgICAgICAgICAgICAgICBhcmNoaXZlLndyaXRlKHBhZGRpbmcpDQogICAgICAgICAgICAgICAgb2Zmc2V0ICs9IGxlbihwYWRkaW5nKQ0KDQogICAgICAgICAgICBhcmNoaXZlLndyaXRlKGNvbnRlbnQpDQogICAgICAgICAgICAjIFVwZGF0ZSBpbmRleC4NCiAgICAgICAgICAgIGlmIHNlbGYudmVyc2lvbiA9PSAzOg0KICAgICAgICAgICAgICAgIGluZGV4ZXNbZmlsZV0gPSBbIChvZmZzZXQgXiBzZWxmLmtleSwgbGVuKGNvbnRlbnQpIF4gc2VsZi5rZXkpIF0NCiAgICAgICAgICAgIGVsaWYgc2VsZi52ZXJzaW9uID09IDI6DQogICAgICAgICAgICAgICAgaW5kZXhlc1tmaWxlXSA9IFsgKG9mZnNldCwgbGVuKGNvbnRlbnQpKSBdDQogICAgICAgICAgICBvZmZzZXQgKz0gbGVuKGNvbnRlbnQpDQoNCiAgICAgICAgIyBXcml0ZSB0aGUgaW5kZXhlcy4NCiAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdXcml0aW5nIGFyY2hpdmUgaW5kZXggdG8gYXJjaGl2ZSBmaWxlLi4uJykNCiAgICAgICAgYXJjaGl2ZS53cml0ZShjb2RlY3MuZW5jb2RlKHBpY2tsZS5kdW1wcyhpbmRleGVzLCBzZWxmLlBJQ0tMRV9QUk9UT0NPTCksICd6bGliJykpDQogICAgICAgICMgTm93IHdyaXRlIHRoZSBoZWFkZXIuDQogICAgICAgIHNlbGYudmVyYm9zZV9wcmludCgnV3JpdGluZyBoZWFkZXIgdG8gYXJjaGl2ZSBmaWxlLi4uICh2ZXJzaW9uID0gUlBBdnswfSknLmZvcm1hdChzZWxmLnZlcnNpb24pKQ0KICAgICAgICBhcmNoaXZlLnNlZWsoMCkNCiAgICAgICAgaWYgc2VsZi52ZXJzaW9uID09IDM6DQogICAgICAgICAgICBhcmNoaXZlLndyaXRlKGNvZGVjcy5lbmNvZGUoJ3t9ezowMTZ4fSB7OjA4eH1cbicuZm9ybWF0KHNlbGYuUlBBM19NQUdJQywgb2Zmc2V0LCBzZWxmLmtleSkpKQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgYXJjaGl2ZS53cml0ZShjb2RlY3MuZW5jb2RlKCd7fXs6MDE2eH1cbicuZm9ybWF0KHNlbGYuUlBBMl9NQUdJQywgb2Zmc2V0KSkpDQogICAgICAgICMgV2UncmUgZG9uZSwgY2xvc2UgaXQuDQogICAgICAgIGFyY2hpdmUuY2xvc2UoKQ0KDQogICAgICAgICMgUmVsb2FkIHRoZSBmaWxlIGluIG91ciBpbm5lciBkYXRhYmFzZS4NCiAgICAgICAgc2VsZi5sb2FkKGZpbGVuYW1lKQ0KDQppZiBfX25hbWVfXyA9PSAiX19tYWluX18iOg0KICAgIGltcG9ydCBhcmdwYXJzZQ0KDQogICAgcGFyc2VyID0gYXJncGFyc2UuQXJndW1lbnRQYXJzZXIoDQogICAgICAgIGRlc2NyaXB0aW9uPSdBIHRvb2wgZm9yIHdvcmtpbmcgd2l0aCBSZW5cJ1B5IGFyY2hpdmUgZmlsZXMuJywNCiAgICAgICAgZXBpbG9nPSdUaGUgRklMRSBhcmd1bWVudCBjYW4gb3B0aW9uYWxseSBiZSBpbiBBUkNISVZFPVJFQUwgZm9ybWF0LCBtYXBwaW5nIGEgZmlsZSBpbiB0aGUgYXJjaGl2ZSBmaWxlIHN5c3RlbSB0byBhIGZpbGUgb24geW91ciByZWFsIGZpbGUgc3lzdGVtLiBBbiBleGFtcGxlIG9mIHRoaXM6IHJwYXRvb2wgLXggdGVzdC5ycGEgc2NyaXB0LnJweWM9L2hvbWUvZm9vL3Rlc3QucnB5YycsDQogICAgICAgIGFkZF9oZWxwPUZhbHNlKQ0KDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnYXJjaGl2ZScsIG1ldGF2YXI9J0FSQ0hJVkUnLCBoZWxwPSdUaGUgUmVuXCdweSBhcmNoaXZlIGZpbGUgdG8gb3BlcmF0ZSBvbi4nKQ0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJ2ZpbGVzJywgbWV0YXZhcj0nRklMRScsIG5hcmdzPScqJywgYWN0aW9uPSdhcHBlbmQnLCBoZWxwPSdaZXJvIG9yIG1vcmUgZmlsZXMgdG8gb3BlcmF0ZSBvbi4nKQ0KDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWwnLCAnLS1saXN0JywgYWN0aW9uPSdzdG9yZV90cnVlJywgaGVscD0nTGlzdCBmaWxlcyBpbiBhcmNoaXZlIEFSQ0hJVkUuJykNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCcteCcsICctLWV4dHJhY3QnLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdFeHRyYWN0IEZJTEVzIGZyb20gQVJDSElWRS4nKQ0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1jJywgJy0tY3JlYXRlJywgYWN0aW9uPSdzdG9yZV90cnVlJywgaGVscD0nQ3JlYXRpdmUgQVJDSElWRSBmcm9tIEZJTEVzLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWQnLCAnLS1kZWxldGUnLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdEZWxldGUgRklMRXMgZnJvbSBBUkNISVZFLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWEnLCAnLS1hcHBlbmQnLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdBcHBlbmQgRklMRXMgdG8gQVJDSElWRS4nKQ0KDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLTInLC"
+            <nul set /p="AnLS10d28nLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdVc2UgdGhlIFJQQXYyIGZvcm1hdCBmb3IgY3JlYXRpbmcvYXBwZW5kaW5nIHRvIGFyY2hpdmVzLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLTMnLCAnLS10aHJlZScsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J1VzZSB0aGUgUlBBdjMgZm9ybWF0IGZvciBjcmVhdGluZy9hcHBlbmRpbmcgdG8gYXJjaGl2ZXMgKGRlZmF1bHQpLicpDQoNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctaycsICctLWtleScsIG1ldGF2YXI9J0tFWScsIGhlbHA9J1RoZSBvYmZ1c2NhdGlvbiBrZXkgdXNlZCBmb3IgY3JlYXRpbmcgUlBBdjMgYXJjaGl2ZXMsIGluIGhleGFkZWNpbWFsIChkZWZhdWx0OiAweERFQURCRUVGKS4nKQ0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1wJywgJy0tcGFkZGluZycsIG1ldGF2YXI9J0NPVU5UJywgaGVscD0nVGhlIG1heGltdW0gbnVtYmVyIG9mIGJ5dGVzIG9mIHBhZGRpbmcgdG8gYWRkIGJldHdlZW4gZmlsZXMgKGRlZmF1bHQ6IDApLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLW8nLCAnLS1vdXRmaWxlJywgaGVscD0nQW4gYWx0ZXJuYXRpdmUgb3V0cHV0IGFyY2hpdmUgZmlsZSB3aGVuIGFwcGVuZGluZyB0byBvciBkZWxldGluZyBmcm9tIGFyY2hpdmVzLCBvciBvdXRwdXQgZGlyZWN0b3J5IHdoZW4gZXh0cmFjdGluZy4nKQ0KDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWgnLCAnLS1oZWxwJywgYWN0aW9uPSdoZWxwJywgaGVscD0nUHJpbnQgdGhpcyBoZWxwIGFuZCBleGl0LicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLXYnLCAnLS12ZXJib3NlJywgYWN0aW9uPSdzdG9yZV90cnVlJywgaGVscD0nQmUgYSBiaXQgbW9yZSB2ZXJib3NlIHdoaWxlIHBlcmZvcm1pbmcgb3BlcmF0aW9ucy4nKQ0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1WJywgJy0tdmVyc2lvbicsIGFjdGlvbj0ndmVyc2lvbicsIHZlcnNpb249J3JwYXRvb2wgdjAuOCcsIGhlbHA9J1Nob3cgdmVyc2lvbiBpbmZvcm1hdGlvbi4nKQ0KICAgIGFyZ3VtZW50cyA9IHBhcnNlci5wYXJzZV9hcmdzKCkNCg0KICAgICMgRGV0ZXJtaW5lIFJQQSB2ZXJzaW9uLg0KICAgIGlmIGFyZ3VtZW50cy50d286DQogICAgICAgIHZlcnNpb24gPSAyDQogICAgZWxzZToNCiAgICAgICAgdmVyc2lvbiA9IDMNCg0KICAgICMgRGV0ZXJtaW5lIFJQQXYzIGtleS4NCiAgICBpZiAna2V5JyBpbiBhcmd1bWVudHMgYW5kIGFyZ3VtZW50cy5rZXkgaXMgbm90IE5vbmU6DQogICAgICAgIGtleSA9IGludChhcmd1bWVudHMua2V5LCAxNikNCiAgICBlbHNlOg0KICAgICAgICBrZXkgPSAweERFQURCRUVGDQoNCiAgICAjIERldGVybWluZSBwYWRkaW5nIGJ5dGVzLg0KICAgIGlmICdwYWRkaW5nJyBpbiBhcmd1bWVudHMgYW5kIGFyZ3VtZW50cy5wYWRkaW5nIGlzIG5vdCBOb25lOg0KICAgICAgICBwYWRkaW5nID0gaW50KGFyZ3VtZW50cy5wYWRkaW5nKQ0KICAgIGVsc2U6DQogICAgICAgIHBhZGRpbmcgPSAwDQoNCiAgICAjIERldGVybWluZSBvdXRwdXQgZmlsZS9kaXJlY3RvcnkgYW5kIGlucHV0IGFyY2hpdmUNCiAgICBpZiBhcmd1bWVudHMuY3JlYXRlOg0KICAgICAgICBhcmNoaXZlID0gTm9uZQ0KICAgICAgICBvdXRwdXQgPSBfdW5pY29kZShhcmd1bWVudHMuYXJjaGl2ZSkNCiAgICBlbHNlOg0KICAgICAgICBhcmNoaXZlID0gX3VuaWNvZGUoYXJndW1lbnRzLmFyY2hpdmUpDQogICAgICAgIGlmICdvdXRmaWxlJyBpbiBhcmd1bWVudHMgYW5kIGFyZ3VtZW50cy5vdXRmaWxlIGlzIG5vdCBOb25lOg0KICAgICAgICAgICAgb3V0cHV0ID0gX3VuaWNvZGUoYXJndW1lbnRzLm91dGZpbGUpDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICAjIERlZmF1bHQgb3V0cHV0IGRpcmVjdG9yeSBmb3IgZXh0cmFjdGlvbiBpcyB0aGUgY3VycmVudCBkaXJlY3RvcnkuDQogICAgICAgICAgICBpZiBhcmd1bWVudHMuZXh0cmFjdDoNCiAgICAgICAgICAgICAgICBvdXRwdXQgPSAnLicNCiAgICAgICAgICAgIGVsc2U6DQogICAgICAgICAgICAgICAgb3V0cHV0ID0gX3VuaWNvZGUoYXJndW1lbnRzLmFyY2hpdmUpDQoNCiAgICAjIE5vcm1hbGl6ZSBmaWxlcy4NCiAgICBpZiBsZW4oYXJndW1lbnRzLmZpbGVzKSA+IDAgYW5kIGlzaW5zdGFuY2UoYXJndW1lbnRzLmZpbGVzWzBdLCBsaXN0KToNCiAgICAgICAgYXJndW1lbnRzLmZpbGVzID0gYXJndW1lbnRzLmZpbGVzWzBdDQoNCiAgICB0cnk6DQogICAgICAgIGFyY2hpdmUgPSBSZW5QeUFyY2hpdmUoYXJjaGl2ZSwgcGFkbGVuZ3RoPXBhZGRpbmcsIGtleT1rZXksIHZlcnNpb249dmVyc2lvbiwgdmVyYm9zZT1hcmd1bWVudHMudmVyYm9zZSkNCiAgICBleGNlcHQgSU9FcnJvciBhcyBlOg0KICAgICAgICBwcmludCgnQ291bGQgbm90IG9wZW4gYXJjaGl2ZSBmaWxlIHswfSBmb3IgcmVhZGluZzogezF9Jy5mb3JtYXQoYXJjaGl2ZSwgZSksIGZpbGU9c3lzLnN0ZGVycikNCiAgICAgICAgc3lzLmV4aXQoMSkNCg0KICAgIGlmIGFyZ3VtZW50cy5jcmVhdGUgb3IgYXJndW1lbnRzLmFwcGVuZDoNCiAgICAgICAgIyBXZSBuZWVkIHRoaXMgc2VwZXJhdGUgZnVuY3Rpb24gdG8gcmVjdXJzaXZlbHkgcHJvY2VzcyBkaXJlY3Rvcmllcy4NCiAgICAgICAgZGVmIGFkZF9maWxlKGZpbGVuYW1lKToNCiAgICAgICAgICAgICMgSWYgdGhlIGFyY2hpdmUgcGF0aCBkaWZmZXJzIGZyb20gdGhlIGFjdHVhbCBmaWxlIHBhdGgsIGFzIGdpdmVuIGluIHRoZSBhcmd1bWVudCwNCiAgICAgICAgICAgICMgZXh0cmFjdCB0aGUgYXJjaGl2ZSBwYXRoIGFuZCBhY3R1YWwgZmlsZSBwYXRoLg0KICAgICAgICAgICAgaWYgZmlsZW5hbWUuZmluZCgnPScpICE9IC0xOg0KICAgICAgICAgICAgICAgIChvdXRmaWxlLCBmaWxlbmFtZSkgPSBmaWxlbmFtZS5zcGxpdCgnPScsIDIpDQogICAgICAgICAgICBlbHNlOg0KICAgICAgICAgICAgICAgIG91dGZpbGUgPSBmaWxlbmFtZQ0KDQogICAgICAgICAgICBpZiBvcy5wYXRoLmlzZGlyKGZpbGVuYW1lKToNCiAgICAgICAgICAgICAgICBmb3IgZmlsZSBpbiBvcy5saXN0ZGlyKGZpbGVuYW1lKToNCiAgICAgICAgICAgICAgICAgICAgIyBXZSBuZWVkIHRvIGRvIHRoaXMgaW4gb3JkZXIgdG8gbWFpbnRhaW4gYSBwb3NzaWJsZSBBUkNISVZFPVJFQUwgbWFwcGluZyBiZXR3ZWVuIGRpcmVjdG9yaWVzLg0KICAgICAgICAgICAgICAgICAgICBhZGRfZmlsZShvdXRmaWxlICsgb3Muc2VwICsgZmlsZSArICc9JyArIGZpbGVuYW1lICsgb3Muc2VwICsgZmlsZSkNCiAgICAgICAgICAgIGVsc2U6DQogICAgICAgICAgICAgICAgdHJ5Og0KICAgICAgICAgICAgICAgICAgICB3aXRoIG9wZW4oZmlsZW5hbWUsICdyYicpIGFzIGZpbGU6DQogICAgICAgICAgICAgICAgICAgICAgICBhcmNoaXZlLmFkZChvdXRmaWxlLCBmaWxlLnJlYWQoKSkNCiAgICAgICAgICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGU6DQogICAgICAgICAgICAgICAgICAgIHByaW50KCdDb3VsZCBub3QgYWRkIGZpbGUgezB9IHRvIGFyY2hpdmU6IHsxfScuZm9ybWF0KGZpbGVuYW1lLCBlKSwgZmlsZT1zeXMuc3RkZXJyKQ0KDQogICAgICAgICMgSXRlcmF0ZSBvdmVyIHRoZSBnaXZlbiBmaWxlcyB0byBhZGQgdG8gYXJjaGl2ZS4NCiAgICAgICAgZm9yIGZpbGVuYW1lIGluIGFyZ3VtZW50cy5maWxlczoNCiAgICAgICAgICAgIGFkZF9maWxlKF91bmljb2RlKGZpbGVuYW1lKSkNCg0KICAgICAgICAjIFNldCB2ZXJzaW9uIGZvciBzYXZpbmcsIGFuZCBzYXZlLg0KICAgICAgICBhcmNoaXZlLnZlcnNpb24gPSB2ZXJzaW9uDQogICAgICAgIHRyeToNCiAgICAgICAgICAgIGFyY2hpdmUuc2F2ZShvdXRwdXQpDQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToNCiAgICAgICAgICAgIHByaW50KCdDb3VsZCBub3Qgc2F2ZSBhcmNoaXZlIGZpbGU6IHswfScuZm9ybWF0KGUpLCBmaWxlPXN5cy5zdGRlcnIpDQogICAgZWxpZiBhcmd1bWVudHMuZGVsZXRlOg0KICAgICAgICAjIEl0ZXJhdGUgb3ZlciB0aGUgZ2l2ZW4gZmlsZXMgdG8gZGVsZXRlIGZyb20gdGhlIGFyY2hpdmUuDQogICAgICAgIGZvciBmaWxlbmFtZSBpbiBhcmd1bWVudHMuZmlsZXM6DQogICAgICAgICAgICB0cnk6DQogICAgICAgICAgICAgICAgYXJjaGl2ZS5yZW1vdmUoZmlsZW5hbWUpDQogICAgICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGU6DQogICAgICAgICAgICAgICAgcHJpbnQoJ0NvdWxkIG5vdCBkZWxldGUgZmlsZSB7MH0gZnJvbSBhcmNoaXZlOiB7MX0nLmZvcm1hdChmaWxlbmFtZSwgZSksIGZpbGU9c3lzLnN0ZGVycikNCg0KICAgICAgICAjIFNldCB2ZXJzaW9uIGZvciBzYXZpbmcsIGFuZCBzYXZlLg0KICAgICAgICBhcmNoaXZlLnZlcnNpb24gPSB2ZXJzaW9uDQogICAgICAgIHRyeToNCiAgICAgICAgICAgIGFyY2hpdmUuc2F2ZShvdXRwdXQpDQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToNCiAgICAgICAgICAgIHByaW50KCdDb3VsZCBub3Qgc2F2ZSBhcmNoaXZlIGZpbGU6IHswfScuZm9ybWF0KGUpLCBmaWxlPXN5cy5zdGRlcnIpDQogICAgZWxpZiBhcmd1bWVudHMuZXh0cmFjdDoNCiAgICAgICAgIyBFaXRoZXIgZXh0cmFjdCB0aGUgZ2l2ZW4gZmlsZXMsIG9yIGFsbCBmaWxlcyBpZiBubyBmaWxlcyBhcmUgZ2l2ZW4uDQogICAgICAgIGlmIGxlbihhcmd1bWVudHMuZmlsZXMpID4gMDoNCiAgICAgICAgICAgIGZpbGVzID0gYXJndW1lbnRzLmZpbGVzDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICBmaWxlcyA9IGFyY2hpdmUubGlzdCgpDQoNCiAgICAgICAgIyBDcmVhdGUgb3V0cHV0IGRpcmVjdG9yeSBpZiBub3QgcHJlc2VudC4NCiAgICAgICAgaWYgbm90IG9zLnBhdGguZXhpc3RzKG91dHB1dCk6DQogICAgICAgICAgICBvcy5tYWtlZGlycyhvdXRwdXQpDQoNCiAgICAgICAgIyBJdGVyYXRlIG92ZXIgZmlsZXMgdG8gZXh0cmFjdC4NCiAgICAgICAgZm9yIGZpbGVuYW1lIGluIGZpbGVzOg0KICAgICAgICAgICAgaWYgZmlsZW5hbWUuZmluZCgnPScpICE9IC0xOg0KICAgICAgICAgICAgICAgIChvdXRmaWxlLCBmaWxlbmFtZSkgPSBmaWxlbmFtZS5zcGxpdCgnPScsIDIpDQogICAgICAgICAgICBlbHNlOg0KICAgICAgICAgICAgICAgIG91dGZpbGUgPSBmaWxlbmFtZQ0KDQogICAgICAgICAgICB0cnk6DQogICAgICAgICAgICAgICAgY29udGVudHMgPSBhcmNoaXZlLnJlYWQoZmlsZW5hbWUpDQoNCiAgICAgICAgICAgICAgICAjIENyZWF0ZSBvdXRwdXQgZGlyZWN0b3J5IGZvciBmaWxlIGlmIG5vdCBwcmVzZW50Lg0KICAgICAgICAgICAgICAgIGlmIG5vdCBvcy5wYXRoLmV4aXN0cyhvcy5wYXRoLmRpcm5hbWUob3MucGF0aC5qb2luKG91dHB1dCwgb3V0ZmlsZSkpKToNCiAgICAgICAgICAgICAgICAgICAgb3MubWFrZWRpcnMob3MucGF0aC5kaXJuYW1lKG9zLnBhdGguam9pbihvdXRwdXQsIG91dGZpbGUpKSkNCg0KICAgICAgICAgICAgICAgIHdpdGggb3Blbihvcy5wYXRoLmpvaW4ob3V0cHV0LCBvdXRmaWxlKSwgJ3diJykgYXMgZmlsZToNCiAgICAgICAgICAgICAgICAgICAgZmlsZS53cml0ZShjb250ZW50cykNCiAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToNCiAgICAgICAgICAgICAgICBwcmludCgnQ291bGQgbm90IGV4dHJhY3QgZmlsZSB7MH0gZnJvbSBhcmNoaXZlOiB7MX0nLmZvcm1hdChmaWxlbmFtZSwgZSksIGZpbGU9c3lzLnN0ZGVycikNCiAgICBlbGlmIGFyZ3VtZW50cy5saXN0Og0KICAgICAgICAjIFByaW50IHRoZSBzb3J0ZWQgZmlsZSBsaXN0Lg0KICAgICAgICBsaXN0ID0gYXJjaGl2ZS5saXN0KCkNCiAgICAgICAgbGlzdC5zb3J0KCkNCiAgICAgICAgZm9yIGZpbGUgaW4gbGlzdDoNCiAgICAgICAgICAgIHByaW50KGZpbGUpDQogICAgZWxzZToNCiAgICAgICAgcHJpbnQoJ05vIG9wZXJhdGlvbiBnaXZlbiA6KCcpDQogICAgICAgIHByaW50KCdVc2UgezB9IC0taGVscCBmb3IgdXNhZ2UgZGV0YWlscy4nLmZvcm1hdChzeXMuYXJndlswXSkpDQoNCg=="
+        )
+    ) else (
+        >"%rpatool%.b64" (
+            <nul set /p="IyEvdXNyL2Jpbi9lbnYgcHl0aG9uCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgcHJpbnRfZnVuY3Rpb24KaW1wb3J0IHN5cwppbXBvcnQgb3MKCnN5cy5wYXRoLmFwcGVuZCgnLi4nKQp0cnk6CiAgICBpbXBvcnQgbWFpbgpleGNlcHQ6CiAgICBwYXNzCmltcG9ydCByZW5weS5vYmplY3QKaW1wb3J0IHJlbnB5LmNvbmZpZwppbXBvcnQgcmVucHkubG9hZGVyCnRyeToKICAgIGltcG9ydCByZW5weS51dGlsCmV4Y2VwdDoKICAgIHBhc3MKCgpjbGFzcyBSZW5QeUFyY2hpdmU6CiAgICBmaWxlID0gTm9uZQogICAgaGFuZGxlID0gTm9uZQoKICAgIGZpbGVzID0ge30KICAgIGluZGV4ZXMgPSB7fQoKICAgIGRlZiBfX2luaXRfXyhzZWxmLCBmaWxlKToKICAgICAgICBzZWxmLmxvYWQoZmlsZSkKCiAgICAjIENvbnZlcnRzIGEgZmlsZW5hbWUgdG8gYXJjaGl2ZSBmb3JtYXQuCiAgICBkZWYgY29udmVydF9maWxlbmFtZShzZWxmLCBmaWxlbmFtZSk6CiAgICAgICAgKGRyaXZlLCBmaWxlbmFtZSkgPSBvcy5wYXRoLnNwbGl0ZHJpdmUob3MucGF0aC5ub3JtcGF0aChmaWxlbmFtZSkucmVwbGFjZShvcy5zZXAsICcvJykpCiAgICAgICAgcmV0dXJuIGZpbGVuYW1lCgogICAgIyBMaXN0IGZpbGVzIGluIGFyY2hpdmUgYW5kIGN1cnJlbnQgaW50ZXJuYWwgc3RvcmFnZS4KICAgIGRlZiBsaXN0KHNlbGYpOgogICAgICAgIHJldHVybiBsaXN0KHNlbGYuaW5kZXhlcykKCiAgICAjIFJlYWQgZmlsZSBmcm9tIGFyY2hpdmUgb3IgaW50ZXJuYWwgc3RvcmFnZS4KICAgIGRlZiByZWFkKHNlbGYsIGZpbGVuYW1lKToKICAgICAgICBmaWxlbmFtZSA9IHNlbGYuY29udmVydF9maWxlbmFtZShmaWxlbmFtZSkKICAgICAgICBpZiBmaWxlbmFtZSAhPSAnLicgYW5kIGlzaW5zdGFuY2Uoc2VsZi5pbmRleGVzW2ZpbGVuYW1lXSwgbGlzdCk6CiAgICAgICAgICAgIGlmIGhhc2F0dHIocmVucHkubG9hZGVyLCAibG9hZF9mcm9tX2FyY2hpdmUiKToKICAgICAgICAgICAgICAgIHN1YmZpbGUgPSByZW5weS5sb2FkZXIubG9hZF9mcm9tX2FyY2hpdmUoZmlsZW5hbWUpCiAgICAgICAgICAgIGVsc2U6CiAgICAgICAgICAgICAgICBzdWJmaWxlID0gcmVucHkubG9hZGVyLmxvYWRfY29yZShmaWxlbmFtZSkKICAgICAgICAgICAgcmV0dXJuIHN1YmZpbGUucmVhZCgpCiAgICAgICAgZWxzZToKICAgICAgICAgICAgcmV0dXJuIE5vbmUKCiAgICAjIExvYWQgYXJjaGl2ZS4KICAgIGRlZiBsb2FkKHNlbGYsIGZpbGVuYW1lKToKICAgICAgICBzZWxmLmZpbGUgPSBmaWxlbmFtZQogICAgICAgIHNlbGYuZmlsZXMgPSB7fQogICAgICAgIHNlbGYuaW5kZXhlcyA9IHt9CiAgICAgICAgc2VsZi5oYW5kbGUgPSBvcGVuKHNlbGYuZmlsZSwgJ3JiJykKCiAgICAgICAgYWJzX3BhdGggPSBvcy5wYXRoLnJlYWxwYXRoKGZpbGVuYW1lKQogICAgICAgIGFyY2hpdmVfZGlyID0gb3MucGF0aC5kaXJuYW1lKGFic19wYXRoKQogICAgICAgIGFyY2hpdmVfYmFzZW5hbWUgPSBvcy5wYXRoLmJhc2VuYW1lKGFic19wYXRoKQogICAgICAgIGJhc2UsIGV4dCA9IGFyY2hpdmVfYmFzZW5hbWUucnNwbGl0KCIuIiwgMSkKCiAgICAgICAgIyBSZW4nUHkgZXhwZWN0cyBhcmNoaXZlIG5hbWVzIHJlZ2lzdGVyZWQgaW4gY29uZmlnLmFyY2hpdmVzIHRvIGJlCiAgICAgICAgIyBwbGFpbiBiYXNlbmFtZXMgKG5vIGRpcmVjdG9yeSBjb21wb25lbnQpLCBtYXRjaGVkIGFnYWluc3QgZmlsZXMKICAgICAgICAjIGZvdW5kIG9uIGNvbmZpZy5zZWFyY2hwYXRoLgogICAgICAgIHJlbnB5LmNvbmZpZy5hcmNoaXZlcy5hcHBlbmQoYmFzZSkKICAgICAgICByZW5weS5jb25maWcuc2VhcmNocGF0aCA9IFthcmNoaXZlX2Rpcl0KICAgICAgICByZW5weS5jb25maWcuYmFzZWRpciA9IG9zLnBhdGguZGlybmFtZShhcmNoaXZlX2RpcikKICAgICAgICByZW5weS5sb2FkZXIuaW5kZXhfYXJjaGl2ZXMoKQoKICAgICAgICAjIExvb2sgdXAgdGhlIG1hdGNoaW5nIGFyY2hpdmUgYW1vbmcgdGhlIG9uZXMgaW5kZXhlZCBieSBSZW4nUHksCiAgICAgICAgIyBpbnN0ZWFkIG9mIGFzc3VtaW5nIGEgZml4ZWQgaW5kZXggKHRoZSBvcmlnaW5hbCBzY3JpcHQgcGlja2VkCiAgICAgICAgIyB0aGUgYXJjaGl2ZSBiYXNlZCBvbiBpdHMgcG9zaXRpb24gaW4gYSBsaXN0IG9mIHNjYW5uZWQgZmlsZXMpLgogICAgICAgIGFyY2hpdmVfaW5kZXggPSBOb25lCiAgICAgICAgZm9yIGksIChhcmNoaXZlX2Jhc2UsIF8pIGluIGVudW1lcmF0ZShyZW5weS5sb2FkZXIuYXJjaGl2ZXMpOgogICAgICAgICAgICBpZiBvcy5wYXRoLmJhc2VuYW1lKGFyY2hpdmVfYmFzZSkgPT0gYmFzZToKICAgICAgICAgICAgICAgIGFyY2hpdmVfaW5kZXggPSBpCiAgICAgICAgICAgICAgICBicmVhawogICAgICAgIGlmIGFyY2hpdmVfaW5kZXggaXMgTm9uZToKICAgICAgICAgICAgIyBGYWxsYmFjazogaWYgb25seSBvbmUgYXJjaGl2ZSB3YXMgaW5kZXhlZCwgdXNlIHRoYXQgb25lLgogICAgICAgICAgICBpZiBsZW4ocmVucHkubG9hZGVyLmFyY2hpdmVzKSA9PSAxOgogICAgICAgICAgICAgICAgYXJjaGl2ZV9pbmRleCA9IDAKICAgICAgICAgICAgZWxzZToKICAgICAgICAgICAgICAgIGluZGV4ZWQgPSBbYVswXSBmb3IgYSBpbiByZW5weS5sb2FkZXIuYXJjaGl2ZXNdCiAgICAgICAgICAgICAgICByYWlzZSBWYWx1ZUVycm9yKAogICAgICAgICAgICAgICAgICAgICdjb3VsZCBub3QgZmluZCBhcmNoaXZlICJ7MH0iIGFtb25nIHRoZSBhcmNoaXZlcyBpbmRleGVkIGJ5ICcKICAgICAgICAgICAgICAgICAgICAnUmVuXCdQeS4gTG9va2VkIGZvciBiYXNlbmFtZSAiezF9IiBpbiBzZWFyY2hwYXRoICJ7Mn0iLiAnCiAgICAgICAgICAgICAgICAgICAgJ0FyY2hpdmVzIFJlblwnUHkgYWN0dWFsbHkgaW5kZXhlZDogezN9Jy5mb3JtYXQoCiAgICAgICAgICAgICAgICAgICAgICAgIGZpbGVuYW1lLCBiYXNlLCBhcmNoaXZlX2RpciwgaW5kZXhlZCkpCgogICAgICAgIGl0ZW1zID0gcmVucHkubG9hZGVyLmFyY2hpdmVzW2FyY2hpdmVfaW5kZXhdWzFdLml0ZW1zKCkKICAgICAgICBmb3IgZmlsZSwgaW5kZXggaW4gaXRlbXM6CiAgICAgICAgICAgIHNlbGYuaW5kZXhlc1tmaWxlXSA9IGluZGV4CgoKaWYgX19uYW1lX18gPT0gIl9fbWFpbl9fIjoKICAgIGltcG9ydCBhcmdwYXJzZQoKICAgIHBhcnNlciA9IGFyZ3BhcnNlLkFyZ3VtZW50UGFyc2VyKAogICAgICAgIGRlc2NyaXB0aW9uPSdBIHRvb2wgZm9yIHdvcmtpbmcgd2l0aCBSZW5cJ1B5IGFyY2hpdmUgZmlsZXMgKHVzZXMgUmVuXCdQeVwncyBpbnRlcm5hbCBsb2FkZXIsIHN1cHBvcnRzIGVuY3J5cHRlZC9jdXN0b20gYXJjaGl2ZXMpLicsCiAgICAgICAgZXBpbG9nPSdUaGUgRklMRSBhcmd1bWVudCBjYW4gb3B0aW9uYWxseSBiZSBpbiBBUkNISVZFPVJFQUwgZm9ybWF0LCBtYXBwaW5nIGEgZmlsZSBpbiB0aGUgYXJjaGl2ZSBmaWxlIHN5c3RlbSB0byBhIGZpbGUgb24geW91ciByZWFsIGZpbGUgc3lzdGVtLiBBbiBleGFtcGxlIG9mIHRoaXM6IHJwYXRvb2xfcmVucHkucHkgLXggdGVzdC5ycGEgc2NyaXB0LnJweWM9L2hvbWUvZm9vL3Rlc3QucnB5YycsCiAgICAgICAgYWRkX2hlbHA9RmFsc2UpCgogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnYXJjaGl2ZScsIG1ldGF2YXI9J0FSQ0hJVkUnLCBoZWxwPSdUaGUgUmVuXCdweSBhcmNoaXZlIGZpbGUgdG8gb3BlcmF0ZSBvbi4nKQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnZmlsZXMnLCBtZXRhdmFyPSdGSUxFJywgbmFyZ3M9JyonLCBhY3Rpb249J2FwcGVuZCcsIGhlbHA9J1plcm8gb3IgbW9yZSBmaWxlcyB0byBvcGVyYXRlIG9uLicpCgogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWwnLCAnLS1saXN0JywgYWN0aW9uPSdzdG9yZV90cnVlJywgaGVscD0nTGlzdCBGSUxFKFMpIGluIGFyY2hpdmUgQVJDSElWRS4nKQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLXgnLCAnLS1leHRyYWN0JywgYWN0aW9uPSdzdG9yZV90cnVlJywgaGVscD0nRXh0cmFjdCBGSUxFKFMpIGZyb20gQVJDSElWRS4nKQoKICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1vJywgJy0tb3V0ZmlsZScsIGhlbHA9J0FuIGFsdGVybmF0aXZlIG91dHB1dCBkaXJlY3Rvcnkgd2hlbiBleHRyYWN0aW5nLicpCgogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWgnLCAnLS1oZWxwJywgYWN0aW9uPSdoZWxwJywgaGVscD0nUHJpbnQgdGhpcyBoZWxwIGFuZCBleGl0LicpCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctdicsICctLXZlcmJvc2UnLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdCZSBhIGJpdCBtb3JlIHZlcmJvc2Ugd2hpbGUgcGVyZm9ybWluZyBvcGVyYXRpb25zLicpCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctVicsICctLXZlcnNpb24nLCBhY3Rpb249J3ZlcnNpb24nLCB2ZXJzaW9uPSdycGF0b29sdjIucHkgdjAuMSAocmVucHkubG9hZGVyIGJhY2tlbmQpJywgaGVscD0nU2hvdyB2ZXJzaW9uIGluZm9ybWF0aW9uLicpCgogICAgYXJndW1lbnRzID0gcGFyc2VyLnBhcnNlX2FyZ3MoKQoKICAgIGFyY2hpdmVfcGF0aCA9IGFyZ3VtZW50cy5hcmNoaXZlCgogICAgaWYgJ291dGZpbGUnIGluIGFyZ3VtZW50cyBhbmQgYXJndW1lbnRzLm91dGZpbGUgaXMgbm90IE5vbmU6CiAgICAgICAgb3V0cHV0ID0gYXJndW1lbnRzLm91dGZpbGUKICAgIGVsc2U6CiAgICAgICAgb3V0cHV0ID0gJy4nCgogICAgIyBOb3JtYWxpemUgZmlsZXMuCiAgICBpZiBsZW4oYXJndW1lbnRzLmZpbGVzKSA+IDAgYW5kIGlzaW5zdGFuY2UoYXJndW1lbnRzLmZpbGVzWzBdLCBsaXN0KToKICAgICAgICBhcmd1bWVudHMuZmlsZXMgPSBhcmd1bWVudHMuZmlsZXNbMF0KCiAgICB0cnk6CiAgICAgICAgYXJjaGl2ZSA9IFJlblB5QXJjaGl2ZShhcmNoaXZlX3BhdGgpCiAgICBleGNlcHQgSU9FcnJvciBhcyBlOgogICAgICAgIHByaW50KCdDb3VsZCBub3Qgb3BlbiBhcmNoaXZlIGZpbGUgezB9IGZvciByZWFkaW5nOiB7MX0nLmZvcm1hdChhcmNoaXZlX3BhdGgsIGUpLCBmaWxlPXN5cy5zdGRlcnIpCiAgICAgICAgc3lzLmV4aXQoMSkKCiAgICBpZiBhcmd1bWVudHMuZXh0cmFjdDoKICAgICAgICAjIEVpdGhlciBleHRyYWN0IHRoZSBnaXZlbiBmaWxlcywgb3IgYWxsIGZpbGVzIGlmIG5vIGZpbGVzIGFyZSBnaXZlbi4KICAgICAgICBpZiBsZW4oYXJndW1lbnRzLmZpbGVzKSA+IDA6CiAgICAgICAgICAgIGZpbGVzID0gYXJndW1lbnRzLmZpbGVzCiAgICAgICAgZWxzZToKICAgICAgICAgICAgZmlsZXMgPSBhcmNoaXZlLmxpc3QoKQoKICAgICAgICAjIENyZWF0ZSBvdXRwdXQgZGlyZWN0b3J5IGlmIG5vdCBwcmVzZW50LgogICAgICAgIGlmIG5vdCBvcy5wYXRoLmV4aXN0cyhvdXRwdXQpOgogICAgICAgICAgICBvcy5tYWtlZGlycyhvdXRwdXQpCgogICAgICAgICMgSXRlcmF0ZSBvdmVyIGZpbGVzIHRvIGV4dHJhY3QuCiAgICAgICAgZm9yIGZpbGVuYW1lIGluIGZpbGVzOgogICAgICAgICAgICBpZiBmaWxlbmFtZS5maW5kKCc9JykgIT0gLTE6CiAgICAgICAgICAgICAgICAob3V0ZmlsZSwgZmlsZW5hbWUpID0gZmlsZW5hbWUuc3BsaXQoJz0nLCAyKQogICAgICAgICAgICBlbHNlOgogICAgICAgICAgICAgICAgb3V0ZmlsZSA9IGZpbGVuYW1lCgogICAgICAgICAgICB0cnk6CiAgICAgICAgICAgICAgICBpZiBhcmd1bWVudHMudmVyYm9zZToKICAgICAgICAgICAgICAgICAgICBwcmludCgnRXh0cmFjdGluZyB7MH0uLi4nLmZvcm1hdChmaWxlbmFtZSkpCgogICAgICAgICAgICAgICAgY29udGVudHMgPSBhcmNoaXZlLnJlYWQoZmlsZW5hbWUpCiAgICAgICAgICAgICAgICBpZiBjb250ZW50cyBpcyBOb25lOgogICAgICAgICAgICAgICAgICAgIHJhaXNlIElPRXJyb3IoJ3RoZSByZXF1ZXN0ZWQgZmlsZSB7MH0gZG9lcyBub3QgZXhpc3QgaW4gdGhlIGdpdmVuIFJlblwnUHkgYXJjaGl2ZScuZm9ybWF0KGZpbGVuYW1lKSkKCiAgICAgICAgICAgICAgICAjIENyZWF0ZSBvdXRwdXQgZGlyZWN0b3J5IGZvciBmaWxlIGlmIG5vdCBwcmVzZW50LgogICAgICAgICAgICAgICAgZGVzdF9kaXIgPSBvcy5wYXRoLmRpcm5hbWUob3MucGF0aC5qb2luKG91dHB1dCwgb3V0ZmlsZSkpCiAgICAgICAgICAgICAgICBpZiBkZXN0X2RpciBhbmQgbm90IG9zLnBhdGguZ"
+            <nul set /p="Xhpc3RzKGRlc3RfZGlyKToKICAgICAgICAgICAgICAgICAgICBvcy5tYWtlZGlycyhkZXN0X2RpcikKCiAgICAgICAgICAgICAgICB3aXRoIG9wZW4ob3MucGF0aC5qb2luKG91dHB1dCwgb3V0ZmlsZSksICd3YicpIGFzIGZpbGU6CiAgICAgICAgICAgICAgICAgICAgZmlsZS53cml0ZShjb250ZW50cykKICAgICAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOgogICAgICAgICAgICAgICAgcHJpbnQoJ0NvdWxkIG5vdCBleHRyYWN0IGZpbGUgezB9IGZyb20gYXJjaGl2ZTogezF9Jy5mb3JtYXQoZmlsZW5hbWUsIGUpLCBmaWxlPXN5cy5zdGRlcnIpCiAgICBlbGlmIGFyZ3VtZW50cy5saXN0OgogICAgICAgICMgUHJpbnQgdGhlIHNvcnRlZCBmaWxlIGxpc3QuCiAgICAgICAgZmlsZV9saXN0ID0gYXJjaGl2ZS5saXN0KCkKICAgICAgICBmaWxlX2xpc3Quc29ydCgpCiAgICAgICAgZm9yIGZpbGUgaW4gZmlsZV9saXN0OgogICAgICAgICAgICBwcmludChmaWxlKQogICAgZWxzZToKICAgICAgICBwcmludCgnTm8gb3BlcmF0aW9uIGdpdmVuIDooJykKICAgICAgICBwcmludCgnVXNlIHswfSAtLWhlbHAgZm9yIHVzYWdlIGRldGFpbHMuJy5mb3JtYXQoc3lzLmFyZ3ZbMF0pKQo="
+        )
     )
 )
 
-:: rpatool by Shizmob 2022-08-24
-::  https://github.com/Shizmob/rpatool
-::  Version 0.8 w pickle5 - Require Python ^>= 3.8
-::  Include SVAC-1.0 decoder & .jas files extensions by JoeLurmel@f95zone
+:: rpatool2 by JoeLurmel v0.1 for Ren'Py >=8
+::  Include SVAC-1.0 decoder & .jas file extension by JoeLurmel@f95zone
 if "%RPATOOL_NEW%" == "y" (
-    >"%rpatool%.b64" (
-        <nul set /p="IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMw0KDQpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IHByaW50X2Z1bmN0aW9uDQoNCmltcG9ydCBzeXMNCmltcG9ydCBvcw0KaW1wb3J0IGNvZGVjcw0KaW1wb3J0IHBpY2tsZQ0KaW1wb3J0IGVycm5vDQppbXBvcnQgcmFuZG9tDQoNCnRyeToNCiAgICBpbXBvcnQgcGlja2xlNSBhcyBwaWNrbGUNCmV4Y2VwdDoNCiAgICBpbXBvcnQgcGlja2xlDQogICAgaWYgc3lzLnZlcnNpb25faW5mbyA8ICgzLCA4KToNCiAgICAgICAgcHJpbnQoJ3dhcm5pbmc6IHBpY2tsZTUgbW9kdWxlIGNvdWxkIG5vdCBiZSBsb2FkZWQgYW5kIFB5dGhvbiB2ZXJzaW9uIGlzIDwgMy44LCcsIGZpbGU9c3lzLnN0ZGVycikNCiAgICAgICAgcHJpbnQoJyAgICAgICAgIG5ld2VyIFJlblwnUHkgZ2FtZXMgbWF5IGZhaWwgdG8gdW5wYWNrIScsIGZpbGU9c3lzLnN0ZGVycikNCiAgICAgICAgaWYgc3lzLnZlcnNpb25faW5mbyA+PSAoMywgNSk6DQogICAgICAgICAgICBwcmludCgnICAgICAgICAgaWYgdGhpcyBvY2N1cnMsIGZpeCBpdCBieSBpbnN0YWxsaW5nIHBpY2tsZTU6JywgZmlsZT1zeXMuc3RkZXJyKQ0KICAgICAgICAgICAgcHJpbnQoJyAgICAgICAgICAgICB7fSAtbSBwaXAgaW5zdGFsbCBwaWNrbGU1Jy5mb3JtYXQoc3lzLmV4ZWN1dGFibGUpLCBmaWxlPXN5cy5zdGRlcnIpDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICBwcmludCgnICAgICAgICAgaWYgdGhpcyBvY2N1cnMsIHBsZWFzZSB1cGdyYWRlIHRvIGEgbmV3ZXIgUHl0aG9uICg+PSAzLjUpLicsIGZpbGU9c3lzLnN0ZGVycikNCiAgICAgICAgcHJpbnQoZmlsZT1zeXMuc3RkZXJyKQ0KDQoNCmlmIHN5cy52ZXJzaW9uX2luZm9bMF0gPj0gMzoNCiAgICBkZWYgX3VuaWNvZGUodGV4dCk6DQogICAgICAgIHJldHVybiB0ZXh0DQoNCiAgICBkZWYgX3ByaW50YWJsZSh0ZXh0KToNCiAgICAgICAgcmV0dXJuIHRleHQNCg0KICAgIGRlZiBfdW5tYW5nbGUoZGF0YSk6DQogICAgICAgIGlmIHR5cGUoZGF0YSkgPT0gYnl0ZXM6DQogICAgICAgICAgICByZXR1cm4gZGF0YQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgcmV0dXJuIGRhdGEuZW5jb2RlKCdsYXRpbjEnKQ0KDQogICAgZGVmIF91bnBpY2tsZShkYXRhKToNCiAgICAgICAgIyBTcGVjaWZ5IGxhdGluMSBlbmNvZGluZyB0byBwcmV2ZW50IHJhdyBieXRlIHZhbHVlcyBmcm9tIGNhdXNpbmcgYW4gQVNDSUkgZGVjb2RlIGVycm9yLg0KICAgICAgICByZXR1cm4gcGlja2xlLmxvYWRzKGRhdGEsIGVuY29kaW5nPSdsYXRpbjEnKQ0KZWxpZiBzeXMudmVyc2lvbl9pbmZvWzBdID09IDI6DQogICAgZGVmIF91bmljb2RlKHRleHQpOg0KICAgICAgICBpZiBpc2luc3RhbmNlKHRleHQsIHVuaWNvZGUpOg0KICAgICAgICAgICAgcmV0dXJuIHRleHQNCiAgICAgICAgcmV0dXJuIHRleHQuZGVjb2RlKCd1dGYtOCcpDQoNCiAgICBkZWYgX3ByaW50YWJsZSh0ZXh0KToNCiAgICAgICAgcmV0dXJuIHRleHQuZW5jb2RlKCd1dGYtOCcpDQoNCiAgICBkZWYgX3VubWFuZ2xlKGRhdGEpOg0KICAgICAgICByZXR1cm4gZGF0YQ0KDQogICAgZGVmIF91bnBpY2tsZShkYXRhKToNCiAgICAgICAgcmV0dXJuIHBpY2tsZS5sb2FkcyhkYXRhKQ0KDQpjbGFzcyBSZW5QeUFyY2hpdmU6DQogICAgZmlsZSA9IE5vbmUNCiAgICBoYW5kbGUgPSBOb25lDQoNCiAgICBmaWxlcyA9IHt9DQogICAgaW5kZXhlcyA9IHt9DQoNCiAgICB2ZXJzaW9uID0gTm9uZQ0KICAgIHBhZGxlbmd0aCA9IDANCiAgICBrZXkgPSBOb25lDQogICAgdmVyYm9zZSA9IEZhbHNlDQoNCiAgICBSUEEyX01BR0lDID0gJ1JQQS0yLjAgJw0KICAgIFJQQTNfTUFHSUMgPSAnUlBBLTMuMCAnDQogICAgUldBM19NQUdJQyA9ICdSV0EtMy4wICcNCiAgICBSUEEzXzJfTUFHSUMgPSAnUlBBLTMuMiAnDQogICAgU1ZBQzFfTUFHSUMgPSAnU1ZBQy0xLjAgJw0KDQogICAgIyBGb3IgYmFja3dhcmQgY29tcGF0aWJpbGl0eSwgb3RoZXJ3aXNlIFB5dGhvbjMtcGFja2VkIGFyY2hpdmVzIHdvbid0IGJlIHJlYWQgYnkgUHl0aG9uMg0KICAgIFBJQ0tMRV9QUk9UT0NPTCA9IDINCg0KICAgIGRlZiBfX2luaXRfXyhzZWxmLCBmaWxlID0gTm9uZSwgdmVyc2lvbiA9IDMsIHBhZGxlbmd0aCA9IDAsIGtleSA9IDB4REVBREJFRUYsIHZlcmJvc2UgPSBGYWxzZSk6DQogICAgICAgIHNlbGYucGFkbGVuZ3RoID0gcGFkbGVuZ3RoDQogICAgICAgIHNlbGYua2V5ID0ga2V5DQogICAgICAgIHNlbGYudmVyYm9zZSA9IHZlcmJvc2UNCg0KICAgICAgICBpZiBmaWxlIGlzIG5vdCBOb25lOg0KICAgICAgICAgICAgc2VsZi5sb2FkKGZpbGUpDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICBzZWxmLnZlcnNpb24gPSB2ZXJzaW9uDQoNCiAgICBkZWYgX19kZWxfXyhzZWxmKToNCiAgICAgICAgaWYgc2VsZi5oYW5kbGUgaXMgbm90IE5vbmU6DQogICAgICAgICAgICBzZWxmLmhhbmRsZS5jbG9zZSgpDQoNCiAgICAjIERldGVybWluZSBhcmNoaXZlIHZlcnNpb24uDQogICAgZGVmIGdldF92ZXJzaW9uKHNlbGYpOg0KICAgICAgICBzZWxmLmhhbmRsZS5zZWVrKDApDQogICAgICAgIG1hZ2ljID0gc2VsZi5oYW5kbGUucmVhZGxpbmUoKS5kZWNvZGUoJ3V0Zi04JykNCg0KICAgICAgICBpZiBtYWdpYy5zdGFydHN3aXRoKHNlbGYuU1ZBQzFfTUFHSUMpOg0KICAgICAgICAgICAgcGFydHMgPSBtYWdpYy5zcGxpdCgpDQogICAgICAgICAgICBpZiBsZW4ocGFydHMpID09IDQ6DQogICAgICAgICAgICAgICAgcmV0dXJuIDQgICAgICAjIHRydWUgU1ZBQy0xLjAgYXJjaGl2ZQ0KICAgICAgICAgICAgZWxzZToNCiAgICAgICAgICAgICAgICByZXR1cm4gMyAgICAjIGZhbHNlIFNWQUMsIGFjdHVhbGx5IFJQQS0zLjAgd2l0aCBhIGN1c3RvbSBoZWFkZXINCiAgICAgICAgZWxpZiBtYWdpYy5zdGFydHN3aXRoKHNlbGYuUlBBM18yX01BR0lDKToNCiAgICAgICAgICAgIHJldHVybiAzLjINCiAgICAgICAgZWxpZiBtYWdpYy5zdGFydHN3aXRoKHNlbGYuUlBBM19NQUdJQyk6DQogICAgICAgICAgICByZXR1cm4gMw0KICAgICAgICBlbGlmIG1hZ2ljLnN0YXJ0c3dpdGgoc2VsZi5SV0EzX01BR0lDKToNCiAgICAgICAgICAgIHJldHVybiAzDQogICAgICAgIGVsaWYgbWFnaWMuc3RhcnRzd2l0aChzZWxmLlJQQTJfTUFHSUMpOg0KICAgICAgICAgICAgcmV0dXJuIDINCiAgICAgICAgZWxpZiBzZWxmLmZpbGUuZW5kc3dpdGgoJy5ycGknKToNCiAgICAgICAgICAgIHJldHVybiAxDQoNCiAgICAgICAgcmFpc2UgVmFsdWVFcnJvcigndGhlIGdpdmVuIGZpbGUgaXMgbm90IGEgdmFsaWQgUmVuXCdQeSBhcmNoaXZlLCBvciBhbiB1bnN1cHBvcnRlZCB2ZXJzaW9uJykNCg0KICAgICMgRXh0cmFjdCBmaWxlIGluZGV4ZXMgZnJvbSBvcGVuZWQgYXJjaGl2ZS4NCiAgICBkZWYgZXh0cmFjdF9pbmRleGVzKHNlbGYpOg0KICAgICAgICBzZWxmLmhhbmRsZS5zZWVrKDApDQogICAgICAgIGluZGV4ZXMgPSBOb25lDQoNCiAgICAgICAgaWYgc2VsZi52ZXJzaW9uIGluIFsyLCAzLCAzLjJdOg0KICAgICAgICAgICAgIyBGZXRjaCBtZXRhZGF0YS4NCiAgICAgICAgICAgIG1ldGFkYXRhID0gc2VsZi5oYW5kbGUucmVhZGxpbmUoKQ0KICAgICAgICAgICAgdmFscyA9IG1ldGFkYXRhLnNwbGl0KCkNCiAgICAgICAgICAgIG9mZnNldCA9IGludCh2YWxzWzFdLCAxNikNCiAgICAgICAgICAgIGlmIHNlbGYudmVyc2lvbiA9PSAzOg0KICAgICAgICAgICAgICAgIHNlbGYua2V5ID0gMA0KICAgICAgICAgICAgICAgIGZvciBzdWJrZXkgaW4gdmFsc1syOl06DQogICAgICAgICAgICAgICAgICAgIHNlbGYua2V5IF49IGludChzdWJrZXksIDE2KQ0KICAgICAgICAgICAgZWxpZiBzZWxmLnZlcnNpb24gPT0gMy4yOg0KICAgICAgICAgICAgICAgIHNlbGYua2V5ID0gMA0KICAgICAgICAgICAgICAgIGZvciBzdWJrZXkgaW4gdmFsc1szOl06DQogICAgICAgICAgICAgICAgICAgIHNlbGYua2V5IF49IGludChzdWJrZXksIDE2KQ0KDQogICAgICAgICAgICAjIExvYWQgaW4gaW5kZXhlcy4NCiAgICAgICAgICAgIHNlbGYuaGFuZGxlLnNlZWsob2Zmc2V0KQ0KICAgICAgICAgICAgY29udGVudHMgPSBjb2RlY3MuZGVjb2RlKHNlbGYuaGFuZGxlLnJlYWQoKSwgJ3psaWInKQ0KICAgICAgICAgICAgaW5kZXhlcyA9IF91bnBpY2tsZShjb250ZW50cykNCg0KICAgICAgICAgICAgIyBEZW9iZnVzY2F0ZSBpbmRleGVzLg0KICAgICAgICAgICAgaWYgc2VsZi52ZXJzaW9uIGluIFszLCAzLjJdOg0KICAgICAgICAgICAgICAgIG9iZnVzY2F0ZWRfaW5kZXhlcyA9IGluZGV4ZXMNCiAgICAgICAgICAgICAgICBpbmRleGVzID0ge30NCiAgICAgICAgICAgICAgICBmb3IgaSBpbiBvYmZ1c2NhdGVkX2luZGV4ZXMua2V5cygpOg0KICAgICAgICAgICAgICAgICAgICBpZiBsZW4ob2JmdXNjYXRlZF9pbmRleGVzW2ldWzBdKSA9PSAyOg0KICAgICAgICAgICAgICAgICAgICAgICAgaW5kZXhlc1tpXSA9IFsgKG9mZnNldCBeIHNlbGYua2V5LCBsZW5ndGggXiBzZWxmLmtleSkgZm9yIG9mZnNldCwgbGVuZ3RoIGluIG9iZnVzY2F0ZWRfaW5kZXhlc1tpXSBdDQogICAgICAgICAgICAgICAgICAgIGVsc2U6DQogICAgICAgICAgICAgICAgICAgICAgICBpbmRleGVzW2ldID0gWyAob2Zmc2V0IF4gc2VsZi5rZXksIGxlbmd0aCBeIHNlbGYua2V5LCBwcmVmaXgpIGZvciBvZmZzZXQsIGxlbmd0aCwgcHJlZml4IGluIG9iZnVzY2F0ZWRfaW5kZXhlc1tpXSBdDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICBpbmRleGVzID0gcGlja2xlLmxvYWRzKGNvZGVjcy5kZWNvZGUoc2VsZi5oYW5kbGUucmVhZCgpLCAnemxpYicpKQ0KDQogICAgICAgIHJldHVybiBpbmRleGVzDQoNCiAgICAjIEdlbmVyYXRlIHBzZXVkb3JhbmRvbSBwYWRkaW5nIChmb3Igd2hhdGV2ZXIgcmVhc29uKS4NCiAgICBkZWYgZ2VuZXJhdGVfcGFkZGluZyhzZWxmKToNCiAgICAgICAgbGVuZ3RoID0gcmFuZG9tLnJhbmRpbnQoMSwgc2VsZi5wYWRsZW5ndGgpDQoNCiAgICAgICAgcGFkZGluZyA9ICcnDQogICAgICAgIHdoaWxlIGxlbmd0aCA+IDA6DQogICAgICAgICAgICBwYWRkaW5nICs9IGNocihyYW5kb20ucmFuZGludCgxLCAyNTUpKQ0KICAgICAgICAgICAgbGVuZ3RoIC09IDENCg0KICAgICAgICByZXR1cm4gYnl0ZXMocGFkZGluZywgJ3V0Zi04JykNCg0KICAgICMgQ29udmVydHMgYSBmaWxlbmFtZSB0byBhcmNoaXZlIGZvcm1hdC4NCiAgICBkZWYgY29udmVydF9maWxlbmFtZShzZWxmLCBmaWxlbmFtZSk6DQogICAgICAgIChkcml2ZSwgZmlsZW5hbWUpID0gb3MucGF0aC5zcGxpdGRyaXZlKG9zLnBhdGgubm9ybXBhdGgoZmlsZW5hbWUpLnJlcGxhY2Uob3Muc2VwLCAnLycpKQ0KICAgICAgICByZXR1cm4gZmlsZW5hbWUNCg0KICAgICMgRGVidWcgKHZlcmJvc2UpIG1lc3NhZ2VzLg0KICAgIGRlZiB2ZXJib3NlX3ByaW50KHNlbGYsIG1lc3NhZ2UpOg0KICAgICAgICBpZiBzZWxmLnZlcmJvc2U6DQogICAgICAgICAgICBwcmludChtZXNzYWdlKQ0KDQoNCiAgICAjIExpc3QgZmlsZXMgaW4gYXJjaGl2ZSBhbmQgY3VycmVudCBpbnRlcm5hbCBzdG9yYWdlLg0KICAgIGRlZiBsaXN0KHNlbGYpOg0KICAgICAgICByZXR1cm4gbGlzdChzZWxmLmluZGV4ZXMua2V5cygpKSArIGxpc3Qoc2VsZi5maWxlcy5rZXlzKCkpDQoNCiAgICAjIENoZWNrIGlmIGEgZmlsZSBleGlzdHMgaW4gdGhlIGFyY2hpdmUuDQogICAgZGVmIGhhc19maWxlKHNlbGYsIGZpbGVuYW1lKToNCiAgICAgICAgZmlsZW5hbWUgPSBfdW5pY29kZShmaWxlbmFtZSkNCiAgICAgICAgcmV0dXJuIGZpbGVuYW1lIGluIHNlbGYuaW5kZXhlcy5rZXlzKCkgb3IgZmlsZW5hbWUgaW4gc2VsZi5maWxlcy5rZXlzKCkNCg0KICAgICMgUmVhZCBmaWxlIGZyb20gYXJjaGl2ZSBvciBpbnRlcm5hbCBzdG9yYWdlLg0KICAgIGRlZiByZWFkKHNlbGYsIGZpbGVuYW1lKToNCiAgICAgICAgZmlsZW5hbWUgPSBzZWxmLmNvbnZlcnRfZmlsZW5hbWUoX3VuaWNvZGUoZmlsZW5hbWUpKQ0KDQogICAgICAgICMgQ2hlY2sgaWYgdGhlIGZpbGUgZXhpc3RzIGluIG91ciBpbmRleGVzLg0KICAgICAgICBpZiBmaWxlbmFtZSBub3QgaW4gc2VsZi5maWxlcyBhbmQgZmlsZW5hbWUgbm90IGluIHNlbGYua"
-        <nul set /p="W5kZXhlczoNCiAgICAgICAgICAgIHJhaXNlIElPRXJyb3IoZXJybm8uRU5PRU5ULCAndGhlIHJlcXVlc3RlZCBmaWxlIHswfSBkb2VzIG5vdCBleGlzdCBpbiB0aGUgZ2l2ZW4gUmVuXCdQeSBhcmNoaXZlJy5mb3JtYXQoDQogICAgICAgICAgICAgICAgX3ByaW50YWJsZShmaWxlbmFtZSkpKQ0KDQogICAgICAgICMgSWYgaXQncyBpbiBvdXIgb3BlbmVkIGFyY2hpdmUgaW5kZXgsIGFuZCBvdXIgYXJjaGl2ZSBoYW5kbGUgaXNuJ3QgdmFsaWQsIHNvbWV0aGluZyBpcyBvYnZpb3VzbHkgd3JvbmcuDQogICAgICAgIGlmIGZpbGVuYW1lIG5vdCBpbiBzZWxmLmZpbGVzIGFuZCBmaWxlbmFtZSBpbiBzZWxmLmluZGV4ZXMgYW5kIHNlbGYuaGFuZGxlIGlzIE5vbmU6DQogICAgICAgICAgICByYWlzZSBJT0Vycm9yKGVycm5vLkVOT0VOVCwgJ3RoZSByZXF1ZXN0ZWQgZmlsZSB7MH0gZG9lcyBub3QgZXhpc3QgaW4gdGhlIGdpdmVuIFJlblwnUHkgYXJjaGl2ZScuZm9ybWF0KA0KICAgICAgICAgICAgICAgIF9wcmludGFibGUoZmlsZW5hbWUpKSkNCg0KICAgICAgICAjIENoZWNrIG91ciBzaW1wbGlmaWVkIGludGVybmFsIGluZGV4ZXMgZmlyc3QsIGluIGNhc2Ugc29tZW9uZSB3YW50cyB0byByZWFkIGEgZmlsZSB0aGV5IGFkZGVkIGJlZm9yZSB3aXRob3V0IHNhdmluZywgZm9yIHNvbWUgdW5ob2x5IHJlYXNvbi4NCiAgICAgICAgaWYgZmlsZW5hbWUgaW4gc2VsZi5maWxlczoNCiAgICAgICAgICAgIHNlbGYudmVyYm9zZV9wcmludCgnUmVhZGluZyBmaWxlIHswfSBmcm9tIGludGVybmFsIHN0b3JhZ2UuLi4nLmZvcm1hdChfcHJpbnRhYmxlKGZpbGVuYW1lKSkpDQogICAgICAgICAgICByZXR1cm4gc2VsZi5maWxlc1tmaWxlbmFtZV0NCiAgICAgICAgIyBXZSBuZWVkIHRvIHJlYWQgdGhlIGZpbGUgZnJvbSBvdXIgb3BlbiBhcmNoaXZlLg0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgIyBSZWFkIG9mZnNldCBhbmQgbGVuZ3RoLCBzZWVrIHRvIHRoZSBvZmZzZXQgYW5kIHJlYWQgdGhlIGZpbGUgY29udGVudHMuDQogICAgICAgICAgICBpZiBsZW4oc2VsZi5pbmRleGVzW2ZpbGVuYW1lXVswXSkgPT0gMzoNCiAgICAgICAgICAgICAgICAob2Zmc2V0LCBsZW5ndGgsIHByZWZpeCkgPSBzZWxmLmluZGV4ZXNbZmlsZW5hbWVdWzBdDQogICAgICAgICAgICBlbHNlOg0KICAgICAgICAgICAgICAgIChvZmZzZXQsIGxlbmd0aCkgPSBzZWxmLmluZGV4ZXNbZmlsZW5hbWVdWzBdDQogICAgICAgICAgICAgICAgcHJlZml4ID0gJycNCg0KICAgICAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdSZWFkaW5nIGZpbGUgezB9IGZyb20gZGF0YSBmaWxlIHsxfS4uLiAob2Zmc2V0ID0gezJ9LCBsZW5ndGggPSB7M30gYnl0ZXMpJy5mb3JtYXQoDQogICAgICAgICAgICAgICAgX3ByaW50YWJsZShmaWxlbmFtZSksIHNlbGYuZmlsZSwgb2Zmc2V0LCBsZW5ndGgpKQ0KICAgICAgICAgICAgc2VsZi5oYW5kbGUuc2VlayhvZmZzZXQpDQogICAgICAgICAgICByZXR1cm4gX3VubWFuZ2xlKHByZWZpeCkgKyBzZWxmLmhhbmRsZS5yZWFkKGxlbmd0aCAtIGxlbihwcmVmaXgpKQ0KDQogICAgIyBNb2RpZnkgYSBmaWxlIGluIGFyY2hpdmUgb3IgaW50ZXJuYWwgc3RvcmFnZS4NCiAgICBkZWYgY2hhbmdlKHNlbGYsIGZpbGVuYW1lLCBjb250ZW50cyk6DQogICAgICAgIGZpbGVuYW1lID0gX3VuaWNvZGUoZmlsZW5hbWUpDQoNCiAgICAgICAgIyBPdXIgJ2NoYW5nZScgaXMgYmFzaWNhbGx5IHJlbW92aW5nIHRoZSBmaWxlIGZyb20gb3VyIGluZGV4ZXMgZmlyc3QsIGFuZCB0aGVuIHJlLWFkZGluZyBpdC4NCiAgICAgICAgc2VsZi5yZW1vdmUoZmlsZW5hbWUpDQogICAgICAgIHNlbGYuYWRkKGZpbGVuYW1lLCBjb250ZW50cykNCg0KICAgICMgQWRkIGEgZmlsZSB0byB0aGUgaW50ZXJuYWwgc3RvcmFnZS4NCiAgICBkZWYgYWRkKHNlbGYsIGZpbGVuYW1lLCBjb250ZW50cyk6DQogICAgICAgIGZpbGVuYW1lID0gc2VsZi5jb252ZXJ0X2ZpbGVuYW1lKF91bmljb2RlKGZpbGVuYW1lKSkNCiAgICAgICAgaWYgZmlsZW5hbWUgaW4gc2VsZi5maWxlcyBvciBmaWxlbmFtZSBpbiBzZWxmLmluZGV4ZXM6DQogICAgICAgICAgICByYWlzZSBWYWx1ZUVycm9yKCdmaWxlIHswfSBhbHJlYWR5IGV4aXN0cyBpbiBhcmNoaXZlJy5mb3JtYXQoX3ByaW50YWJsZShmaWxlbmFtZSkpKQ0KDQogICAgICAgIHNlbGYudmVyYm9zZV9wcmludCgnQWRkaW5nIGZpbGUgezB9IHRvIGFyY2hpdmUuLi4gKGxlbmd0aCA9IHsxfSBieXRlcyknLmZvcm1hdCgNCiAgICAgICAgICAgIF9wcmludGFibGUoZmlsZW5hbWUpLCBsZW4oY29udGVudHMpKSkNCiAgICAgICAgc2VsZi5maWxlc1tmaWxlbmFtZV0gPSBjb250ZW50cw0KDQogICAgIyBSZW1vdmUgYSBmaWxlIGZyb20gYXJjaGl2ZSBvciBpbnRlcm5hbCBzdG9yYWdlLg0KICAgIGRlZiByZW1vdmUoc2VsZiwgZmlsZW5hbWUpOg0KICAgICAgICBmaWxlbmFtZSA9IF91bmljb2RlKGZpbGVuYW1lKQ0KICAgICAgICBpZiBmaWxlbmFtZSBpbiBzZWxmLmZpbGVzOg0KICAgICAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdSZW1vdmluZyBmaWxlIHswfSBmcm9tIGludGVybmFsIHN0b3JhZ2UuLi4nLmZvcm1hdChfcHJpbnRhYmxlKGZpbGVuYW1lKSkpDQogICAgICAgICAgICBkZWwgc2VsZi5maWxlc1tmaWxlbmFtZV0NCiAgICAgICAgZWxpZiBmaWxlbmFtZSBpbiBzZWxmLmluZGV4ZXM6DQogICAgICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1JlbW92aW5nIGZpbGUgezB9IGZyb20gYXJjaGl2ZSBpbmRleGVzLi4uJy5mb3JtYXQoX3ByaW50YWJsZShmaWxlbmFtZSkpKQ0KICAgICAgICAgICAgZGVsIHNlbGYuaW5kZXhlc1tmaWxlbmFtZV0NCiAgICAgICAgZWxzZToNCiAgICAgICAgICAgIHJhaXNlIElPRXJyb3IoZXJybm8uRU5PRU5ULCAndGhlIHJlcXVlc3RlZCBmaWxlIHswfSBkb2VzIG5vdCBleGlzdCBpbiB0aGlzIGFyY2hpdmUnLmZvcm1hdChfcHJpbnRhYmxlKGZpbGVuYW1lKSkpDQoNCiAgICAjIExvYWQgYXJjaGl2ZS4NCiAgICBkZWYgbG9hZChzZWxmLCBmaWxlbmFtZSk6DQogICAgICAgIGZpbGVuYW1lID0gX3VuaWNvZGUoZmlsZW5hbWUpDQoNCiAgICAgICAgaWYgc2VsZi5oYW5kbGUgaXMgbm90IE5vbmU6DQogICAgICAgICAgICBzZWxmLmhhbmRsZS5jbG9zZSgpDQogICAgICAgIHNlbGYuZmlsZSA9IGZpbGVuYW1lDQogICAgICAgIHNlbGYuZmlsZXMgPSB7fQ0KICAgICAgICBzZWxmLmhhbmRsZSA9IG9wZW4oc2VsZi5maWxlLCAncmInKQ0KICAgICAgICBzZWxmLnZlcnNpb24gPSBzZWxmLmdldF92ZXJzaW9uKCkNCiAgICAgICAgaWYgc2VsZi52ZXJzaW9uIGluIFsxLCAyLCAzLCAzLjJdOg0KICAgICAgICAgICAgc2VsZi5pbmRleGVzID0gc2VsZi5leHRyYWN0X2luZGV4ZXMoKQ0KICAgICAgICBlbGlmIHNlbGYudmVyc2lvbiA9PSA0Og0KICAgICAgICAgICAgc2VsZi5pbmRleGVzID0gc2VsZi5leHRyYWN0X3N2YWMxX2luZGV4ZXMoKQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgcmFpc2UgVmFsdWVFcnJvcigndW5zdXBwb3J0ZWQgUmVuXCdQeSBhcmNoaXZlIHZlcnNpb24nKQ0KDQogICAgIyBFeHRyYWN0IGZpbGUgaW5kZXhlcyBmcm9tIG9wZW5lZCBTVkFDLTEuMCBhcmNoaXZlLg0KICAgIGRlZiBleHRyYWN0X3N2YWMxX2luZGV4ZXMoc2VsZik6DQogICAgICAgIGltcG9ydCBqc29uLCB6bGliDQoNCiAgICAgICAgc2VsZi5oYW5kbGUuc2VlaygwKQ0KICAgICAgICBoZWFkZXIgPSBzZWxmLmhhbmRsZS5yZWFkbGluZSgpLmRlY29kZSgndXRmLTgnKQ0KICAgICAgICBwYXJ0cyA9IGhlYWRlci5zcGxpdCgpDQoNCiAgICAgICAgIyBwYXJ0c1sxXSA9IG9mZnNldCBoZXgNCiAgICAgICAgaW5kZXhfb2Zmc2V0ID0gaW50KHBhcnRzWzFdLCAxNikNCg0KICAgICAgICAjIEdvIHRvIHRoZSBPZ2dTIGJsb2NrIGNvbnRhaW5pbmcgdGhlIGNvbXByZXNzZWQgSlNPTiBkYXRhLA0KICAgICAgICAjIHJlYWQgaXQgYW5kIHRyeSB0byBkZWNvZGUgaXQgYXMgemxpYiBmaXJzdCwgaWYgdGhhdCBmYWlscywNCiAgICAgICAgIyBkZWNvZGUgaXQgYXMgT2dnIGVuY2Fwc3VsYXRlZCBWb3JiaXMgY29tbWVudHMuDQogICAgICAgIHNlbGYuaGFuZGxlLnNlZWsoaW5kZXhfb2Zmc2V0KQ0KICAgICAgICBjb21wcmVzc2VkID0gc2VsZi5oYW5kbGUucmVhZCgpDQoNCiAgICAgICAgdHJ5Og0KICAgICAgICAgICAgIyBWYXJpYW50IEI6IERpcmVjdCB6bGliIHN0cmVhbSwgbm8gT2dnIGVuY2Fwc3VsYXRpb24NCiAgICAgICAgICAgIGpzb25fZGF0YSA9IHpsaWIuZGVjb21wcmVzcyhjb21wcmVzc2VkKS5kZWNvZGUoInV0Zi04IikNCiAgICAgICAgZXhjZXB0Og0KICAgICAgICAgICAgIyBWYXJpYW50IEE6IEVuY2Fwc3VsYXRlZCBPZ2cgc3RyZWFtLCBkZWNvZGUgaXQgdG8gZXh0cmFjdCB0aGUgSlNPTiBmcm9tIFZvcmJpcyBjb21tZW50cw0KICAgICAgICAgICAganNvbl9kYXRhID0gc2VsZi5kZWNvZGVfc3ZhYzFfb2dnKGNvbXByZXNzZWQpDQoNCiAgICAgICAgIyBEZWNvZGUgVm9yYmlzIHN0cmVhbSDihpIgSlNPTiBkYXRhDQogICAgICAgIGpzb25fZGF0YSA9IHNlbGYuZGVjb2RlX3N2YWMxX29nZyhvZ2dfZGF0YSkNCg0KICAgICAgICAjIExvYWQgSlNPTiBkYXRhIGludG8gYSBQeXRob24gZGljdA0KICAgICAgICByYXcgPSBqc29uLmxvYWRzKGpzb25fZGF0YSkNCg0KICAgICAgICAjIENvbnZlcnQgdG8gaW50ZXJuYWwgaW5kZXggZm9ybWF0DQogICAgICAgIGluZGV4ZXMgPSB7fQ0KICAgICAgICBmb3IgbmFtZSwgaW5mbyBpbiByYXdbImZpbGVzIl0uaXRlbXMoKToNCiAgICAgICAgICAgIG9mZnNldCwgbGVuZ3RoID0gaW5mbw0KICAgICAgICAgICAgaW5kZXhlc1tuYW1lXSA9IFsob2Zmc2V0LCBsZW5ndGgpXQ0KDQogICAgICAgIHJldHVybiBpbmRleGVzDQoNCiAgICBkZWYgZGVjb2RlX3N2YWMxX29nZyhzZWxmLCBkYXRhKToNCiAgICAgICAgIyBTZWFyY2ggZm9yIHBhY2tldCB0eXBlIDMg4oCcdm9yYmlz4oCdLCB3aGljaCBjb250YWlucyB0aGUgY29tbWVudHMgd2l0aCB0aGUgSlNPTiBkYXRhLg0KICAgICAgICBtYXJrZXIgPSBiIlx4MDN2b3JiaXMiDQogICAgICAgIHBvcyA9IGRhdGEuZmluZChtYXJrZXIpDQogICAgICAgIGlmIHBvcyA9PSAtMToNCiAgICAgICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoIlNWQUMtMS4wOiBWb3JiaXMgcGFja2FnZSAodHlwZSAzKSBub3QgZm91bmQgaW4gT2dnIHN0cmVhbSIpDQoNCiAgICAgICAgIyBBZnRlciB0aGUgbWFya2VyLCB0aGVyZSBpcyBhIOKAnHZlbmRvcl9sZW5ndGjigJ0gZmllbGQgKDQgbGl0dGxlLWVuZGlhbiBieXRlcykuDQogICAgICAgIHZlbmRvcl9sZW4gPSBpbnQuZnJvbV9ieXRlcyhkYXRhW3Bvcys3OnBvcysxMV0sICJsaXR0bGUiKQ0KDQogICAgICAgICMgU2tpcCB0aGUgdmVuZG9yIHN0cmluZyAodmVuZG9yX2xlbmd0aCBieXRlcykgdG8gZ2V0IHRvIHRoZSBjb21tZW50IGxpc3QuDQogICAgICAgIGNvbW1lbnRfc3RhcnQgPSBwb3MgKyAxMSArIHZlbmRvcl9sZW4NCg0KICAgICAgICAjIFJlYWQgdGhlIG51bWJlciBvZiBjb21tZW50cyAoNCBieXRlcyBMRSkNCiAgICAgICAgY29tbWVudF9jb3VudCA9IGludC5mcm9tX2J5dGVzKGRhdGFbY29tbWVudF9zdGFydDpjb21tZW50X3N0YXJ0KzRdLCAibGl0dGxlIikNCiAgICAgICAgcCA9IGNvbW1lbnRfc3RhcnQgKyA0DQoNCiAgICAgICAgIyBCcm93c2UgVm9yYmlzIGNvbW1lbnRzIHRvIGZpbmQgdGhlIG9uZSBzdGFydGluZyB3aXRoICJKU09OPSIsIHdoaWNoIGNvbnRhaW5zIHRoZSBKU09OIGRhdGEuDQogICAgICAgIGZvciBfIGluIHJhbmdlKGNvbW1lbnRfY291bnQpOg0KICAgICAgICAgICAgbGVuZ3RoID0gaW50LmZyb21fYnl0ZXMoZGF0YVtwOnArNF0sICJsaXR0bGUiKQ0KICAgICAgICAgICAgcCArPSA0DQogICAgICAgICAgICBjb21tZW50ID0gZGF0YVtwOnArbGVuZ3RoXQ0KICAgICAgICAgICAgcCArPSBsZW5ndGgNCg0KICAgICAgICAgICAgIyBUaGUgSlNPTiBpcyBpbiBhIGNvbW1lbnQuDQogICAgICAgICAgICBpZiBjb21tZW50LnN0YXJ0c3dpdGgoYiJKU09OPSIpOg0KICAgICAgICAgICAgICAgIHJldHVybiBjb21tZW50WzU6XS5kZWNvZGUoInV0Zi"
-        <nul set /p="04IikNCg0KICAgICAgICByYWlzZSBWYWx1ZUVycm9yKCJTVkFDLTEuMDogSlNPTiBub3QgZm91bmQgaW4gVm9yYmlzIGNvbW1lbnRzLiIpDQoNCiAgICAjIFNhdmUgY3VycmVudCBzdGF0ZSBpbnRvIGEgbmV3IGZpbGUsIG1lcmdpbmcgYXJjaGl2ZSBhbmQgaW50ZXJuYWwgc3RvcmFnZSwgcmVidWlsZGluZyBpbmRleGVzLCBhbmQgb3B0aW9uYWxseSBzYXZpbmcgaW4gYW5vdGhlciBmb3JtYXQgdmVyc2lvbi4NCiAgICBkZWYgc2F2ZShzZWxmLCBmaWxlbmFtZSA9IE5vbmUpOg0KICAgICAgICBmaWxlbmFtZSA9IF91bmljb2RlKGZpbGVuYW1lKQ0KDQogICAgICAgIGlmIGZpbGVuYW1lIGlzIE5vbmU6DQogICAgICAgICAgICBmaWxlbmFtZSA9IHNlbGYuZmlsZQ0KICAgICAgICBpZiBmaWxlbmFtZSBpcyBOb25lOg0KICAgICAgICAgICAgcmFpc2UgVmFsdWVFcnJvcignbm8gdGFyZ2V0IGZpbGUgZm91bmQgZm9yIHNhdmluZyBhcmNoaXZlJykNCiAgICAgICAgaWYgc2VsZi52ZXJzaW9uICE9IDIgYW5kIHNlbGYudmVyc2lvbiAhPSAzOg0KICAgICAgICAgICAgcmFpc2UgVmFsdWVFcnJvcignc2F2aW5nIGlzIG9ubHkgc3VwcG9ydGVkIGZvciB2ZXJzaW9uIDIgYW5kIDMgYXJjaGl2ZXMnKQ0KDQogICAgICAgIHNlbGYudmVyYm9zZV9wcmludCgnUmVidWlsZGluZyBhcmNoaXZlIGluZGV4Li4uJykNCiAgICAgICAgIyBGaWxsIG91ciBvd24gZmlsZXMgc3RydWN0dXJlIHdpdGggdGhlIGZpbGVzIGFkZGVkIG9yIGNoYW5nZWQgaW4gdGhpcyBzZXNzaW9uLg0KICAgICAgICBmaWxlcyA9IHNlbGYuZmlsZXMNCiAgICAgICAgIyBGaXJzdCwgcmVhZCBmaWxlcyBmcm9tIHRoZSBjdXJyZW50IGFyY2hpdmUgaW50byBvdXIgZmlsZXMgc3RydWN0dXJlLg0KICAgICAgICBmb3IgZmlsZSBpbiBsaXN0KHNlbGYuaW5kZXhlcy5rZXlzKCkpOg0KICAgICAgICAgICAgY29udGVudCA9IHNlbGYucmVhZChmaWxlKQ0KICAgICAgICAgICAgIyBSZW1vdmUgZnJvbSBpbmRleGVzIGFycmF5IG9uY2UgcmVhZCwgYWRkIHRvIG91ciBvd24gYXJyYXkuDQogICAgICAgICAgICBkZWwgc2VsZi5pbmRleGVzW2ZpbGVdDQogICAgICAgICAgICBmaWxlc1tmaWxlXSA9IGNvbnRlbnQNCg0KICAgICAgICAjIFByZWRpY3QgaGVhZGVyIGxlbmd0aCwgd2UnbGwgd3JpdGUgdGhhdCBvbmUgbGFzdC4NCiAgICAgICAgb2Zmc2V0ID0gMA0KICAgICAgICBpZiBzZWxmLnZlcnNpb24gPT0gMzoNCiAgICAgICAgICAgIG9mZnNldCA9IDM0DQogICAgICAgIGVsaWYgc2VsZi52ZXJzaW9uID09IDI6DQogICAgICAgICAgICBvZmZzZXQgPSAyNQ0KICAgICAgICBhcmNoaXZlID0gb3BlbihmaWxlbmFtZSwgJ3diJykNCiAgICAgICAgYXJjaGl2ZS5zZWVrKG9mZnNldCkNCg0KICAgICAgICAjIEJ1aWxkIG91ciBvd24gaW5kZXhlcyB3aGlsZSB3cml0aW5nIGZpbGVzIHRvIHRoZSBhcmNoaXZlLg0KICAgICAgICBpbmRleGVzID0ge30NCiAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdXcml0aW5nIGZpbGVzIHRvIGFyY2hpdmUgZmlsZS4uLicpDQogICAgICAgIGZvciBmaWxlLCBjb250ZW50IGluIGZpbGVzLml0ZW1zKCk6DQogICAgICAgICAgICAjIEdlbmVyYXRlIHJhbmRvbSBwYWRkaW5nLCBmb3Igd2hhdGV2ZXIgcmVhc29uLg0KICAgICAgICAgICAgaWYgc2VsZi5wYWRsZW5ndGggPiAwOg0KICAgICAgICAgICAgICAgIHBhZGRpbmcgPSBzZWxmLmdlbmVyYXRlX3BhZGRpbmcoKQ0KICAgICAgICAgICAgICAgIGFyY2hpdmUud3JpdGUocGFkZGluZykNCiAgICAgICAgICAgICAgICBvZmZzZXQgKz0gbGVuKHBhZGRpbmcpDQoNCiAgICAgICAgICAgIGFyY2hpdmUud3JpdGUoY29udGVudCkNCiAgICAgICAgICAgICMgVXBkYXRlIGluZGV4Lg0KICAgICAgICAgICAgaWYgc2VsZi52ZXJzaW9uID09IDM6DQogICAgICAgICAgICAgICAgaW5kZXhlc1tmaWxlXSA9IFsgKG9mZnNldCBeIHNlbGYua2V5LCBsZW4oY29udGVudCkgXiBzZWxmLmtleSkgXQ0KICAgICAgICAgICAgZWxpZiBzZWxmLnZlcnNpb24gPT0gMjoNCiAgICAgICAgICAgICAgICBpbmRleGVzW2ZpbGVdID0gWyAob2Zmc2V0LCBsZW4oY29udGVudCkpIF0NCiAgICAgICAgICAgIG9mZnNldCArPSBsZW4oY29udGVudCkNCg0KICAgICAgICAjIFdyaXRlIHRoZSBpbmRleGVzLg0KICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1dyaXRpbmcgYXJjaGl2ZSBpbmRleCB0byBhcmNoaXZlIGZpbGUuLi4nKQ0KICAgICAgICBhcmNoaXZlLndyaXRlKGNvZGVjcy5lbmNvZGUocGlja2xlLmR1bXBzKGluZGV4ZXMsIHNlbGYuUElDS0xFX1BST1RPQ09MKSwgJ3psaWInKSkNCiAgICAgICAgIyBOb3cgd3JpdGUgdGhlIGhlYWRlci4NCiAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdXcml0aW5nIGhlYWRlciB0byBhcmNoaXZlIGZpbGUuLi4gKHZlcnNpb24gPSBSUEF2ezB9KScuZm9ybWF0KHNlbGYudmVyc2lvbikpDQogICAgICAgIGFyY2hpdmUuc2VlaygwKQ0KICAgICAgICBpZiBzZWxmLnZlcnNpb24gPT0gMzoNCiAgICAgICAgICAgIGFyY2hpdmUud3JpdGUoY29kZWNzLmVuY29kZSgne317OjAxNnh9IHs6MDh4fVxuJy5mb3JtYXQoc2VsZi5SUEEzX01BR0lDLCBvZmZzZXQsIHNlbGYua2V5KSkpDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICBhcmNoaXZlLndyaXRlKGNvZGVjcy5lbmNvZGUoJ3t9ezowMTZ4fVxuJy5mb3JtYXQoc2VsZi5SUEEyX01BR0lDLCBvZmZzZXQpKSkNCiAgICAgICAgIyBXZSdyZSBkb25lLCBjbG9zZSBpdC4NCiAgICAgICAgYXJjaGl2ZS5jbG9zZSgpDQoNCiAgICAgICAgIyBSZWxvYWQgdGhlIGZpbGUgaW4gb3VyIGlubmVyIGRhdGFiYXNlLg0KICAgICAgICBzZWxmLmxvYWQoZmlsZW5hbWUpDQoNCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6DQogICAgaW1wb3J0IGFyZ3BhcnNlDQoNCiAgICBwYXJzZXIgPSBhcmdwYXJzZS5Bcmd1bWVudFBhcnNlcigNCiAgICAgICAgZGVzY3JpcHRpb249J0EgdG9vbCBmb3Igd29ya2luZyB3aXRoIFJlblwnUHkgYXJjaGl2ZSBmaWxlcy4nLA0KICAgICAgICBlcGlsb2c9J1RoZSBGSUxFIGFyZ3VtZW50IGNhbiBvcHRpb25hbGx5IGJlIGluIEFSQ0hJVkU9UkVBTCBmb3JtYXQsIG1hcHBpbmcgYSBmaWxlIGluIHRoZSBhcmNoaXZlIGZpbGUgc3lzdGVtIHRvIGEgZmlsZSBvbiB5b3VyIHJlYWwgZmlsZSBzeXN0ZW0uIEFuIGV4YW1wbGUgb2YgdGhpczogcnBhdG9vbCAteCB0ZXN0LnJwYSBzY3JpcHQucnB5Yz0vaG9tZS9mb28vdGVzdC5ycHljJywNCiAgICAgICAgYWRkX2hlbHA9RmFsc2UpDQoNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCdhcmNoaXZlJywgbWV0YXZhcj0nQVJDSElWRScsIGhlbHA9J1RoZSBSZW5cJ3B5IGFyY2hpdmUgZmlsZSB0byBvcGVyYXRlIG9uLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnZmlsZXMnLCBtZXRhdmFyPSdGSUxFJywgbmFyZ3M9JyonLCBhY3Rpb249J2FwcGVuZCcsIGhlbHA9J1plcm8gb3IgbW9yZSBmaWxlcyB0byBvcGVyYXRlIG9uLicpDQoNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctbCcsICctLWxpc3QnLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdMaXN0IGZpbGVzIGluIGFyY2hpdmUgQVJDSElWRS4nKQ0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy14JywgJy0tZXh0cmFjdCcsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J0V4dHJhY3QgRklMRXMgZnJvbSBBUkNISVZFLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWMnLCAnLS1jcmVhdGUnLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdDcmVhdGl2ZSBBUkNISVZFIGZyb20gRklMRXMuJykNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctZCcsICctLWRlbGV0ZScsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J0RlbGV0ZSBGSUxFcyBmcm9tIEFSQ0hJVkUuJykNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctYScsICctLWFwcGVuZCcsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J0FwcGVuZCBGSUxFcyB0byBBUkNISVZFLicpDQoNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctMicsICctLXR3bycsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J1VzZSB0aGUgUlBBdjIgZm9ybWF0IGZvciBjcmVhdGluZy9hcHBlbmRpbmcgdG8gYXJjaGl2ZXMuJykNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctMycsICctLXRocmVlJywgYWN0aW9uPSdzdG9yZV90cnVlJywgaGVscD0nVXNlIHRoZSBSUEF2MyBmb3JtYXQgZm9yIGNyZWF0aW5nL2FwcGVuZGluZyB0byBhcmNoaXZlcyAoZGVmYXVsdCkuJykNCg0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1rJywgJy0ta2V5JywgbWV0YXZhcj0nS0VZJywgaGVscD0nVGhlIG9iZnVzY2F0aW9uIGtleSB1c2VkIGZvciBjcmVhdGluZyBSUEF2MyBhcmNoaXZlcywgaW4gaGV4YWRlY2ltYWwgKGRlZmF1bHQ6IDB4REVBREJFRUYpLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLXAnLCAnLS1wYWRkaW5nJywgbWV0YXZhcj0nQ09VTlQnLCBoZWxwPSdUaGUgbWF4aW11bSBudW1iZXIgb2YgYnl0ZXMgb2YgcGFkZGluZyB0byBhZGQgYmV0d2VlbiBmaWxlcyAoZGVmYXVsdDogMCkuJykNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctbycsICctLW91dGZpbGUnLCBoZWxwPSdBbiBhbHRlcm5hdGl2ZSBvdXRwdXQgYXJjaGl2ZSBmaWxlIHdoZW4gYXBwZW5kaW5nIHRvIG9yIGRlbGV0aW5nIGZyb20gYXJjaGl2ZXMsIG9yIG91dHB1dCBkaXJlY3Rvcnkgd2hlbiBleHRyYWN0aW5nLicpDQoNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctaCcsICctLWhlbHAnLCBhY3Rpb249J2hlbHAnLCBoZWxwPSdQcmludCB0aGlzIGhlbHAgYW5kIGV4aXQuJykNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctdicsICctLXZlcmJvc2UnLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdCZSBhIGJpdCBtb3JlIHZlcmJvc2Ugd2hpbGUgcGVyZm9ybWluZyBvcGVyYXRpb25zLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLVYnLCAnLS12ZXJzaW9uJywgYWN0aW9uPSd2ZXJzaW9uJywgdmVyc2lvbj0ncnBhdG9vbCB2MC44JywgaGVscD0nU2hvdyB2ZXJzaW9uIGluZm9ybWF0aW9uLicpDQogICAgYXJndW1lbnRzID0gcGFyc2VyLnBhcnNlX2FyZ3MoKQ0KDQogICAgIyBEZXRlcm1pbmUgUlBBIHZlcnNpb24uDQogICAgaWYgYXJndW1lbnRzLnR3bzoNCiAgICAgICAgdmVyc2lvbiA9IDINCiAgICBlbHNlOg0KICAgICAgICB2ZXJzaW9uID0gMw0KDQogICAgIyBEZXRlcm1pbmUgUlBBdjMga2V5Lg0KICAgIGlmICdrZXknIGluIGFyZ3VtZW50cyBhbmQgYXJndW1lbnRzLmtleSBpcyBub3QgTm9uZToNCiAgICAgICAga2V5ID0gaW50KGFyZ3VtZW50cy5rZXksIDE2KQ0KICAgIGVsc2U6DQogICAgICAgIGtleSA9IDB4REVBREJFRUYNCg0KICAgICMgRGV0ZXJtaW5lIHBhZGRpbmcgYnl0ZXMuDQogICAgaWYgJ3BhZGRpbmcnIGluIGFyZ3VtZW50cyBhbmQgYXJndW1lbnRzLnBhZGRpbmcgaXMgbm90IE5vbmU6DQogICAgICAgIHBhZGRpbmcgPSBpbnQoYXJndW1lbnRzLnBhZGRpbmcpDQogICAgZWxzZToNCiAgICAgICAgcGFkZGluZyA9IDANCg0KICAgICMgRGV0ZXJtaW5lIG91dHB1dCBmaWxlL2RpcmVjdG9yeSBhbmQgaW5wdXQgYXJjaGl2ZQ0KICAgIGlmIGFyZ3VtZW50cy5jcmVhdGU6DQogICAgICAgIGFyY2hpdmUgPSBOb25lDQogICAgICAgIG91dHB1dCA9IF91bmljb2RlKGFyZ3VtZW50cy5hcmNoaXZlKQ0KICAgIGVsc2U6DQogICAgICAgIGFyY2hpdmUgPSBfdW5pY29kZShhcmd1bWVudHMuYXJjaGl2ZSkNCiAgICAgICAgaWYgJ291dGZpbGUnIGluIGFyZ3VtZW50cyBhbmQgYXJndW1lbnRzLm91dGZpbGUgaXMgbm90IE5vbmU6DQogICAgICAgICAgICBvdXRwdXQgPSBfdW5pY29kZShhcmd1bWVudHMub3V0ZmlsZSkNCiAgICAgICAgZWxzZToNCiAgICAgICAgICAgICMgRGVmYXVsdCBvdXRwdXQgZGlyZWN0b3J5IGZvciBleHRyYWN0aW9uIGlzIHRoZSBjdXJyZW50IGRpcmVjdG9yeS4NCiAgICAgICAgICAgIGlmIGFyZ3VtZW50cy5leHRyYWN0Og0KICAgICAgICAgICAgICAgIG91dHB1dCA9ICcuJw0KICAgICAgICAgICAgZWxzZToNCiAgICAgICAgICAgICAgICBvdXRwdXQgPSBfdW5pY29kZShhcmd1bWVudHMuYXJjaGl2ZSkNCg0KICAgICM"
-        <nul set /p="gTm9ybWFsaXplIGZpbGVzLg0KICAgIGlmIGxlbihhcmd1bWVudHMuZmlsZXMpID4gMCBhbmQgaXNpbnN0YW5jZShhcmd1bWVudHMuZmlsZXNbMF0sIGxpc3QpOg0KICAgICAgICBhcmd1bWVudHMuZmlsZXMgPSBhcmd1bWVudHMuZmlsZXNbMF0NCg0KICAgIHRyeToNCiAgICAgICAgYXJjaGl2ZSA9IFJlblB5QXJjaGl2ZShhcmNoaXZlLCBwYWRsZW5ndGg9cGFkZGluZywga2V5PWtleSwgdmVyc2lvbj12ZXJzaW9uLCB2ZXJib3NlPWFyZ3VtZW50cy52ZXJib3NlKQ0KICAgIGV4Y2VwdCBJT0Vycm9yIGFzIGU6DQogICAgICAgIHByaW50KCdDb3VsZCBub3Qgb3BlbiBhcmNoaXZlIGZpbGUgezB9IGZvciByZWFkaW5nOiB7MX0nLmZvcm1hdChhcmNoaXZlLCBlKSwgZmlsZT1zeXMuc3RkZXJyKQ0KICAgICAgICBzeXMuZXhpdCgxKQ0KDQogICAgaWYgYXJndW1lbnRzLmNyZWF0ZSBvciBhcmd1bWVudHMuYXBwZW5kOg0KICAgICAgICAjIFdlIG5lZWQgdGhpcyBzZXBlcmF0ZSBmdW5jdGlvbiB0byByZWN1cnNpdmVseSBwcm9jZXNzIGRpcmVjdG9yaWVzLg0KICAgICAgICBkZWYgYWRkX2ZpbGUoZmlsZW5hbWUpOg0KICAgICAgICAgICAgIyBJZiB0aGUgYXJjaGl2ZSBwYXRoIGRpZmZlcnMgZnJvbSB0aGUgYWN0dWFsIGZpbGUgcGF0aCwgYXMgZ2l2ZW4gaW4gdGhlIGFyZ3VtZW50LA0KICAgICAgICAgICAgIyBleHRyYWN0IHRoZSBhcmNoaXZlIHBhdGggYW5kIGFjdHVhbCBmaWxlIHBhdGguDQogICAgICAgICAgICBpZiBmaWxlbmFtZS5maW5kKCc9JykgIT0gLTE6DQogICAgICAgICAgICAgICAgKG91dGZpbGUsIGZpbGVuYW1lKSA9IGZpbGVuYW1lLnNwbGl0KCc9JywgMikNCiAgICAgICAgICAgIGVsc2U6DQogICAgICAgICAgICAgICAgb3V0ZmlsZSA9IGZpbGVuYW1lDQoNCiAgICAgICAgICAgIGlmIG9zLnBhdGguaXNkaXIoZmlsZW5hbWUpOg0KICAgICAgICAgICAgICAgIGZvciBmaWxlIGluIG9zLmxpc3RkaXIoZmlsZW5hbWUpOg0KICAgICAgICAgICAgICAgICAgICAjIFdlIG5lZWQgdG8gZG8gdGhpcyBpbiBvcmRlciB0byBtYWludGFpbiBhIHBvc3NpYmxlIEFSQ0hJVkU9UkVBTCBtYXBwaW5nIGJldHdlZW4gZGlyZWN0b3JpZXMuDQogICAgICAgICAgICAgICAgICAgIGFkZF9maWxlKG91dGZpbGUgKyBvcy5zZXAgKyBmaWxlICsgJz0nICsgZmlsZW5hbWUgKyBvcy5zZXAgKyBmaWxlKQ0KICAgICAgICAgICAgZWxzZToNCiAgICAgICAgICAgICAgICB0cnk6DQogICAgICAgICAgICAgICAgICAgIHdpdGggb3BlbihmaWxlbmFtZSwgJ3JiJykgYXMgZmlsZToNCiAgICAgICAgICAgICAgICAgICAgICAgIGFyY2hpdmUuYWRkKG91dGZpbGUsIGZpbGUucmVhZCgpKQ0KICAgICAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToNCiAgICAgICAgICAgICAgICAgICAgcHJpbnQoJ0NvdWxkIG5vdCBhZGQgZmlsZSB7MH0gdG8gYXJjaGl2ZTogezF9Jy5mb3JtYXQoZmlsZW5hbWUsIGUpLCBmaWxlPXN5cy5zdGRlcnIpDQoNCiAgICAgICAgIyBJdGVyYXRlIG92ZXIgdGhlIGdpdmVuIGZpbGVzIHRvIGFkZCB0byBhcmNoaXZlLg0KICAgICAgICBmb3IgZmlsZW5hbWUgaW4gYXJndW1lbnRzLmZpbGVzOg0KICAgICAgICAgICAgYWRkX2ZpbGUoX3VuaWNvZGUoZmlsZW5hbWUpKQ0KDQogICAgICAgICMgU2V0IHZlcnNpb24gZm9yIHNhdmluZywgYW5kIHNhdmUuDQogICAgICAgIGFyY2hpdmUudmVyc2lvbiA9IHZlcnNpb24NCiAgICAgICAgdHJ5Og0KICAgICAgICAgICAgYXJjaGl2ZS5zYXZlKG91dHB1dCkNCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOg0KICAgICAgICAgICAgcHJpbnQoJ0NvdWxkIG5vdCBzYXZlIGFyY2hpdmUgZmlsZTogezB9Jy5mb3JtYXQoZSksIGZpbGU9c3lzLnN0ZGVycikNCiAgICBlbGlmIGFyZ3VtZW50cy5kZWxldGU6DQogICAgICAgICMgSXRlcmF0ZSBvdmVyIHRoZSBnaXZlbiBmaWxlcyB0byBkZWxldGUgZnJvbSB0aGUgYXJjaGl2ZS4NCiAgICAgICAgZm9yIGZpbGVuYW1lIGluIGFyZ3VtZW50cy5maWxlczoNCiAgICAgICAgICAgIHRyeToNCiAgICAgICAgICAgICAgICBhcmNoaXZlLnJlbW92ZShmaWxlbmFtZSkNCiAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToNCiAgICAgICAgICAgICAgICBwcmludCgnQ291bGQgbm90IGRlbGV0ZSBmaWxlIHswfSBmcm9tIGFyY2hpdmU6IHsxfScuZm9ybWF0KGZpbGVuYW1lLCBlKSwgZmlsZT1zeXMuc3RkZXJyKQ0KDQogICAgICAgICMgU2V0IHZlcnNpb24gZm9yIHNhdmluZywgYW5kIHNhdmUuDQogICAgICAgIGFyY2hpdmUudmVyc2lvbiA9IHZlcnNpb24NCiAgICAgICAgdHJ5Og0KICAgICAgICAgICAgYXJjaGl2ZS5zYXZlKG91dHB1dCkNCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOg0KICAgICAgICAgICAgcHJpbnQoJ0NvdWxkIG5vdCBzYXZlIGFyY2hpdmUgZmlsZTogezB9Jy5mb3JtYXQoZSksIGZpbGU9c3lzLnN0ZGVycikNCiAgICBlbGlmIGFyZ3VtZW50cy5leHRyYWN0Og0KICAgICAgICAjIEVpdGhlciBleHRyYWN0IHRoZSBnaXZlbiBmaWxlcywgb3IgYWxsIGZpbGVzIGlmIG5vIGZpbGVzIGFyZSBnaXZlbi4NCiAgICAgICAgaWYgbGVuKGFyZ3VtZW50cy5maWxlcykgPiAwOg0KICAgICAgICAgICAgZmlsZXMgPSBhcmd1bWVudHMuZmlsZXMNCiAgICAgICAgZWxzZToNCiAgICAgICAgICAgIGZpbGVzID0gYXJjaGl2ZS5saXN0KCkNCg0KICAgICAgICAjIENyZWF0ZSBvdXRwdXQgZGlyZWN0b3J5IGlmIG5vdCBwcmVzZW50Lg0KICAgICAgICBpZiBub3Qgb3MucGF0aC5leGlzdHMob3V0cHV0KToNCiAgICAgICAgICAgIG9zLm1ha2VkaXJzKG91dHB1dCkNCg0KICAgICAgICAjIEl0ZXJhdGUgb3ZlciBmaWxlcyB0byBleHRyYWN0Lg0KICAgICAgICBmb3IgZmlsZW5hbWUgaW4gZmlsZXM6DQogICAgICAgICAgICBpZiBmaWxlbmFtZS5maW5kKCc9JykgIT0gLTE6DQogICAgICAgICAgICAgICAgKG91dGZpbGUsIGZpbGVuYW1lKSA9IGZpbGVuYW1lLnNwbGl0KCc9JywgMikNCiAgICAgICAgICAgIGVsc2U6DQogICAgICAgICAgICAgICAgb3V0ZmlsZSA9IGZpbGVuYW1lDQoNCiAgICAgICAgICAgIHRyeToNCiAgICAgICAgICAgICAgICBjb250ZW50cyA9IGFyY2hpdmUucmVhZChmaWxlbmFtZSkNCg0KICAgICAgICAgICAgICAgICMgQ3JlYXRlIG91dHB1dCBkaXJlY3RvcnkgZm9yIGZpbGUgaWYgbm90IHByZXNlbnQuDQogICAgICAgICAgICAgICAgaWYgbm90IG9zLnBhdGguZXhpc3RzKG9zLnBhdGguZGlybmFtZShvcy5wYXRoLmpvaW4ob3V0cHV0LCBvdXRmaWxlKSkpOg0KICAgICAgICAgICAgICAgICAgICBvcy5tYWtlZGlycyhvcy5wYXRoLmRpcm5hbWUob3MucGF0aC5qb2luKG91dHB1dCwgb3V0ZmlsZSkpKQ0KDQogICAgICAgICAgICAgICAgd2l0aCBvcGVuKG9zLnBhdGguam9pbihvdXRwdXQsIG91dGZpbGUpLCAnd2InKSBhcyBmaWxlOg0KICAgICAgICAgICAgICAgICAgICBmaWxlLndyaXRlKGNvbnRlbnRzKQ0KICAgICAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOg0KICAgICAgICAgICAgICAgIHByaW50KCdDb3VsZCBub3QgZXh0cmFjdCBmaWxlIHswfSBmcm9tIGFyY2hpdmU6IHsxfScuZm9ybWF0KGZpbGVuYW1lLCBlKSwgZmlsZT1zeXMuc3RkZXJyKQ0KICAgIGVsaWYgYXJndW1lbnRzLmxpc3Q6DQogICAgICAgICMgUHJpbnQgdGhlIHNvcnRlZCBmaWxlIGxpc3QuDQogICAgICAgIGxpc3QgPSBhcmNoaXZlLmxpc3QoKQ0KICAgICAgICBsaXN0LnNvcnQoKQ0KICAgICAgICBmb3IgZmlsZSBpbiBsaXN0Og0KICAgICAgICAgICAgcHJpbnQoZmlsZSkNCiAgICBlbHNlOg0KICAgICAgICBwcmludCgnTm8gb3BlcmF0aW9uIGdpdmVuIDooJykNCiAgICAgICAgcHJpbnQoJ1VzZSB7MH0gLS1oZWxwIGZvciB1c2FnZSBkZXRhaWxzLicuZm9ybWF0KHN5cy5hcmd2WzBdKSkNCg0K"
-    )
-
-    >"%altrpatool%.b64" (
-        <nul set /p="IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMw0KDQojIE1hZGUgYnkgKFNNKSBha2EgSm9lTHVybWVsIEAgZjk1em9uZS50bw0KIyBUaGlzIHNjcmlwdCBpcyBsaWNlbnNlZCB1bmRlciBHTlUgR1BMIHYzIOKAlCBzZWUgTElDRU5TRSBmb3IgZGV0YWlscw0KDQpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IHByaW50X2Z1bmN0aW9uDQppbXBvcnQgc3lzDQppbXBvcnQgb3MNCmZyb20gcGF0aGxpYiBpbXBvcnQgUGF0aA0KaW1wb3J0IGFyZ3BhcnNlDQppbXBvcnQgaGFzaGxpYg0KaW1wb3J0IHBpY2tsZQ0KaW1wb3J0IHpsaWINCg0Kc3lzLnBhdGguYXBwZW5kKCcuLicpDQp0cnk6DQogICAgaW1wb3J0IG1haW4gICMgbm9xYTogRjQwMQ0KZXhjZXB0Og0KICAgIHBhc3MNCg0KaW1wb3J0IHJlbnB5Lm9iamVjdCAgIyBub3FhOiBGNDAxDQppbXBvcnQgcmVucHkuY29uZmlnDQppbXBvcnQgcmVucHkubG9hZGVyDQp0cnk6DQogICAgaW1wb3J0IHJlbnB5LnV0aWwgICMgbm9xYTogRjQwMQ0KZXhjZXB0Og0KICAgIHBhc3MNCg0KY2xhc3MgSkFTQXJjaGl2ZUhhbmRsZXJMb2NhbDoNCiAgICAiIiINCiAgICBTdGFuZGFsb25lIEpBUyBIYW5kbGVyICh3aXRob3V0IFJlbidQeSkNCiAgICAiIiINCg0KICAgIGRlZiBfX2luaXRfXyhzZWxmLCBmaWxlX3BhdGgpOg0KICAgICAgICBzZWxmLmZpbGUgPSBmaWxlX3BhdGgNCiAgICAgICAgc2VsZi5pbmRleCA9IHt9DQogICAgICAgIHNlbGYuX2xvYWRfaW5kZXgoKQ0KDQogICAgZGVmIF9kZWNvZGVfaGVhZGVyKHNlbGYsIGhlYWRlcik6DQogICAgICAgICMgVGhlIGRldiBhbHdheXMgcmV0dXJucyB0aGlzIHN0cmluZywgc28gd2UgY2FuIHVzZSBpdCB0byBmaW5kIHRoZSBvZmZzZXRzIGFuZCBrZXkNCiAgICAgICAgcmV0dXJuICJkYW5zdG9uY3VsbGFiYWxheWV0dGUiDQoNCiAgICBkZWYgX2xvYWRfaW5kZXgoc2VsZik6DQogICAgICAgIHdpdGggb3BlbihzZWxmLmZpbGUsICJyYiIpIGFzIGY6DQogICAgICAgICAgICBoZWFkZXIgPSBmLnJlYWQoNDApDQoNCiAgICAgICAgICAgICMgMSkgZGVjb2RlKCkg4oaSIHJldHVybnMgYSBmaXhlZCBzdHJpbmcNCiAgICAgICAgICAgIGRlY29kZWQgPSBzZWxmLl9kZWNvZGVfaGVhZGVyKGhlYWRlcikNCg0KICAgICAgICAgICAgIyAyKSBNRDUNCiAgICAgICAgICAgIG1kNWhleCA9IGhhc2hsaWIubWQ1KGRlY29kZWQuZW5jb2RlKCkpLmhleGRpZ2VzdCgpDQogICAgICAgICAgICB4NTAgPSBpbnQobWQ1aGV4WzBdLCAxNikgJSA4DQogICAgICAgICAgICB4NEIgPSBpbnQobWQ1aGV4WzFdLCAxNikgJSA0DQoNCiAgICAgICAgICAgICMgMykgZXh0cmFjdGlvbiBvZiBoZXggZmllbGRzDQogICAgICAgICAgICB4MjIgPSBoZWFkZXJbOCt4NTAgOiAyNCt4NTBdLmRlY29kZSgpLnJlcGxhY2UoIlgiLCAiMCIpDQogICAgICAgICAgICB4MjMgPSBoZWFkZXJbMjUreDRCIDogMzMreDRCXS5kZWNvZGUoKS5yZXBsYWNlKCJYIiwgIjAiKQ0KDQogICAgICAgICAgICB4NEYgPSBpbnQoeDIyLCAxNikgICMgb2Zmc2V0IGluZGV4DQogICAgICAgICAgICB4NkIgPSBpbnQoeDIzLCAxNikgICMgWE9SIGtleQ0KDQogICAgICAgICAgICAjIDQpIHJlYWRpbmcgdGhlIGluZGV4DQogICAgICAgICAgICBmLnNlZWsoeDRGKQ0KICAgICAgICAgICAgcmF3ID0gZi5yZWFkKCkNCiAgICAgICAgICAgIHRyeToNCiAgICAgICAgICAgICAgICBpbmRleCA9IHBpY2tsZS5sb2Fkcyh6bGliLmRlY29tcHJlc3MocmF3KSkNCiAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb246DQogICAgICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCJJbXBvc3NpYmxlIGRlIGTDqWNvbXByZXNzZXIgbOKAmWluZGV4IEpBUyIpDQoNCiAgICAgICAgICAgICMgNSkgZGVjb2RpbmcgdGhlIG9mZnNldHMNCiAgICAgICAgICAgIGZpeGVkID0ge30NCiAgICAgICAgICAgIGZvciBuYW1lLCBlbnRyaWVzIGluIGluZGV4Lml0ZW1zKCk6DQogICAgICAgICAgICAgICAgbmV3X2VudHJpZXMgPSBbXQ0KICAgICAgICAgICAgICAgIGZvciBlIGluIGVudHJpZXM6DQogICAgICAgICAgICAgICAgICAgIGlmIGxlbihlKSA9PSAyOg0KICAgICAgICAgICAgICAgICAgICAgICAgb2ZmLCBzaXplID0gZQ0KICAgICAgICAgICAgICAgICAgICAgICAgbmV3X2VudHJpZXMuYXBwZW5kKChvZmYgXiB4NkIsIHNpemUgXiB4NkIpKQ0KICAgICAgICAgICAgICAgICAgICBlbHNlOg0KICAgICAgICAgICAgICAgICAgICAgICAgb2ZmLCBzaXplLCBleHRyYSA9IGUNCiAgICAgICAgICAgICAgICAgICAgICAgIG5ld19lbnRyaWVzLmFwcGVuZCgob2ZmIF4geDZCLCBzaXplIF4geDZCLCBleHRyYSkpDQogICAgICAgICAgICAgICAgZml4ZWRbbmFtZV0gPSBuZXdfZW50cmllcw0KDQogICAgICAgICAgICBzZWxmLmluZGV4ID0gZml4ZWQNCg0KICAgIGRlZiBsaXN0KHNlbGYpOg0KICAgICAgICByZXR1cm4gbGlzdChzZWxmLmluZGV4LmtleXMoKSkNCg0KICAgIGRlZiByZWFkKHNlbGYsIGZpbGVuYW1lKToNCiAgICAgICAgZW50cmllcyA9IHNlbGYuaW5kZXguZ2V0KGZpbGVuYW1lKQ0KICAgICAgICBpZiBub3QgZW50cmllczoNCiAgICAgICAgICAgIHJldHVybiBOb25lDQoNCiAgICAgICAgb2ZmLCBzaXplID0gZW50cmllc1swXVs6Ml0NCiAgICAgICAgd2l0aCBvcGVuKHNlbGYuZmlsZSwgInJiIikgYXMgZjoNCiAgICAgICAgICAgIGYuc2VlayhvZmYpDQogICAgICAgICAgICByZXR1cm4gZi5yZWFkKHNpemUpDQoNCg0KY2xhc3MgUmVuUHlBcmNoaXZlOg0KICAgIGRlZiBfX2luaXRfXyhzZWxmLCBmaWxlX3BhdGgsIGluZGV4PTApOg0KICAgICAgICBzZWxmLmZpbGUgPSBzdHIoZmlsZV9wYXRoKQ0KICAgICAgICBzZWxmLmluZGV4ZXMgPSB7fQ0KICAgICAgICBzZWxmLmxvYWQoc2VsZi5maWxlLCBpbmRleCkNCg0KICAgIGRlZiBjb252ZXJ0X2ZpbGVuYW1lKHNlbGYsIGZpbGVuYW1lKToNCiAgICAgICAgZHJpdmUsIGZpbGVuYW1lID0gb3MucGF0aC5zcGxpdGRyaXZlKA0KICAgICAgICAgICAgb3MucGF0aC5ub3JtcGF0aChmaWxlbmFtZSkucmVwbGFjZShvcy5zZXAsICcvJykNCiAgICAgICAgKQ0KICAgICAgICByZXR1cm4gZmlsZW5hbWUNCg0KICAgIGRlZiBsaXN0KHNlbGYpOg0KICAgICAgICByZXR1cm4gbGlzdChzZWxmLmluZGV4ZXMpDQoNCiAgICBkZWYgcmVhZChzZWxmLCBmaWxlbmFtZSk6DQogICAgICAgIGZpbGVuYW1lID0gc2VsZi5jb252ZXJ0X2ZpbGVuYW1lKGZpbGVuYW1lKQ0KICAgICAgICBpZHggPSBzZWxmLmluZGV4ZXMuZ2V0KGZpbGVuYW1lKQ0KICAgICAgICBpZiBmaWxlbmFtZSAhPSAnLicgYW5kIGlzaW5zdGFuY2UoaWR4LCBsaXN0KToNCiAgICAgICAgICAgIGlmIGhhc2F0dHIocmVucHkubG9hZGVyLCAibG9hZF9mcm9tX2FyY2hpdmUiKToNCiAgICAgICAgICAgICAgICBzdWJmaWxlID0gcmVucHkubG9hZGVyLmxvYWRfZnJvbV9hcmNoaXZlKGZpbGVuYW1lKQ0KICAgICAgICAgICAgZWxzZToNCiAgICAgICAgICAgICAgICBzdWJmaWxlID0gcmVucHkubG9hZGVyLmxvYWRfY29yZShmaWxlbmFtZSkNCiAgICAgICAgICAgIHJldHVybiBzdWJmaWxlLnJlYWQoKQ0KICAgICAgICByZXR1cm4gTm9uZQ0KDQogICAgZGVmIGxvYWQoc2VsZiwgZmlsZW5hbWUsIGluZGV4KToNCiAgICAgICAgYmFzZSA9IG9zLnBhdGguc3BsaXRleHQob3MucGF0aC5iYXNlbmFtZShmaWxlbmFtZSkpWzBdDQoNCiAgICAgICAgaWYgYmFzZSBub3QgaW4gcmVucHkuY29uZmlnLmFyY2hpdmVzOg0KICAgICAgICAgICAgcmVucHkuY29uZmlnLmFyY2hpdmVzLmFwcGVuZChiYXNlKQ0KDQogICAgICAgIGFyY2hpdmVfZGlyID0gb3MucGF0aC5kaXJuYW1lKG9zLnBhdGgucmVhbHBhdGgoZmlsZW5hbWUpKQ0KICAgICAgICByZW5weS5jb25maWcuc2VhcmNocGF0aCA9IFthcmNoaXZlX2Rpcl0NCiAgICAgICAgcmVucHkuY29uZmlnLmJhc2VkaXIgPSBvcy5wYXRoLmRpcm5hbWUocmVucHkuY29uZmlnLnNlYXJjaHBhdGhbMF0pDQogICAgICAgIHJlbnB5LmxvYWRlci5pbmRleF9hcmNoaXZlcygpDQoNCiAgICAgICAgYXJjaGl2ZXNfb2JqID0gcmVucHkubG9hZGVyLmFyY2hpdmVzDQoNCiAgICAgICAgaWYgaXNpbnN0YW5jZShhcmNoaXZlc19vYmosIGRpY3QpOg0KICAgICAgICAgICAgaXRlbXMgPSBhcmNoaXZlc19vYmpbYmFzZV1bMV0uaXRlbXMoKQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgaXRlbXMgPSBhcmNoaXZlc19vYmpbaW5kZXhdWzFdLml0ZW1zKCkNCg0KICAgICAgICBmb3IgZiwgaWR4IGluIGl0ZW1zOg0KICAgICAgICAgICAgc2VsZi5pbmRleGVzW2ZdID0gaWR4DQoNCg0KZGVmIGxpc3RfYXJjaGl2ZShhcmNoX3BhdGgsIGFyY2hpdmVfY2xhc3MpOg0KICAgIHByaW50KGYnQ29udGVudSBkZSAie2FyY2hfcGF0aH0iOicpDQogICAgYXJjaGl2ZSA9IGFyY2hpdmVfY2xhc3MoYXJjaF9wYXRoKQ0KICAgIGZvciBmaWxlbmFtZSBpbiBhcmNoaXZlLmxpc3QoKToNCiAgICAgICAgcHJpbnQoIiAgIiwgZmlsZW5hbWUpDQoNCg0KZGVmIGRpc2NvdmVyX2V4dGVuc2lvbnMoKToNCiAgICBleHRzID0gW10NCiAgICBpZiBoYXNhdHRyKHJlbnB5LmxvYWRlciwgImFyY2hpdmVfaGFuZGxlcnMiKToNCiAgICAgICAgZm9yIGhhbmRsZXIgaW4gcmVucHkubG9hZGVyLmFyY2hpdmVfaGFuZGxlcnM6DQogICAgICAgICAgICBpZiBoYXNhdHRyKGhhbmRsZXIsICJnZXRfc3VwcG9ydGVkX2V4dGVuc2lvbnMiKToNCiAgICAgICAgICAgICAgICBleHRzLmV4dGVuZChoYW5kbGVyLmdldF9zdXBwb3J0ZWRfZXh0ZW5zaW9ucygpKQ0KICAgICAgICAgICAgaWYgaGFzYXR0cihoYW5kbGVyLCAiZ2V0X3N1cHBvcnRlZF9leHQiKToNCiAgICAgICAgICAgICAgICBleHRzLmV4dGVuZChoYW5kbGVyLmdldF9zdXBwb3J0ZWRfZXh0KCkpDQogICAgZWxzZToNCiAgICAgICAgZXh0cy5hcHBlbmQoJy5ycGEnKQ0KDQogICAgIyBBam91dCBtYW51ZWwgc2kgbGUgaGFuZGxlciBuJ2VzdCBwYXMgZMOpdGVjdMOpDQogICAgaWYgJy5qYXMnIG5vdCBpbiBleHRzOg0KICAgICAgICBleHRzLmFwcGVuZCgnLmphcycpDQoNCiAgICBpZiAnLnJwYycgbm90IGluIGV4dHM6DQogICAgICAgIGV4dHMuYXBwZW5kKCcucnBjJykNCg0KICAgIHJldHVybiBzb3J0ZWQoc2V0KGUubG93ZXIoKSBmb3IgZSBpbiBleHRzKSkNCg0KDQpkZWYgZGlzY292ZXJfYXJjaGl2ZXMoc2VhcmNoX2RpciwgZXh0ZW5zaW9ucyk6DQogICAgYXJjaGl2ZXMgPSBbXQ0KICAgIGZvciByb290LCBkaXJzLCBmaWxlcyBpbiBvcy53YWxrKHN0cihzZWFyY2hfZGlyKSk6DQogICAgICAgIGZvciBmaWxlIGluIGZpbGVzOg0KICAgICAgICAgICAgdHJ5Og0KICAgICAgICAgICAgICAgIGJhc2UsIGV4dCA9IGZpbGUucnNwbGl0KCcuJywgMSkNCiAgICAgICAgICAgICAgICBleHQgPSAnLicgKyBleHQubG93ZXIoKQ0KICAgICAgICAgICAgICAgIGlmIGV4dCBpbiBleHRlbnNpb25zIGFuZCAnJScgbm90IGluIGZpbGU6DQogICAgICAgICAgICAgICAgICAgIGFyY2hpdmVzLmFwcGVuZChQYXRoKHJvb3QpIC8gZmlsZSkNCiAgICAgICAgICAgIGV4Y2VwdCBWYWx1ZUVycm9yOg0KICAgICAgICAgICAgICAgIGNvbnRpbnVlDQogICAgcmV0dXJuIGFyY2hpdmVzDQoNCg0KZGVmIGV4dHJhY3RfYXJjaGl2ZShhcmNoX3BhdGgsIG91dHB1dCwgYXJjaGl2ZV9jbGFzcyk6DQogICAgcHJpbnQoZicgIFVucGFja2luZyAie2FyY2hfcGF0aH0iJykNCiAgICBhcmNoaXZlID0gYXJjaGl2ZV9jbGFzcyhhcmNoX3BhdGgpDQogICAgZmlsZXMgPSBhcmNoaXZlLmxpc3QoKQ0KDQogICAgb3V0cHV0Lm1rZGlyKHBhcmVudHM9VHJ1ZSwgZXhpc3Rfb2s9VHJ1ZSkNCg0KICAgIGZvciBmaWxlbmFtZSBpbiBmaWxlczoNCiAgICAgICAgY29udGVudHMgPSBhcmNoaXZlLnJlYWQoZmlsZW5hbWUpDQogICAgICAgIGlmIGNvbnRlbnRzIGlzIG5vdCBOb25lOg0KICAgICAgICAgICAgb3V0ZmlsZSA9IG91dHB1dCAvIGZpbGVuYW1lDQogICAgICAgICAgICBvdXRmaWxlLnBhcmVudC5ta2RpcihwYXJlbnRzPVRydWUsIGV4aXN0X29rPVRydWUpDQogICAgICAgICAgICB3aXRoIG9wZW4ob3V0ZmlsZSwgJ3diJykgYXMgZjoNCiAgICAgICAgICAgICAgICBmLndyaXRlKGNvbnRlbnRzKQ0KDQoNCmRlZiBtYWluKCk6DQogICA"
-        <nul set /p="gcGFyc2VyID0gYXJncGFyc2UuQXJndW1lbnRQYXJzZXIoKQ0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1sJywgJy0tbGlzdCcsIGFjdGlvbj0ic3RvcmVfdHJ1ZSIsIGRlc3Q9J2xpc3Rfb25seScsDQogICAgICAgICAgICAgICAgICAgICAgICBoZWxwPSJMaXN0IHRoZSBjb250ZW50cyBvZiB0aGUgYXJjaGl2ZSB3aXRob3V0IGV4dHJhY3RpbmcgdGhlbSIpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLXInLCBhY3Rpb249InN0b3JlX3RydWUiLCBkZXN0PSdyZW1vdmUnKQ0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy14JywgZGVzdD0nYXJjaGl2ZScsIHR5cGU9c3RyKQ0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1vJywgZGVzdD0nb3V0cHV0JywgdHlwZT1zdHIsIGRlZmF1bHQ9Jy4nKQ0KICAgIGFyZ3MgPSBwYXJzZXIucGFyc2VfYXJncygpDQoNCiAgICBvdXRwdXQgPSBQYXRoKGFyZ3Mub3V0cHV0KS5yZXNvbHZlKCkNCiAgICBhcmNoaXZlX2ZpbHRlciA9IGFyZ3MuYXJjaGl2ZQ0KICAgIHJlbW92ZSA9IGFyZ3MucmVtb3ZlDQoNCiAgICBleHRlbnNpb25zID0gZGlzY292ZXJfZXh0ZW5zaW9ucygpDQoNCiAgICAjIE1vZGUgLXgNCiAgICBpZiBhcmNoaXZlX2ZpbHRlcjoNCiAgICAgICAgdGFyZ2V0ID0gUGF0aChhcmNoaXZlX2ZpbHRlcikucmVzb2x2ZSgpDQogICAgICAgIGlmIG5vdCB0YXJnZXQuZXhpc3RzKCk6DQogICAgICAgICAgICBiYXNlbmFtZSA9IG9zLnBhdGguYmFzZW5hbWUoYXJjaGl2ZV9maWx0ZXIpDQogICAgICAgICAgICBmb3VuZCA9IE5vbmUNCiAgICAgICAgICAgIGZvciByb290LCBkaXJzLCBmaWxlcyBpbiBvcy53YWxrKCcuJyk6DQogICAgICAgICAgICAgICAgaWYgYmFzZW5hbWUgaW4gZmlsZXM6DQogICAgICAgICAgICAgICAgICAgIGZvdW5kID0gUGF0aChyb290KSAvIGJhc2VuYW1lDQogICAgICAgICAgICAgICAgICAgIGJyZWFrDQogICAgICAgICAgICBpZiBmb3VuZCBpcyBOb25lOg0KICAgICAgICAgICAgICAgIHByaW50KGYnQXJjaGl2ZSAie2FyY2hpdmVfZmlsdGVyfSIgbm90IGZvdW5kLicpDQogICAgICAgICAgICAgICAgc3lzLmV4aXQoMSkNCiAgICAgICAgICAgIHRhcmdldCA9IGZvdW5kLnJlc29sdmUoKQ0KDQogICAgICAgICMgQ2hvaXggZHUgaGFuZGxlcg0KICAgICAgICBpZiB0YXJnZXQuc3VmZml4Lmxvd2VyKCkgPT0gIi5qYXMiOg0KICAgICAgICAgICAgaGFuZGxlciA9IEpBU0FyY2hpdmVIYW5kbGVyTG9jYWwNCiAgICAgICAgZWxzZToNCiAgICAgICAgICAgIGhhbmRsZXIgPSBSZW5QeUFyY2hpdmUNCg0KICAgICAgICBpZiBhcmdzLmxpc3Rfb25seToNCiAgICAgICAgICAgIGxpc3RfYXJjaGl2ZSh0YXJnZXQsIGhhbmRsZXIpDQogICAgICAgICAgICByZXR1cm4NCg0KICAgICAgICBleHRyYWN0X2FyY2hpdmUodGFyZ2V0LCBvdXRwdXQsIGhhbmRsZXIpDQoNCiAgICAgICAgaWYgcmVtb3ZlOg0KICAgICAgICAgICAgb3MucmVtb3ZlKHN0cih0YXJnZXQpKQ0KICAgICAgICByZXR1cm4NCg0KICAgICMgRMOpZmF1bHQgbW9kZQ0KICAgIGFyY2hpdmVzID0gZGlzY292ZXJfYXJjaGl2ZXMoUGF0aCgnLicpLCBleHRlbnNpb25zKQ0KDQogICAgaWYgbm90IGFyY2hpdmVzOg0KICAgICAgICBwcmludCgiTm8gYXJjaGl2ZXMgZm91bmQuIikNCiAgICAgICAgcmV0dXJuDQoNCiAgICBmb3IgYXJjaCBpbiBhcmNoaXZlczoNCiAgICAgICAgaWYgYXJjaC5zdWZmaXgubG93ZXIoKSA9PSAiLmphcyI6DQogICAgICAgICAgICBoYW5kbGVyID0gSkFTQXJjaGl2ZUhhbmRsZXJMb2NhbA0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgaGFuZGxlciA9IFJlblB5QXJjaGl2ZQ0KDQogICAgICAgIGlmIGFyZ3MubGlzdF9vbmx5Og0KICAgICAgICAgICAgbGlzdF9hcmNoaXZlKGFyY2gsIGhhbmRsZXIpDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICBleHRyYWN0X2FyY2hpdmUoYXJjaCwgb3V0cHV0LCBoYW5kbGVyKQ0KDQogICAgaWYgcmVtb3ZlOg0KICAgICAgICBmb3IgYXJjaCBpbiBhcmNoaXZlczoNCiAgICAgICAgICAgIG9zLnJlbW92ZShzdHIoYXJjaCkpDQoNCg0KaWYgX19uYW1lX18gPT0gIl9fbWFpbl9fIjoNCiAgICBtYWluKCkNCg=="
+    if "%OPTION%" == "1" (
+        >"%rpatool%.b64" (
+            <nul set /p="IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMw0KDQpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IHByaW50X2Z1bmN0aW9uDQoNCmltcG9ydCBzeXMNCmltcG9ydCBvcw0KaW1wb3J0IGNvZGVjcw0KaW1wb3J0IHBpY2tsZQ0KaW1wb3J0IGVycm5vDQppbXBvcnQgcmFuZG9tDQoNCnRyeToNCiAgICBpbXBvcnQgcGlja2xlNSBhcyBwaWNrbGUNCmV4Y2VwdDoNCiAgICBpbXBvcnQgcGlja2xlDQogICAgaWYgc3lzLnZlcnNpb25faW5mbyA8ICgzLCA4KToNCiAgICAgICAgcHJpbnQoJ3dhcm5pbmc6IHBpY2tsZTUgbW9kdWxlIGNvdWxkIG5vdCBiZSBsb2FkZWQgYW5kIFB5dGhvbiB2ZXJzaW9uIGlzIDwgMy44LCcsIGZpbGU9c3lzLnN0ZGVycikNCiAgICAgICAgcHJpbnQoJyAgICAgICAgIG5ld2VyIFJlblwnUHkgZ2FtZXMgbWF5IGZhaWwgdG8gdW5wYWNrIScsIGZpbGU9c3lzLnN0ZGVycikNCiAgICAgICAgaWYgc3lzLnZlcnNpb25faW5mbyA+PSAoMywgNSk6DQogICAgICAgICAgICBwcmludCgnICAgICAgICAgaWYgdGhpcyBvY2N1cnMsIGZpeCBpdCBieSBpbnN0YWxsaW5nIHBpY2tsZTU6JywgZmlsZT1zeXMuc3RkZXJyKQ0KICAgICAgICAgICAgcHJpbnQoJyAgICAgICAgICAgICB7fSAtbSBwaXAgaW5zdGFsbCBwaWNrbGU1Jy5mb3JtYXQoc3lzLmV4ZWN1dGFibGUpLCBmaWxlPXN5cy5zdGRlcnIpDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICBwcmludCgnICAgICAgICAgaWYgdGhpcyBvY2N1cnMsIHBsZWFzZSB1cGdyYWRlIHRvIGEgbmV3ZXIgUHl0aG9uICg+PSAzLjUpLicsIGZpbGU9c3lzLnN0ZGVycikNCiAgICAgICAgcHJpbnQoZmlsZT1zeXMuc3RkZXJyKQ0KDQoNCmlmIHN5cy52ZXJzaW9uX2luZm9bMF0gPj0gMzoNCiAgICBkZWYgX3VuaWNvZGUodGV4dCk6DQogICAgICAgIHJldHVybiB0ZXh0DQoNCiAgICBkZWYgX3ByaW50YWJsZSh0ZXh0KToNCiAgICAgICAgcmV0dXJuIHRleHQNCg0KICAgIGRlZiBfdW5tYW5nbGUoZGF0YSk6DQogICAgICAgIGlmIHR5cGUoZGF0YSkgPT0gYnl0ZXM6DQogICAgICAgICAgICByZXR1cm4gZGF0YQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgcmV0dXJuIGRhdGEuZW5jb2RlKCdsYXRpbjEnKQ0KDQogICAgZGVmIF91bnBpY2tsZShkYXRhKToNCiAgICAgICAgIyBTcGVjaWZ5IGxhdGluMSBlbmNvZGluZyB0byBwcmV2ZW50IHJhdyBieXRlIHZhbHVlcyBmcm9tIGNhdXNpbmcgYW4gQVNDSUkgZGVjb2RlIGVycm9yLg0KICAgICAgICByZXR1cm4gcGlja2xlLmxvYWRzKGRhdGEsIGVuY29kaW5nPSdsYXRpbjEnKQ0KZWxpZiBzeXMudmVyc2lvbl9pbmZvWzBdID09IDI6DQogICAgZGVmIF91bmljb2RlKHRleHQpOg0KICAgICAgICBpZiBpc2luc3RhbmNlKHRleHQsIHVuaWNvZGUpOg0KICAgICAgICAgICAgcmV0dXJuIHRleHQNCiAgICAgICAgcmV0dXJuIHRleHQuZGVjb2RlKCd1dGYtOCcpDQoNCiAgICBkZWYgX3ByaW50YWJsZSh0ZXh0KToNCiAgICAgICAgcmV0dXJuIHRleHQuZW5jb2RlKCd1dGYtOCcpDQoNCiAgICBkZWYgX3VubWFuZ2xlKGRhdGEpOg0KICAgICAgICByZXR1cm4gZGF0YQ0KDQogICAgZGVmIF91bnBpY2tsZShkYXRhKToNCiAgICAgICAgcmV0dXJuIHBpY2tsZS5sb2FkcyhkYXRhKQ0KDQpjbGFzcyBSZW5QeUFyY2hpdmU6DQogICAgZmlsZSA9IE5vbmUNCiAgICBoYW5kbGUgPSBOb25lDQoNCiAgICBmaWxlcyA9IHt9DQogICAgaW5kZXhlcyA9IHt9DQoNCiAgICB2ZXJzaW9uID0gTm9uZQ0KICAgIHBhZGxlbmd0aCA9IDANCiAgICBrZXkgPSBOb25lDQogICAgdmVyYm9zZSA9IEZhbHNlDQoNCiAgICBSUEEyX01BR0lDID0gJ1JQQS0yLjAgJw0KICAgIFJQQTNfTUFHSUMgPSAnUlBBLTMuMCAnDQogICAgUldBM19NQUdJQyA9ICdSV0EtMy4wICcNCiAgICBSUEEzXzJfTUFHSUMgPSAnUlBBLTMuMiAnDQogICAgU1ZBQzFfTUFHSUMgPSAnU1ZBQy0xLjAgJw0KDQogICAgIyBGb3IgYmFja3dhcmQgY29tcGF0aWJpbGl0eSwgb3RoZXJ3aXNlIFB5dGhvbjMtcGFja2VkIGFyY2hpdmVzIHdvbid0IGJlIHJlYWQgYnkgUHl0aG9uMg0KICAgIFBJQ0tMRV9QUk9UT0NPTCA9IDINCg0KICAgIGRlZiBfX2luaXRfXyhzZWxmLCBmaWxlID0gTm9uZSwgdmVyc2lvbiA9IDMsIHBhZGxlbmd0aCA9IDAsIGtleSA9IDB4REVBREJFRUYsIHZlcmJvc2UgPSBGYWxzZSk6DQogICAgICAgIHNlbGYucGFkbGVuZ3RoID0gcGFkbGVuZ3RoDQogICAgICAgIHNlbGYua2V5ID0ga2V5DQogICAgICAgIHNlbGYudmVyYm9zZSA9IHZlcmJvc2UNCg0KICAgICAgICBpZiBmaWxlIGlzIG5vdCBOb25lOg0KICAgICAgICAgICAgc2VsZi5sb2FkKGZpbGUpDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICBzZWxmLnZlcnNpb24gPSB2ZXJzaW9uDQoNCiAgICBkZWYgX19kZWxfXyhzZWxmKToNCiAgICAgICAgaWYgc2VsZi5oYW5kbGUgaXMgbm90IE5vbmU6DQogICAgICAgICAgICBzZWxmLmhhbmRsZS5jbG9zZSgpDQoNCiAgICAjIERldGVybWluZSBhcmNoaXZlIHZlcnNpb24uDQogICAgZGVmIGdldF92ZXJzaW9uKHNlbGYpOg0KICAgICAgICBzZWxmLmhhbmRsZS5zZWVrKDApDQogICAgICAgIG1hZ2ljID0gc2VsZi5oYW5kbGUucmVhZGxpbmUoKS5kZWNvZGUoJ3V0Zi04JykNCg0KICAgICAgICBpZiBtYWdpYy5zdGFydHN3aXRoKHNlbGYuU1ZBQzFfTUFHSUMpOg0KICAgICAgICAgICAgcGFydHMgPSBtYWdpYy5zcGxpdCgpDQogICAgICAgICAgICBpZiBsZW4ocGFydHMpID09IDQ6DQogICAgICAgICAgICAgICAgcmV0dXJuIDQgICAgICAjIHRydWUgU1ZBQy0xLjAgYXJjaGl2ZQ0KICAgICAgICAgICAgZWxzZToNCiAgICAgICAgICAgICAgICByZXR1cm4gMyAgICAjIGZhbHNlIFNWQUMsIGFjdHVhbGx5IFJQQS0zLjAgd2l0aCBhIGN1c3RvbSBoZWFkZXINCiAgICAgICAgZWxpZiBtYWdpYy5zdGFydHN3aXRoKHNlbGYuUlBBM18yX01BR0lDKToNCiAgICAgICAgICAgIHJldHVybiAzLjINCiAgICAgICAgZWxpZiBtYWdpYy5zdGFydHN3aXRoKHNlbGYuUlBBM19NQUdJQyk6DQogICAgICAgICAgICByZXR1cm4gMw0KICAgICAgICBlbGlmIG1hZ2ljLnN0YXJ0c3dpdGgoc2VsZi5SV0EzX01BR0lDKToNCiAgICAgICAgICAgIHJldHVybiAzDQogICAgICAgIGVsaWYgbWFnaWMuc3RhcnRzd2l0aChzZWxmLlJQQTJfTUFHSUMpOg0KICAgICAgICAgICAgcmV0dXJuIDINCiAgICAgICAgZWxpZiBzZWxmLmZpbGUuZW5kc3dpdGgoJy5ycGknKToNCiAgICAgICAgICAgIHJldHVybiAxDQoNCiAgICAgICAgcmFpc2UgVmFsdWVFcnJvcigndGhlIGdpdmVuIGZpbGUgaXMgbm90IGEgdmFsaWQgUmVuXCdQeSBhcmNoaXZlLCBvciBhbiB1bnN1cHBvcnRlZCB2ZXJzaW9uJykNCg0KICAgICMgRXh0cmFjdCBmaWxlIGluZGV4ZXMgZnJvbSBvcGVuZWQgYXJjaGl2ZS4NCiAgICBkZWYgZXh0cmFjdF9pbmRleGVzKHNlbGYpOg0KICAgICAgICBzZWxmLmhhbmRsZS5zZWVrKDApDQogICAgICAgIGluZGV4ZXMgPSBOb25lDQoNCiAgICAgICAgaWYgc2VsZi52ZXJzaW9uIGluIFsyLCAzLCAzLjJdOg0KICAgICAgICAgICAgIyBGZXRjaCBtZXRhZGF0YS4NCiAgICAgICAgICAgIG1ldGFkYXRhID0gc2VsZi5oYW5kbGUucmVhZGxpbmUoKQ0KICAgICAgICAgICAgdmFscyA9IG1ldGFkYXRhLnNwbGl0KCkNCiAgICAgICAgICAgIG9mZnNldCA9IGludCh2YWxzWzFdLCAxNikNCiAgICAgICAgICAgIGlmIHNlbGYudmVyc2lvbiA9PSAzOg0KICAgICAgICAgICAgICAgIHNlbGYua2V5ID0gMA0KICAgICAgICAgICAgICAgIGZvciBzdWJrZXkgaW4gdmFsc1syOl06DQogICAgICAgICAgICAgICAgICAgIHNlbGYua2V5IF49IGludChzdWJrZXksIDE2KQ0KICAgICAgICAgICAgZWxpZiBzZWxmLnZlcnNpb24gPT0gMy4yOg0KICAgICAgICAgICAgICAgIHNlbGYua2V5ID0gMA0KICAgICAgICAgICAgICAgIGZvciBzdWJrZXkgaW4gdmFsc1szOl06DQogICAgICAgICAgICAgICAgICAgIHNlbGYua2V5IF49IGludChzdWJrZXksIDE2KQ0KDQogICAgICAgICAgICAjIExvYWQgaW4gaW5kZXhlcy4NCiAgICAgICAgICAgIHNlbGYuaGFuZGxlLnNlZWsob2Zmc2V0KQ0KICAgICAgICAgICAgY29udGVudHMgPSBjb2RlY3MuZGVjb2RlKHNlbGYuaGFuZGxlLnJlYWQoKSwgJ3psaWInKQ0KICAgICAgICAgICAgaW5kZXhlcyA9IF91bnBpY2tsZShjb250ZW50cykNCg0KICAgICAgICAgICAgIyBEZW9iZnVzY2F0ZSBpbmRleGVzLg0KICAgICAgICAgICAgaWYgc2VsZi52ZXJzaW9uIGluIFszLCAzLjJdOg0KICAgICAgICAgICAgICAgIG9iZnVzY2F0ZWRfaW5kZXhlcyA9IGluZGV4ZXMNCiAgICAgICAgICAgICAgICBpbmRleGVzID0ge30NCiAgICAgICAgICAgICAgICBmb3IgaSBpbiBvYmZ1c2NhdGVkX2luZGV4ZXMua2V5cygpOg0KICAgICAgICAgICAgICAgICAgICBpZiBsZW4ob2JmdXNjYXRlZF9pbmRleGVzW2ldWzBdKSA9PSAyOg0KICAgICAgICAgICAgICAgICAgICAgICAgaW5kZXhlc1tpXSA9IFsgKG9mZnNldCBeIHNlbGYua2V5LCBsZW5ndGggXiBzZWxmLmtleSkgZm9yIG9mZnNldCwgbGVuZ3RoIGluIG9iZnVzY2F0ZWRfaW5kZXhlc1tpXSBdDQogICAgICAgICAgICAgICAgICAgIGVsc2U6DQogICAgICAgICAgICAgICAgICAgICAgICBpbmRleGVzW2ldID0gWyAob2Zmc2V0IF4gc2VsZi5rZXksIGxlbmd0aCBeIHNlbGYua2V5LCBwcmVmaXgpIGZvciBvZmZzZXQsIGxlbmd0aCwgcHJlZml4IGluIG9iZnVzY2F0ZWRfaW5kZXhlc1tpXSBdDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICBpbmRleGVzID0gcGlja2xlLmxvYWRzKGNvZGVjcy5kZWNvZGUoc2VsZi5oYW5kbGUucmVhZCgpLCAnemxpYicpKQ0KDQogICAgICAgIHJldHVybiBpbmRleGVzDQoNCiAgICAjIEdlbmVyYXRlIHBzZXVkb3JhbmRvbSBwYWRkaW5nIChmb3Igd2hhdGV2ZXIgcmVhc29uKS4NCiAgICBkZWYgZ2VuZXJhdGVfcGFkZGluZyhzZWxmKToNCiAgICAgICAgbGVuZ3RoID0gcmFuZG9tLnJhbmRpbnQoMSwgc2VsZi5wYWRsZW5ndGgpDQoNCiAgICAgICAgcGFkZGluZyA9ICcnDQogICAgICAgIHdoaWxlIGxlbmd0aCA+IDA6DQogICAgICAgICAgICBwYWRkaW5nICs9IGNocihyYW5kb20ucmFuZGludCgxLCAyNTUpKQ0KICAgICAgICAgICAgbGVuZ3RoIC09IDENCg0KICAgICAgICByZXR1cm4gYnl0ZXMocGFkZGluZywgJ3V0Zi04JykNCg0KICAgICMgQ29udmVydHMgYSBmaWxlbmFtZSB0byBhcmNoaXZlIGZvcm1hdC4NCiAgICBkZWYgY29udmVydF9maWxlbmFtZShzZWxmLCBmaWxlbmFtZSk6DQogICAgICAgIChkcml2ZSwgZmlsZW5hbWUpID0gb3MucGF0aC5zcGxpdGRyaXZlKG9zLnBhdGgubm9ybXBhdGgoZmlsZW5hbWUpLnJlcGxhY2Uob3Muc2VwLCAnLycpKQ0KICAgICAgICByZXR1cm4gZmlsZW5hbWUNCg0KICAgICMgRGVidWcgKHZlcmJvc2UpIG1lc3NhZ2VzLg0KICAgIGRlZiB2ZXJib3NlX3ByaW50KHNlbGYsIG1lc3NhZ2UpOg0KICAgICAgICBpZiBzZWxmLnZlcmJvc2U6DQogICAgICAgICAgICBwcmludChtZXNzYWdlKQ0KDQoNCiAgICAjIExpc3QgZmlsZXMgaW4gYXJjaGl2ZSBhbmQgY3VycmVudCBpbnRlcm5hbCBzdG9yYWdlLg0KICAgIGRlZiBsaXN0KHNlbGYpOg0KICAgICAgICByZXR1cm4gbGlzdChzZWxmLmluZGV4ZXMua2V5cygpKSArIGxpc3Qoc2VsZi5maWxlcy5rZXlzKCkpDQoNCiAgICAjIENoZWNrIGlmIGEgZmlsZSBleGlzdHMgaW4gdGhlIGFyY2hpdmUuDQogICAgZGVmIGhhc19maWxlKHNlbGYsIGZpbGVuYW1lKToNCiAgICAgICAgZmlsZW5hbWUgPSBfdW5pY29kZShmaWxlbmFtZSkNCiAgICAgICAgcmV0dXJuIGZpbGVuYW1lIGluIHNlbGYuaW5kZXhlcy5rZXlzKCkgb3IgZmlsZW5hbWUgaW4gc2VsZi5maWxlcy5rZXlzKCkNCg0KICAgICMgUmVhZCBmaWxlIGZyb20gYXJjaGl2ZSBvciBpbnRlcm5hbCBzdG9yYWdlLg0KICAgIGRlZiByZWFkKHNlbGYsIGZpbGVuYW1lKToNCiAgICAgICAgZmlsZW5hbWUgPSBzZWxmLmNvbnZlcnRfZmlsZW5hbWUoX3VuaWNvZGUoZmlsZW5hbWUpKQ0KDQogICAgICAgICMgQ2hlY2sgaWYgdGhlIGZpbGUgZXhpc3RzIGluIG91ciBpbmRleGVzLg0KICAgICAgICBpZiBmaWxlbmFtZSBub3QgaW4gc2VsZi5maWxlcyBhbmQgZmlsZW5hbWUgbm90IGluIHNlbGYua"
+            <nul set /p="W5kZXhlczoNCiAgICAgICAgICAgIHJhaXNlIElPRXJyb3IoZXJybm8uRU5PRU5ULCAndGhlIHJlcXVlc3RlZCBmaWxlIHswfSBkb2VzIG5vdCBleGlzdCBpbiB0aGUgZ2l2ZW4gUmVuXCdQeSBhcmNoaXZlJy5mb3JtYXQoDQogICAgICAgICAgICAgICAgX3ByaW50YWJsZShmaWxlbmFtZSkpKQ0KDQogICAgICAgICMgSWYgaXQncyBpbiBvdXIgb3BlbmVkIGFyY2hpdmUgaW5kZXgsIGFuZCBvdXIgYXJjaGl2ZSBoYW5kbGUgaXNuJ3QgdmFsaWQsIHNvbWV0aGluZyBpcyBvYnZpb3VzbHkgd3JvbmcuDQogICAgICAgIGlmIGZpbGVuYW1lIG5vdCBpbiBzZWxmLmZpbGVzIGFuZCBmaWxlbmFtZSBpbiBzZWxmLmluZGV4ZXMgYW5kIHNlbGYuaGFuZGxlIGlzIE5vbmU6DQogICAgICAgICAgICByYWlzZSBJT0Vycm9yKGVycm5vLkVOT0VOVCwgJ3RoZSByZXF1ZXN0ZWQgZmlsZSB7MH0gZG9lcyBub3QgZXhpc3QgaW4gdGhlIGdpdmVuIFJlblwnUHkgYXJjaGl2ZScuZm9ybWF0KA0KICAgICAgICAgICAgICAgIF9wcmludGFibGUoZmlsZW5hbWUpKSkNCg0KICAgICAgICAjIENoZWNrIG91ciBzaW1wbGlmaWVkIGludGVybmFsIGluZGV4ZXMgZmlyc3QsIGluIGNhc2Ugc29tZW9uZSB3YW50cyB0byByZWFkIGEgZmlsZSB0aGV5IGFkZGVkIGJlZm9yZSB3aXRob3V0IHNhdmluZywgZm9yIHNvbWUgdW5ob2x5IHJlYXNvbi4NCiAgICAgICAgaWYgZmlsZW5hbWUgaW4gc2VsZi5maWxlczoNCiAgICAgICAgICAgIHNlbGYudmVyYm9zZV9wcmludCgnUmVhZGluZyBmaWxlIHswfSBmcm9tIGludGVybmFsIHN0b3JhZ2UuLi4nLmZvcm1hdChfcHJpbnRhYmxlKGZpbGVuYW1lKSkpDQogICAgICAgICAgICByZXR1cm4gc2VsZi5maWxlc1tmaWxlbmFtZV0NCiAgICAgICAgIyBXZSBuZWVkIHRvIHJlYWQgdGhlIGZpbGUgZnJvbSBvdXIgb3BlbiBhcmNoaXZlLg0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgIyBSZWFkIG9mZnNldCBhbmQgbGVuZ3RoLCBzZWVrIHRvIHRoZSBvZmZzZXQgYW5kIHJlYWQgdGhlIGZpbGUgY29udGVudHMuDQogICAgICAgICAgICBpZiBsZW4oc2VsZi5pbmRleGVzW2ZpbGVuYW1lXVswXSkgPT0gMzoNCiAgICAgICAgICAgICAgICAob2Zmc2V0LCBsZW5ndGgsIHByZWZpeCkgPSBzZWxmLmluZGV4ZXNbZmlsZW5hbWVdWzBdDQogICAgICAgICAgICBlbHNlOg0KICAgICAgICAgICAgICAgIChvZmZzZXQsIGxlbmd0aCkgPSBzZWxmLmluZGV4ZXNbZmlsZW5hbWVdWzBdDQogICAgICAgICAgICAgICAgcHJlZml4ID0gJycNCg0KICAgICAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdSZWFkaW5nIGZpbGUgezB9IGZyb20gZGF0YSBmaWxlIHsxfS4uLiAob2Zmc2V0ID0gezJ9LCBsZW5ndGggPSB7M30gYnl0ZXMpJy5mb3JtYXQoDQogICAgICAgICAgICAgICAgX3ByaW50YWJsZShmaWxlbmFtZSksIHNlbGYuZmlsZSwgb2Zmc2V0LCBsZW5ndGgpKQ0KICAgICAgICAgICAgc2VsZi5oYW5kbGUuc2VlayhvZmZzZXQpDQogICAgICAgICAgICByZXR1cm4gX3VubWFuZ2xlKHByZWZpeCkgKyBzZWxmLmhhbmRsZS5yZWFkKGxlbmd0aCAtIGxlbihwcmVmaXgpKQ0KDQogICAgIyBNb2RpZnkgYSBmaWxlIGluIGFyY2hpdmUgb3IgaW50ZXJuYWwgc3RvcmFnZS4NCiAgICBkZWYgY2hhbmdlKHNlbGYsIGZpbGVuYW1lLCBjb250ZW50cyk6DQogICAgICAgIGZpbGVuYW1lID0gX3VuaWNvZGUoZmlsZW5hbWUpDQoNCiAgICAgICAgIyBPdXIgJ2NoYW5nZScgaXMgYmFzaWNhbGx5IHJlbW92aW5nIHRoZSBmaWxlIGZyb20gb3VyIGluZGV4ZXMgZmlyc3QsIGFuZCB0aGVuIHJlLWFkZGluZyBpdC4NCiAgICAgICAgc2VsZi5yZW1vdmUoZmlsZW5hbWUpDQogICAgICAgIHNlbGYuYWRkKGZpbGVuYW1lLCBjb250ZW50cykNCg0KICAgICMgQWRkIGEgZmlsZSB0byB0aGUgaW50ZXJuYWwgc3RvcmFnZS4NCiAgICBkZWYgYWRkKHNlbGYsIGZpbGVuYW1lLCBjb250ZW50cyk6DQogICAgICAgIGZpbGVuYW1lID0gc2VsZi5jb252ZXJ0X2ZpbGVuYW1lKF91bmljb2RlKGZpbGVuYW1lKSkNCiAgICAgICAgaWYgZmlsZW5hbWUgaW4gc2VsZi5maWxlcyBvciBmaWxlbmFtZSBpbiBzZWxmLmluZGV4ZXM6DQogICAgICAgICAgICByYWlzZSBWYWx1ZUVycm9yKCdmaWxlIHswfSBhbHJlYWR5IGV4aXN0cyBpbiBhcmNoaXZlJy5mb3JtYXQoX3ByaW50YWJsZShmaWxlbmFtZSkpKQ0KDQogICAgICAgIHNlbGYudmVyYm9zZV9wcmludCgnQWRkaW5nIGZpbGUgezB9IHRvIGFyY2hpdmUuLi4gKGxlbmd0aCA9IHsxfSBieXRlcyknLmZvcm1hdCgNCiAgICAgICAgICAgIF9wcmludGFibGUoZmlsZW5hbWUpLCBsZW4oY29udGVudHMpKSkNCiAgICAgICAgc2VsZi5maWxlc1tmaWxlbmFtZV0gPSBjb250ZW50cw0KDQogICAgIyBSZW1vdmUgYSBmaWxlIGZyb20gYXJjaGl2ZSBvciBpbnRlcm5hbCBzdG9yYWdlLg0KICAgIGRlZiByZW1vdmUoc2VsZiwgZmlsZW5hbWUpOg0KICAgICAgICBmaWxlbmFtZSA9IF91bmljb2RlKGZpbGVuYW1lKQ0KICAgICAgICBpZiBmaWxlbmFtZSBpbiBzZWxmLmZpbGVzOg0KICAgICAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdSZW1vdmluZyBmaWxlIHswfSBmcm9tIGludGVybmFsIHN0b3JhZ2UuLi4nLmZvcm1hdChfcHJpbnRhYmxlKGZpbGVuYW1lKSkpDQogICAgICAgICAgICBkZWwgc2VsZi5maWxlc1tmaWxlbmFtZV0NCiAgICAgICAgZWxpZiBmaWxlbmFtZSBpbiBzZWxmLmluZGV4ZXM6DQogICAgICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1JlbW92aW5nIGZpbGUgezB9IGZyb20gYXJjaGl2ZSBpbmRleGVzLi4uJy5mb3JtYXQoX3ByaW50YWJsZShmaWxlbmFtZSkpKQ0KICAgICAgICAgICAgZGVsIHNlbGYuaW5kZXhlc1tmaWxlbmFtZV0NCiAgICAgICAgZWxzZToNCiAgICAgICAgICAgIHJhaXNlIElPRXJyb3IoZXJybm8uRU5PRU5ULCAndGhlIHJlcXVlc3RlZCBmaWxlIHswfSBkb2VzIG5vdCBleGlzdCBpbiB0aGlzIGFyY2hpdmUnLmZvcm1hdChfcHJpbnRhYmxlKGZpbGVuYW1lKSkpDQoNCiAgICAjIExvYWQgYXJjaGl2ZS4NCiAgICBkZWYgbG9hZChzZWxmLCBmaWxlbmFtZSk6DQogICAgICAgIGZpbGVuYW1lID0gX3VuaWNvZGUoZmlsZW5hbWUpDQoNCiAgICAgICAgaWYgc2VsZi5oYW5kbGUgaXMgbm90IE5vbmU6DQogICAgICAgICAgICBzZWxmLmhhbmRsZS5jbG9zZSgpDQogICAgICAgIHNlbGYuZmlsZSA9IGZpbGVuYW1lDQogICAgICAgIHNlbGYuZmlsZXMgPSB7fQ0KICAgICAgICBzZWxmLmhhbmRsZSA9IG9wZW4oc2VsZi5maWxlLCAncmInKQ0KICAgICAgICBzZWxmLnZlcnNpb24gPSBzZWxmLmdldF92ZXJzaW9uKCkNCiAgICAgICAgaWYgc2VsZi52ZXJzaW9uIGluIFsxLCAyLCAzLCAzLjJdOg0KICAgICAgICAgICAgc2VsZi5pbmRleGVzID0gc2VsZi5leHRyYWN0X2luZGV4ZXMoKQ0KICAgICAgICBlbGlmIHNlbGYudmVyc2lvbiA9PSA0Og0KICAgICAgICAgICAgc2VsZi5pbmRleGVzID0gc2VsZi5leHRyYWN0X3N2YWMxX2luZGV4ZXMoKQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgcmFpc2UgVmFsdWVFcnJvcigndW5zdXBwb3J0ZWQgUmVuXCdQeSBhcmNoaXZlIHZlcnNpb24nKQ0KDQogICAgIyBFeHRyYWN0IGZpbGUgaW5kZXhlcyBmcm9tIG9wZW5lZCBTVkFDLTEuMCBhcmNoaXZlLg0KICAgIGRlZiBleHRyYWN0X3N2YWMxX2luZGV4ZXMoc2VsZik6DQogICAgICAgIGltcG9ydCBqc29uLCB6bGliDQoNCiAgICAgICAgc2VsZi5oYW5kbGUuc2VlaygwKQ0KICAgICAgICBoZWFkZXIgPSBzZWxmLmhhbmRsZS5yZWFkbGluZSgpLmRlY29kZSgndXRmLTgnKQ0KICAgICAgICBwYXJ0cyA9IGhlYWRlci5zcGxpdCgpDQoNCiAgICAgICAgIyBwYXJ0c1sxXSA9IG9mZnNldCBoZXgNCiAgICAgICAgaW5kZXhfb2Zmc2V0ID0gaW50KHBhcnRzWzFdLCAxNikNCg0KICAgICAgICAjIEdvIHRvIHRoZSBPZ2dTIGJsb2NrIGNvbnRhaW5pbmcgdGhlIGNvbXByZXNzZWQgSlNPTiBkYXRhLA0KICAgICAgICAjIHJlYWQgaXQgYW5kIHRyeSB0byBkZWNvZGUgaXQgYXMgemxpYiBmaXJzdCwgaWYgdGhhdCBmYWlscywNCiAgICAgICAgIyBkZWNvZGUgaXQgYXMgT2dnIGVuY2Fwc3VsYXRlZCBWb3JiaXMgY29tbWVudHMuDQogICAgICAgIHNlbGYuaGFuZGxlLnNlZWsoaW5kZXhfb2Zmc2V0KQ0KICAgICAgICBjb21wcmVzc2VkID0gc2VsZi5oYW5kbGUucmVhZCgpDQoNCiAgICAgICAgdHJ5Og0KICAgICAgICAgICAgIyBWYXJpYW50IEI6IERpcmVjdCB6bGliIHN0cmVhbSwgbm8gT2dnIGVuY2Fwc3VsYXRpb24NCiAgICAgICAgICAgIGpzb25fZGF0YSA9IHpsaWIuZGVjb21wcmVzcyhjb21wcmVzc2VkKS5kZWNvZGUoInV0Zi04IikNCiAgICAgICAgZXhjZXB0Og0KICAgICAgICAgICAgIyBWYXJpYW50IEE6IEVuY2Fwc3VsYXRlZCBPZ2cgc3RyZWFtLCBkZWNvZGUgaXQgdG8gZXh0cmFjdCB0aGUgSlNPTiBmcm9tIFZvcmJpcyBjb21tZW50cw0KICAgICAgICAgICAganNvbl9kYXRhID0gc2VsZi5kZWNvZGVfc3ZhYzFfb2dnKGNvbXByZXNzZWQpDQoNCiAgICAgICAgIyBEZWNvZGUgVm9yYmlzIHN0cmVhbSDihpIgSlNPTiBkYXRhDQogICAgICAgIGpzb25fZGF0YSA9IHNlbGYuZGVjb2RlX3N2YWMxX29nZyhvZ2dfZGF0YSkNCg0KICAgICAgICAjIExvYWQgSlNPTiBkYXRhIGludG8gYSBQeXRob24gZGljdA0KICAgICAgICByYXcgPSBqc29uLmxvYWRzKGpzb25fZGF0YSkNCg0KICAgICAgICAjIENvbnZlcnQgdG8gaW50ZXJuYWwgaW5kZXggZm9ybWF0DQogICAgICAgIGluZGV4ZXMgPSB7fQ0KICAgICAgICBmb3IgbmFtZSwgaW5mbyBpbiByYXdbImZpbGVzIl0uaXRlbXMoKToNCiAgICAgICAgICAgIG9mZnNldCwgbGVuZ3RoID0gaW5mbw0KICAgICAgICAgICAgaW5kZXhlc1tuYW1lXSA9IFsob2Zmc2V0LCBsZW5ndGgpXQ0KDQogICAgICAgIHJldHVybiBpbmRleGVzDQoNCiAgICBkZWYgZGVjb2RlX3N2YWMxX29nZyhzZWxmLCBkYXRhKToNCiAgICAgICAgIyBTZWFyY2ggZm9yIHBhY2tldCB0eXBlIDMg4oCcdm9yYmlz4oCdLCB3aGljaCBjb250YWlucyB0aGUgY29tbWVudHMgd2l0aCB0aGUgSlNPTiBkYXRhLg0KICAgICAgICBtYXJrZXIgPSBiIlx4MDN2b3JiaXMiDQogICAgICAgIHBvcyA9IGRhdGEuZmluZChtYXJrZXIpDQogICAgICAgIGlmIHBvcyA9PSAtMToNCiAgICAgICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoIlNWQUMtMS4wOiBWb3JiaXMgcGFja2FnZSAodHlwZSAzKSBub3QgZm91bmQgaW4gT2dnIHN0cmVhbSIpDQoNCiAgICAgICAgIyBBZnRlciB0aGUgbWFya2VyLCB0aGVyZSBpcyBhIOKAnHZlbmRvcl9sZW5ndGjigJ0gZmllbGQgKDQgbGl0dGxlLWVuZGlhbiBieXRlcykuDQogICAgICAgIHZlbmRvcl9sZW4gPSBpbnQuZnJvbV9ieXRlcyhkYXRhW3Bvcys3OnBvcysxMV0sICJsaXR0bGUiKQ0KDQogICAgICAgICMgU2tpcCB0aGUgdmVuZG9yIHN0cmluZyAodmVuZG9yX2xlbmd0aCBieXRlcykgdG8gZ2V0IHRvIHRoZSBjb21tZW50IGxpc3QuDQogICAgICAgIGNvbW1lbnRfc3RhcnQgPSBwb3MgKyAxMSArIHZlbmRvcl9sZW4NCg0KICAgICAgICAjIFJlYWQgdGhlIG51bWJlciBvZiBjb21tZW50cyAoNCBieXRlcyBMRSkNCiAgICAgICAgY29tbWVudF9jb3VudCA9IGludC5mcm9tX2J5dGVzKGRhdGFbY29tbWVudF9zdGFydDpjb21tZW50X3N0YXJ0KzRdLCAibGl0dGxlIikNCiAgICAgICAgcCA9IGNvbW1lbnRfc3RhcnQgKyA0DQoNCiAgICAgICAgIyBCcm93c2UgVm9yYmlzIGNvbW1lbnRzIHRvIGZpbmQgdGhlIG9uZSBzdGFydGluZyB3aXRoICJKU09OPSIsIHdoaWNoIGNvbnRhaW5zIHRoZSBKU09OIGRhdGEuDQogICAgICAgIGZvciBfIGluIHJhbmdlKGNvbW1lbnRfY291bnQpOg0KICAgICAgICAgICAgbGVuZ3RoID0gaW50LmZyb21fYnl0ZXMoZGF0YVtwOnArNF0sICJsaXR0bGUiKQ0KICAgICAgICAgICAgcCArPSA0DQogICAgICAgICAgICBjb21tZW50ID0gZGF0YVtwOnArbGVuZ3RoXQ0KICAgICAgICAgICAgcCArPSBsZW5ndGgNCg0KICAgICAgICAgICAgIyBUaGUgSlNPTiBpcyBpbiBhIGNvbW1lbnQuDQogICAgICAgICAgICBpZiBjb21tZW50LnN0YXJ0c3dpdGgoYiJKU09OPSIpOg0KICAgICAgICAgICAgICAgIHJldHVybiBjb21tZW50WzU6XS5kZWNvZGUoInV0Zi"
+            <nul set /p="04IikNCg0KICAgICAgICByYWlzZSBWYWx1ZUVycm9yKCJTVkFDLTEuMDogSlNPTiBub3QgZm91bmQgaW4gVm9yYmlzIGNvbW1lbnRzLiIpDQoNCiAgICAjIFNhdmUgY3VycmVudCBzdGF0ZSBpbnRvIGEgbmV3IGZpbGUsIG1lcmdpbmcgYXJjaGl2ZSBhbmQgaW50ZXJuYWwgc3RvcmFnZSwgcmVidWlsZGluZyBpbmRleGVzLCBhbmQgb3B0aW9uYWxseSBzYXZpbmcgaW4gYW5vdGhlciBmb3JtYXQgdmVyc2lvbi4NCiAgICBkZWYgc2F2ZShzZWxmLCBmaWxlbmFtZSA9IE5vbmUpOg0KICAgICAgICBmaWxlbmFtZSA9IF91bmljb2RlKGZpbGVuYW1lKQ0KDQogICAgICAgIGlmIGZpbGVuYW1lIGlzIE5vbmU6DQogICAgICAgICAgICBmaWxlbmFtZSA9IHNlbGYuZmlsZQ0KICAgICAgICBpZiBmaWxlbmFtZSBpcyBOb25lOg0KICAgICAgICAgICAgcmFpc2UgVmFsdWVFcnJvcignbm8gdGFyZ2V0IGZpbGUgZm91bmQgZm9yIHNhdmluZyBhcmNoaXZlJykNCiAgICAgICAgaWYgc2VsZi52ZXJzaW9uICE9IDIgYW5kIHNlbGYudmVyc2lvbiAhPSAzOg0KICAgICAgICAgICAgcmFpc2UgVmFsdWVFcnJvcignc2F2aW5nIGlzIG9ubHkgc3VwcG9ydGVkIGZvciB2ZXJzaW9uIDIgYW5kIDMgYXJjaGl2ZXMnKQ0KDQogICAgICAgIHNlbGYudmVyYm9zZV9wcmludCgnUmVidWlsZGluZyBhcmNoaXZlIGluZGV4Li4uJykNCiAgICAgICAgIyBGaWxsIG91ciBvd24gZmlsZXMgc3RydWN0dXJlIHdpdGggdGhlIGZpbGVzIGFkZGVkIG9yIGNoYW5nZWQgaW4gdGhpcyBzZXNzaW9uLg0KICAgICAgICBmaWxlcyA9IHNlbGYuZmlsZXMNCiAgICAgICAgIyBGaXJzdCwgcmVhZCBmaWxlcyBmcm9tIHRoZSBjdXJyZW50IGFyY2hpdmUgaW50byBvdXIgZmlsZXMgc3RydWN0dXJlLg0KICAgICAgICBmb3IgZmlsZSBpbiBsaXN0KHNlbGYuaW5kZXhlcy5rZXlzKCkpOg0KICAgICAgICAgICAgY29udGVudCA9IHNlbGYucmVhZChmaWxlKQ0KICAgICAgICAgICAgIyBSZW1vdmUgZnJvbSBpbmRleGVzIGFycmF5IG9uY2UgcmVhZCwgYWRkIHRvIG91ciBvd24gYXJyYXkuDQogICAgICAgICAgICBkZWwgc2VsZi5pbmRleGVzW2ZpbGVdDQogICAgICAgICAgICBmaWxlc1tmaWxlXSA9IGNvbnRlbnQNCg0KICAgICAgICAjIFByZWRpY3QgaGVhZGVyIGxlbmd0aCwgd2UnbGwgd3JpdGUgdGhhdCBvbmUgbGFzdC4NCiAgICAgICAgb2Zmc2V0ID0gMA0KICAgICAgICBpZiBzZWxmLnZlcnNpb24gPT0gMzoNCiAgICAgICAgICAgIG9mZnNldCA9IDM0DQogICAgICAgIGVsaWYgc2VsZi52ZXJzaW9uID09IDI6DQogICAgICAgICAgICBvZmZzZXQgPSAyNQ0KICAgICAgICBhcmNoaXZlID0gb3BlbihmaWxlbmFtZSwgJ3diJykNCiAgICAgICAgYXJjaGl2ZS5zZWVrKG9mZnNldCkNCg0KICAgICAgICAjIEJ1aWxkIG91ciBvd24gaW5kZXhlcyB3aGlsZSB3cml0aW5nIGZpbGVzIHRvIHRoZSBhcmNoaXZlLg0KICAgICAgICBpbmRleGVzID0ge30NCiAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdXcml0aW5nIGZpbGVzIHRvIGFyY2hpdmUgZmlsZS4uLicpDQogICAgICAgIGZvciBmaWxlLCBjb250ZW50IGluIGZpbGVzLml0ZW1zKCk6DQogICAgICAgICAgICAjIEdlbmVyYXRlIHJhbmRvbSBwYWRkaW5nLCBmb3Igd2hhdGV2ZXIgcmVhc29uLg0KICAgICAgICAgICAgaWYgc2VsZi5wYWRsZW5ndGggPiAwOg0KICAgICAgICAgICAgICAgIHBhZGRpbmcgPSBzZWxmLmdlbmVyYXRlX3BhZGRpbmcoKQ0KICAgICAgICAgICAgICAgIGFyY2hpdmUud3JpdGUocGFkZGluZykNCiAgICAgICAgICAgICAgICBvZmZzZXQgKz0gbGVuKHBhZGRpbmcpDQoNCiAgICAgICAgICAgIGFyY2hpdmUud3JpdGUoY29udGVudCkNCiAgICAgICAgICAgICMgVXBkYXRlIGluZGV4Lg0KICAgICAgICAgICAgaWYgc2VsZi52ZXJzaW9uID09IDM6DQogICAgICAgICAgICAgICAgaW5kZXhlc1tmaWxlXSA9IFsgKG9mZnNldCBeIHNlbGYua2V5LCBsZW4oY29udGVudCkgXiBzZWxmLmtleSkgXQ0KICAgICAgICAgICAgZWxpZiBzZWxmLnZlcnNpb24gPT0gMjoNCiAgICAgICAgICAgICAgICBpbmRleGVzW2ZpbGVdID0gWyAob2Zmc2V0LCBsZW4oY29udGVudCkpIF0NCiAgICAgICAgICAgIG9mZnNldCArPSBsZW4oY29udGVudCkNCg0KICAgICAgICAjIFdyaXRlIHRoZSBpbmRleGVzLg0KICAgICAgICBzZWxmLnZlcmJvc2VfcHJpbnQoJ1dyaXRpbmcgYXJjaGl2ZSBpbmRleCB0byBhcmNoaXZlIGZpbGUuLi4nKQ0KICAgICAgICBhcmNoaXZlLndyaXRlKGNvZGVjcy5lbmNvZGUocGlja2xlLmR1bXBzKGluZGV4ZXMsIHNlbGYuUElDS0xFX1BST1RPQ09MKSwgJ3psaWInKSkNCiAgICAgICAgIyBOb3cgd3JpdGUgdGhlIGhlYWRlci4NCiAgICAgICAgc2VsZi52ZXJib3NlX3ByaW50KCdXcml0aW5nIGhlYWRlciB0byBhcmNoaXZlIGZpbGUuLi4gKHZlcnNpb24gPSBSUEF2ezB9KScuZm9ybWF0KHNlbGYudmVyc2lvbikpDQogICAgICAgIGFyY2hpdmUuc2VlaygwKQ0KICAgICAgICBpZiBzZWxmLnZlcnNpb24gPT0gMzoNCiAgICAgICAgICAgIGFyY2hpdmUud3JpdGUoY29kZWNzLmVuY29kZSgne317OjAxNnh9IHs6MDh4fVxuJy5mb3JtYXQoc2VsZi5SUEEzX01BR0lDLCBvZmZzZXQsIHNlbGYua2V5KSkpDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICBhcmNoaXZlLndyaXRlKGNvZGVjcy5lbmNvZGUoJ3t9ezowMTZ4fVxuJy5mb3JtYXQoc2VsZi5SUEEyX01BR0lDLCBvZmZzZXQpKSkNCiAgICAgICAgIyBXZSdyZSBkb25lLCBjbG9zZSBpdC4NCiAgICAgICAgYXJjaGl2ZS5jbG9zZSgpDQoNCiAgICAgICAgIyBSZWxvYWQgdGhlIGZpbGUgaW4gb3VyIGlubmVyIGRhdGFiYXNlLg0KICAgICAgICBzZWxmLmxvYWQoZmlsZW5hbWUpDQoNCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6DQogICAgaW1wb3J0IGFyZ3BhcnNlDQoNCiAgICBwYXJzZXIgPSBhcmdwYXJzZS5Bcmd1bWVudFBhcnNlcigNCiAgICAgICAgZGVzY3JpcHRpb249J0EgdG9vbCBmb3Igd29ya2luZyB3aXRoIFJlblwnUHkgYXJjaGl2ZSBmaWxlcy4nLA0KICAgICAgICBlcGlsb2c9J1RoZSBGSUxFIGFyZ3VtZW50IGNhbiBvcHRpb25hbGx5IGJlIGluIEFSQ0hJVkU9UkVBTCBmb3JtYXQsIG1hcHBpbmcgYSBmaWxlIGluIHRoZSBhcmNoaXZlIGZpbGUgc3lzdGVtIHRvIGEgZmlsZSBvbiB5b3VyIHJlYWwgZmlsZSBzeXN0ZW0uIEFuIGV4YW1wbGUgb2YgdGhpczogcnBhdG9vbCAteCB0ZXN0LnJwYSBzY3JpcHQucnB5Yz0vaG9tZS9mb28vdGVzdC5ycHljJywNCiAgICAgICAgYWRkX2hlbHA9RmFsc2UpDQoNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCdhcmNoaXZlJywgbWV0YXZhcj0nQVJDSElWRScsIGhlbHA9J1RoZSBSZW5cJ3B5IGFyY2hpdmUgZmlsZSB0byBvcGVyYXRlIG9uLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnZmlsZXMnLCBtZXRhdmFyPSdGSUxFJywgbmFyZ3M9JyonLCBhY3Rpb249J2FwcGVuZCcsIGhlbHA9J1plcm8gb3IgbW9yZSBmaWxlcyB0byBvcGVyYXRlIG9uLicpDQoNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctbCcsICctLWxpc3QnLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdMaXN0IGZpbGVzIGluIGFyY2hpdmUgQVJDSElWRS4nKQ0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy14JywgJy0tZXh0cmFjdCcsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J0V4dHJhY3QgRklMRXMgZnJvbSBBUkNISVZFLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWMnLCAnLS1jcmVhdGUnLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdDcmVhdGl2ZSBBUkNISVZFIGZyb20gRklMRXMuJykNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctZCcsICctLWRlbGV0ZScsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J0RlbGV0ZSBGSUxFcyBmcm9tIEFSQ0hJVkUuJykNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctYScsICctLWFwcGVuZCcsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J0FwcGVuZCBGSUxFcyB0byBBUkNISVZFLicpDQoNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctMicsICctLXR3bycsIGFjdGlvbj0nc3RvcmVfdHJ1ZScsIGhlbHA9J1VzZSB0aGUgUlBBdjIgZm9ybWF0IGZvciBjcmVhdGluZy9hcHBlbmRpbmcgdG8gYXJjaGl2ZXMuJykNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctMycsICctLXRocmVlJywgYWN0aW9uPSdzdG9yZV90cnVlJywgaGVscD0nVXNlIHRoZSBSUEF2MyBmb3JtYXQgZm9yIGNyZWF0aW5nL2FwcGVuZGluZyB0byBhcmNoaXZlcyAoZGVmYXVsdCkuJykNCg0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1rJywgJy0ta2V5JywgbWV0YXZhcj0nS0VZJywgaGVscD0nVGhlIG9iZnVzY2F0aW9uIGtleSB1c2VkIGZvciBjcmVhdGluZyBSUEF2MyBhcmNoaXZlcywgaW4gaGV4YWRlY2ltYWwgKGRlZmF1bHQ6IDB4REVBREJFRUYpLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLXAnLCAnLS1wYWRkaW5nJywgbWV0YXZhcj0nQ09VTlQnLCBoZWxwPSdUaGUgbWF4aW11bSBudW1iZXIgb2YgYnl0ZXMgb2YgcGFkZGluZyB0byBhZGQgYmV0d2VlbiBmaWxlcyAoZGVmYXVsdDogMCkuJykNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctbycsICctLW91dGZpbGUnLCBoZWxwPSdBbiBhbHRlcm5hdGl2ZSBvdXRwdXQgYXJjaGl2ZSBmaWxlIHdoZW4gYXBwZW5kaW5nIHRvIG9yIGRlbGV0aW5nIGZyb20gYXJjaGl2ZXMsIG9yIG91dHB1dCBkaXJlY3Rvcnkgd2hlbiBleHRyYWN0aW5nLicpDQoNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctaCcsICctLWhlbHAnLCBhY3Rpb249J2hlbHAnLCBoZWxwPSdQcmludCB0aGlzIGhlbHAgYW5kIGV4aXQuJykNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctdicsICctLXZlcmJvc2UnLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdCZSBhIGJpdCBtb3JlIHZlcmJvc2Ugd2hpbGUgcGVyZm9ybWluZyBvcGVyYXRpb25zLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLVYnLCAnLS12ZXJzaW9uJywgYWN0aW9uPSd2ZXJzaW9uJywgdmVyc2lvbj0ncnBhdG9vbCB2MC44JywgaGVscD0nU2hvdyB2ZXJzaW9uIGluZm9ybWF0aW9uLicpDQogICAgYXJndW1lbnRzID0gcGFyc2VyLnBhcnNlX2FyZ3MoKQ0KDQogICAgIyBEZXRlcm1pbmUgUlBBIHZlcnNpb24uDQogICAgaWYgYXJndW1lbnRzLnR3bzoNCiAgICAgICAgdmVyc2lvbiA9IDINCiAgICBlbHNlOg0KICAgICAgICB2ZXJzaW9uID0gMw0KDQogICAgIyBEZXRlcm1pbmUgUlBBdjMga2V5Lg0KICAgIGlmICdrZXknIGluIGFyZ3VtZW50cyBhbmQgYXJndW1lbnRzLmtleSBpcyBub3QgTm9uZToNCiAgICAgICAga2V5ID0gaW50KGFyZ3VtZW50cy5rZXksIDE2KQ0KICAgIGVsc2U6DQogICAgICAgIGtleSA9IDB4REVBREJFRUYNCg0KICAgICMgRGV0ZXJtaW5lIHBhZGRpbmcgYnl0ZXMuDQogICAgaWYgJ3BhZGRpbmcnIGluIGFyZ3VtZW50cyBhbmQgYXJndW1lbnRzLnBhZGRpbmcgaXMgbm90IE5vbmU6DQogICAgICAgIHBhZGRpbmcgPSBpbnQoYXJndW1lbnRzLnBhZGRpbmcpDQogICAgZWxzZToNCiAgICAgICAgcGFkZGluZyA9IDANCg0KICAgICMgRGV0ZXJtaW5lIG91dHB1dCBmaWxlL2RpcmVjdG9yeSBhbmQgaW5wdXQgYXJjaGl2ZQ0KICAgIGlmIGFyZ3VtZW50cy5jcmVhdGU6DQogICAgICAgIGFyY2hpdmUgPSBOb25lDQogICAgICAgIG91dHB1dCA9IF91bmljb2RlKGFyZ3VtZW50cy5hcmNoaXZlKQ0KICAgIGVsc2U6DQogICAgICAgIGFyY2hpdmUgPSBfdW5pY29kZShhcmd1bWVudHMuYXJjaGl2ZSkNCiAgICAgICAgaWYgJ291dGZpbGUnIGluIGFyZ3VtZW50cyBhbmQgYXJndW1lbnRzLm91dGZpbGUgaXMgbm90IE5vbmU6DQogICAgICAgICAgICBvdXRwdXQgPSBfdW5pY29kZShhcmd1bWVudHMub3V0ZmlsZSkNCiAgICAgICAgZWxzZToNCiAgICAgICAgICAgICMgRGVmYXVsdCBvdXRwdXQgZGlyZWN0b3J5IGZvciBleHRyYWN0aW9uIGlzIHRoZSBjdXJyZW50IGRpcmVjdG9yeS4NCiAgICAgICAgICAgIGlmIGFyZ3VtZW50cy5leHRyYWN0Og0KICAgICAgICAgICAgICAgIG91dHB1dCA9ICcuJw0KICAgICAgICAgICAgZWxzZToNCiAgICAgICAgICAgICAgICBvdXRwdXQgPSBfdW5pY29kZShhcmd1bWVudHMuYXJjaGl2ZSkNCg0KICAgICM"
+            <nul set /p="gTm9ybWFsaXplIGZpbGVzLg0KICAgIGlmIGxlbihhcmd1bWVudHMuZmlsZXMpID4gMCBhbmQgaXNpbnN0YW5jZShhcmd1bWVudHMuZmlsZXNbMF0sIGxpc3QpOg0KICAgICAgICBhcmd1bWVudHMuZmlsZXMgPSBhcmd1bWVudHMuZmlsZXNbMF0NCg0KICAgIHRyeToNCiAgICAgICAgYXJjaGl2ZSA9IFJlblB5QXJjaGl2ZShhcmNoaXZlLCBwYWRsZW5ndGg9cGFkZGluZywga2V5PWtleSwgdmVyc2lvbj12ZXJzaW9uLCB2ZXJib3NlPWFyZ3VtZW50cy52ZXJib3NlKQ0KICAgIGV4Y2VwdCBJT0Vycm9yIGFzIGU6DQogICAgICAgIHByaW50KCdDb3VsZCBub3Qgb3BlbiBhcmNoaXZlIGZpbGUgezB9IGZvciByZWFkaW5nOiB7MX0nLmZvcm1hdChhcmNoaXZlLCBlKSwgZmlsZT1zeXMuc3RkZXJyKQ0KICAgICAgICBzeXMuZXhpdCgxKQ0KDQogICAgaWYgYXJndW1lbnRzLmNyZWF0ZSBvciBhcmd1bWVudHMuYXBwZW5kOg0KICAgICAgICAjIFdlIG5lZWQgdGhpcyBzZXBlcmF0ZSBmdW5jdGlvbiB0byByZWN1cnNpdmVseSBwcm9jZXNzIGRpcmVjdG9yaWVzLg0KICAgICAgICBkZWYgYWRkX2ZpbGUoZmlsZW5hbWUpOg0KICAgICAgICAgICAgIyBJZiB0aGUgYXJjaGl2ZSBwYXRoIGRpZmZlcnMgZnJvbSB0aGUgYWN0dWFsIGZpbGUgcGF0aCwgYXMgZ2l2ZW4gaW4gdGhlIGFyZ3VtZW50LA0KICAgICAgICAgICAgIyBleHRyYWN0IHRoZSBhcmNoaXZlIHBhdGggYW5kIGFjdHVhbCBmaWxlIHBhdGguDQogICAgICAgICAgICBpZiBmaWxlbmFtZS5maW5kKCc9JykgIT0gLTE6DQogICAgICAgICAgICAgICAgKG91dGZpbGUsIGZpbGVuYW1lKSA9IGZpbGVuYW1lLnNwbGl0KCc9JywgMikNCiAgICAgICAgICAgIGVsc2U6DQogICAgICAgICAgICAgICAgb3V0ZmlsZSA9IGZpbGVuYW1lDQoNCiAgICAgICAgICAgIGlmIG9zLnBhdGguaXNkaXIoZmlsZW5hbWUpOg0KICAgICAgICAgICAgICAgIGZvciBmaWxlIGluIG9zLmxpc3RkaXIoZmlsZW5hbWUpOg0KICAgICAgICAgICAgICAgICAgICAjIFdlIG5lZWQgdG8gZG8gdGhpcyBpbiBvcmRlciB0byBtYWludGFpbiBhIHBvc3NpYmxlIEFSQ0hJVkU9UkVBTCBtYXBwaW5nIGJldHdlZW4gZGlyZWN0b3JpZXMuDQogICAgICAgICAgICAgICAgICAgIGFkZF9maWxlKG91dGZpbGUgKyBvcy5zZXAgKyBmaWxlICsgJz0nICsgZmlsZW5hbWUgKyBvcy5zZXAgKyBmaWxlKQ0KICAgICAgICAgICAgZWxzZToNCiAgICAgICAgICAgICAgICB0cnk6DQogICAgICAgICAgICAgICAgICAgIHdpdGggb3BlbihmaWxlbmFtZSwgJ3JiJykgYXMgZmlsZToNCiAgICAgICAgICAgICAgICAgICAgICAgIGFyY2hpdmUuYWRkKG91dGZpbGUsIGZpbGUucmVhZCgpKQ0KICAgICAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToNCiAgICAgICAgICAgICAgICAgICAgcHJpbnQoJ0NvdWxkIG5vdCBhZGQgZmlsZSB7MH0gdG8gYXJjaGl2ZTogezF9Jy5mb3JtYXQoZmlsZW5hbWUsIGUpLCBmaWxlPXN5cy5zdGRlcnIpDQoNCiAgICAgICAgIyBJdGVyYXRlIG92ZXIgdGhlIGdpdmVuIGZpbGVzIHRvIGFkZCB0byBhcmNoaXZlLg0KICAgICAgICBmb3IgZmlsZW5hbWUgaW4gYXJndW1lbnRzLmZpbGVzOg0KICAgICAgICAgICAgYWRkX2ZpbGUoX3VuaWNvZGUoZmlsZW5hbWUpKQ0KDQogICAgICAgICMgU2V0IHZlcnNpb24gZm9yIHNhdmluZywgYW5kIHNhdmUuDQogICAgICAgIGFyY2hpdmUudmVyc2lvbiA9IHZlcnNpb24NCiAgICAgICAgdHJ5Og0KICAgICAgICAgICAgYXJjaGl2ZS5zYXZlKG91dHB1dCkNCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOg0KICAgICAgICAgICAgcHJpbnQoJ0NvdWxkIG5vdCBzYXZlIGFyY2hpdmUgZmlsZTogezB9Jy5mb3JtYXQoZSksIGZpbGU9c3lzLnN0ZGVycikNCiAgICBlbGlmIGFyZ3VtZW50cy5kZWxldGU6DQogICAgICAgICMgSXRlcmF0ZSBvdmVyIHRoZSBnaXZlbiBmaWxlcyB0byBkZWxldGUgZnJvbSB0aGUgYXJjaGl2ZS4NCiAgICAgICAgZm9yIGZpbGVuYW1lIGluIGFyZ3VtZW50cy5maWxlczoNCiAgICAgICAgICAgIHRyeToNCiAgICAgICAgICAgICAgICBhcmNoaXZlLnJlbW92ZShmaWxlbmFtZSkNCiAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToNCiAgICAgICAgICAgICAgICBwcmludCgnQ291bGQgbm90IGRlbGV0ZSBmaWxlIHswfSBmcm9tIGFyY2hpdmU6IHsxfScuZm9ybWF0KGZpbGVuYW1lLCBlKSwgZmlsZT1zeXMuc3RkZXJyKQ0KDQogICAgICAgICMgU2V0IHZlcnNpb24gZm9yIHNhdmluZywgYW5kIHNhdmUuDQogICAgICAgIGFyY2hpdmUudmVyc2lvbiA9IHZlcnNpb24NCiAgICAgICAgdHJ5Og0KICAgICAgICAgICAgYXJjaGl2ZS5zYXZlKG91dHB1dCkNCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOg0KICAgICAgICAgICAgcHJpbnQoJ0NvdWxkIG5vdCBzYXZlIGFyY2hpdmUgZmlsZTogezB9Jy5mb3JtYXQoZSksIGZpbGU9c3lzLnN0ZGVycikNCiAgICBlbGlmIGFyZ3VtZW50cy5leHRyYWN0Og0KICAgICAgICAjIEVpdGhlciBleHRyYWN0IHRoZSBnaXZlbiBmaWxlcywgb3IgYWxsIGZpbGVzIGlmIG5vIGZpbGVzIGFyZSBnaXZlbi4NCiAgICAgICAgaWYgbGVuKGFyZ3VtZW50cy5maWxlcykgPiAwOg0KICAgICAgICAgICAgZmlsZXMgPSBhcmd1bWVudHMuZmlsZXMNCiAgICAgICAgZWxzZToNCiAgICAgICAgICAgIGZpbGVzID0gYXJjaGl2ZS5saXN0KCkNCg0KICAgICAgICAjIENyZWF0ZSBvdXRwdXQgZGlyZWN0b3J5IGlmIG5vdCBwcmVzZW50Lg0KICAgICAgICBpZiBub3Qgb3MucGF0aC5leGlzdHMob3V0cHV0KToNCiAgICAgICAgICAgIG9zLm1ha2VkaXJzKG91dHB1dCkNCg0KICAgICAgICAjIEl0ZXJhdGUgb3ZlciBmaWxlcyB0byBleHRyYWN0Lg0KICAgICAgICBmb3IgZmlsZW5hbWUgaW4gZmlsZXM6DQogICAgICAgICAgICBpZiBmaWxlbmFtZS5maW5kKCc9JykgIT0gLTE6DQogICAgICAgICAgICAgICAgKG91dGZpbGUsIGZpbGVuYW1lKSA9IGZpbGVuYW1lLnNwbGl0KCc9JywgMikNCiAgICAgICAgICAgIGVsc2U6DQogICAgICAgICAgICAgICAgb3V0ZmlsZSA9IGZpbGVuYW1lDQoNCiAgICAgICAgICAgIHRyeToNCiAgICAgICAgICAgICAgICBjb250ZW50cyA9IGFyY2hpdmUucmVhZChmaWxlbmFtZSkNCg0KICAgICAgICAgICAgICAgICMgQ3JlYXRlIG91dHB1dCBkaXJlY3RvcnkgZm9yIGZpbGUgaWYgbm90IHByZXNlbnQuDQogICAgICAgICAgICAgICAgaWYgbm90IG9zLnBhdGguZXhpc3RzKG9zLnBhdGguZGlybmFtZShvcy5wYXRoLmpvaW4ob3V0cHV0LCBvdXRmaWxlKSkpOg0KICAgICAgICAgICAgICAgICAgICBvcy5tYWtlZGlycyhvcy5wYXRoLmRpcm5hbWUob3MucGF0aC5qb2luKG91dHB1dCwgb3V0ZmlsZSkpKQ0KDQogICAgICAgICAgICAgICAgd2l0aCBvcGVuKG9zLnBhdGguam9pbihvdXRwdXQsIG91dGZpbGUpLCAnd2InKSBhcyBmaWxlOg0KICAgICAgICAgICAgICAgICAgICBmaWxlLndyaXRlKGNvbnRlbnRzKQ0KICAgICAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOg0KICAgICAgICAgICAgICAgIHByaW50KCdDb3VsZCBub3QgZXh0cmFjdCBmaWxlIHswfSBmcm9tIGFyY2hpdmU6IHsxfScuZm9ybWF0KGZpbGVuYW1lLCBlKSwgZmlsZT1zeXMuc3RkZXJyKQ0KICAgIGVsaWYgYXJndW1lbnRzLmxpc3Q6DQogICAgICAgICMgUHJpbnQgdGhlIHNvcnRlZCBmaWxlIGxpc3QuDQogICAgICAgIGxpc3QgPSBhcmNoaXZlLmxpc3QoKQ0KICAgICAgICBsaXN0LnNvcnQoKQ0KICAgICAgICBmb3IgZmlsZSBpbiBsaXN0Og0KICAgICAgICAgICAgcHJpbnQoZmlsZSkNCiAgICBlbHNlOg0KICAgICAgICBwcmludCgnTm8gb3BlcmF0aW9uIGdpdmVuIDooJykNCiAgICAgICAgcHJpbnQoJ1VzZSB7MH0gLS1oZWxwIGZvciB1c2FnZSBkZXRhaWxzLicuZm9ybWF0KHN5cy5hcmd2WzBdKSkNCg0K"
+        )
+    ) else (
+        >"%rpatool%.b64" (
+            <nul set /p="IyEvdXNyL2Jpbi9lbnYgcHl0aG9uCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgcHJpbnRfZnVuY3Rpb24KaW1wb3J0IHN5cwppbXBvcnQgb3MKCmltcG9ydCByZW5weQp0cnk6CiAgICBpbXBvcnQgcmVucHkuZXJyb3IKZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOgogICAgaWYgb3MuZW52aXJvbi5nZXQoJ1JQQVRPT0xfREVCVUcnKToKICAgICAgICBwcmludCgnREVCVUc6IGltcG9ydCByZW5weS5lcnJvciBmYWlsZWQ6IHswIXJ9Jy5mb3JtYXQoZSkpCmltcG9ydCByZW5weS5vYmplY3QKaW1wb3J0IHJlbnB5LmNvbmZpZwppbXBvcnQgcmVucHkubG9hZGVyCnRyeToKICAgIGltcG9ydCByZW5weS51dGlsCmV4Y2VwdDoKICAgIHBhc3MKCgpjbGFzcyBSZW5QeUFyY2hpdmU6CiAgICBmaWxlID0gTm9uZQogICAgaGFuZGxlID0gTm9uZQoKICAgIGZpbGVzID0ge30KICAgIGluZGV4ZXMgPSB7fQoKICAgIGRlZiBfX2luaXRfXyhzZWxmLCBmaWxlKToKICAgICAgICBzZWxmLmxvYWQoZmlsZSkKCiAgICAjIENvbnZlcnRzIGEgZmlsZW5hbWUgdG8gYXJjaGl2ZSBmb3JtYXQuCiAgICBkZWYgY29udmVydF9maWxlbmFtZShzZWxmLCBmaWxlbmFtZSk6CiAgICAgICAgKGRyaXZlLCBmaWxlbmFtZSkgPSBvcy5wYXRoLnNwbGl0ZHJpdmUob3MucGF0aC5ub3JtcGF0aChmaWxlbmFtZSkucmVwbGFjZShvcy5zZXAsICcvJykpCiAgICAgICAgcmV0dXJuIGZpbGVuYW1lCgogICAgIyBMaXN0IGZpbGVzIGluIGFyY2hpdmUgYW5kIGN1cnJlbnQgaW50ZXJuYWwgc3RvcmFnZS4KICAgIGRlZiBsaXN0KHNlbGYpOgogICAgICAgIHJldHVybiBsaXN0KHNlbGYuaW5kZXhlcykKCiAgICAjIFJlYWQgZmlsZSBmcm9tIGFyY2hpdmUgb3IgaW50ZXJuYWwgc3RvcmFnZS4KICAgIGRlZiByZWFkKHNlbGYsIGZpbGVuYW1lKToKICAgICAgICBmaWxlbmFtZSA9IHNlbGYuY29udmVydF9maWxlbmFtZShmaWxlbmFtZSkKICAgICAgICBpZiBmaWxlbmFtZSAhPSAnLicgYW5kIGlzaW5zdGFuY2Uoc2VsZi5pbmRleGVzW2ZpbGVuYW1lXSwgbGlzdCk6CiAgICAgICAgICAgIGlmIGhhc2F0dHIocmVucHkubG9hZGVyLCAibG9hZF9mcm9tX2FyY2hpdmUiKToKICAgICAgICAgICAgICAgIHN1YmZpbGUgPSByZW5weS5sb2FkZXIubG9hZF9mcm9tX2FyY2hpdmUoZmlsZW5hbWUpCiAgICAgICAgICAgIGVsc2U6CiAgICAgICAgICAgICAgICBzdWJmaWxlID0gcmVucHkubG9hZGVyLmxvYWRfY29yZShmaWxlbmFtZSkKICAgICAgICAgICAgcmV0dXJuIHN1YmZpbGUucmVhZCgpCiAgICAgICAgZWxzZToKICAgICAgICAgICAgcmV0dXJuIE5vbmUKCiAgICAjIExvYWQgYXJjaGl2ZS4KICAgIGRlZiBsb2FkKHNlbGYsIGZpbGVuYW1lKToKICAgICAgICBzZWxmLmZpbGUgPSBmaWxlbmFtZQogICAgICAgIHNlbGYuZmlsZXMgPSB7fQogICAgICAgIHNlbGYuaW5kZXhlcyA9IHt9CiAgICAgICAgc2VsZi5oYW5kbGUgPSBvcGVuKHNlbGYuZmlsZSwgJ3JiJykKCiAgICAgICAgYWJzX3BhdGggPSBvcy5wYXRoLnJlYWxwYXRoKGZpbGVuYW1lKQogICAgICAgIGFyY2hpdmVfZGlyID0gb3MucGF0aC5kaXJuYW1lKGFic19wYXRoKQogICAgICAgIGFyY2hpdmVfYmFzZW5hbWUgPSBvcy5wYXRoLmJhc2VuYW1lKGFic19wYXRoKQogICAgICAgIGJhc2UsIGV4dCA9IGFyY2hpdmVfYmFzZW5hbWUucnNwbGl0KCIuIiwgMSkKCiAgICAgICAgIyBjb25maWcuYXJjaGl2ZXMgbGlzdHMgYXJjaGl2ZSBiYXNlbmFtZXMgKHdpdGhvdXQgZXh0ZW5zaW9uKSB0aGF0CiAgICAgICAgIyBSZW4nUHkgaXMgYWxsb3dlZCB0byB1c2U7IGNvbmZpZy5zZWFyY2hwYXRoIGlzIHdoZXJlIGl0IGxvb2tzIGZvcgogICAgICAgICMgYXJjaGl2ZSBmaWxlcyBhbmQgb3RoZXIgYXNzZXRzLgogICAgICAgIHJlbnB5LmNvbmZpZy5hcmNoaXZlcy5hcHBlbmQoYmFzZSkKICAgICAgICByZW5weS5jb25maWcuc2VhcmNocGF0aCA9IFthcmNoaXZlX2Rpcl0KICAgICAgICByZW5weS5jb25maWcuYmFzZWRpciA9IG9zLnBhdGguZGlybmFtZShhcmNoaXZlX2RpcikKCiAgICAgICAgIyBOZXdlciBSZW4nUHkgYnVpbGRzICg4LjUrKSBubyBsb25nZXIgaGF2ZSBpbmRleF9hcmNoaXZlcygpIHNjYW4KICAgICAgICAjIHRoZSBzZWFyY2hwYXRoIGl0c2VsZjogaXQgbm93IG9ubHkgcHJvY2Vzc2VzIHRoZSBnbG9iYWwgYXJjX2ZpbGVzCiAgICAgICAgIyBsaXN0LCB3aGljaCBtdXN0IGZpcnN0IGJlIHBvcHVsYXRlZCBieSBzY2FuZGlyZmlsZXMoKSB3YWxraW5nIHRoZQogICAgICAgICMgZmlsZXN5c3RlbSB2aWEgdGhlIHNjYW5kaXJmaWxlc19mcm9tX2ZpbGVzeXN0ZW0gY2FsbGJhY2suIE9sZGVyCiAgICAgICAgIyBidWlsZHMgZG9uJ3QgaGF2ZSB0aGlzIHR3by1zdGVwIHNwbGl0LCBzbyB3ZSBjYWxsIGl0IG9ubHkgaWYKICAgICAgICAjIGF2YWlsYWJsZS4KICAgICAgICBpZiBoYXNhdHRyKHJlbnB5LmxvYWRlciwgInNjYW5kaXJmaWxlcyIpOgogICAgICAgICAgICByZW5weS5sb2FkZXIuc2NhbmRpcmZpbGVzKCkKCiAgICAgICAgcmVucHkubG9hZGVyLmluZGV4X2FyY2hpdmVzKCkKCiAgICAgICAgIyBMb29rIHVwIHRoZSBtYXRjaGluZyBhcmNoaXZlIGFtb25nIHRoZSBvbmVzIGluZGV4ZWQgYnkgUmVuJ1B5LAogICAgICAgICMgaW5zdGVhZCBvZiBhc3N1bWluZyBhIGZpeGVkIGluZGV4ICh0aGUgb3JpZ2luYWwgc2NyaXB0IHBpY2tlZAogICAgICAgICMgdGhlIGFyY2hpdmUgYmFzZWQgb24gaXRzIHBvc2l0aW9uIGluIGEgbGlzdCBvZiBzY2FubmVkIGZpbGVzKS4KICAgICAgICAjIE5vdGU6IG9uIG5ld2VyIFJlbidQeSBidWlsZHMsIHJlbnB5LmxvYWRlci5hcmNoaXZlcyBlbnRyaWVzIGFyZQogICAgICAgICMgKGZ1bGxfZmlsZV9wYXRoLCBpbmRleCkgdHVwbGVzLCBzbyB3ZSBjb21wYXJlIGFnYWluc3QgdGhlIGZ1bGwKICAgICAgICAjIGJhc2VuYW1lIChpbmNsdWRpbmcgZXh0ZW5zaW9uKSByYXRoZXIgdGhhbiB0aGUgZXh0ZW5zaW9uLWxlc3MgYmFzZS4KICAgICAgICBhcmNoaXZlX2luZGV4ID0gTm9uZQogICAgICAgIGZvciBpLCAoYXJjaGl2ZV9iYXNlLCBfKSBpbiBlbnVtZXJhdGUocmVucHkubG9hZGVyLmFyY2hpdmVzKToKICAgICAgICAgICAgaWYgb3MucGF0aC5iYXNlbmFtZShhcmNoaXZlX2Jhc2UpIGluIChhcmNoaXZlX2Jhc2VuYW1lLCBiYXNlKToKICAgICAgICAgICAgICAgIGFyY2hpdmVfaW5kZXggPSBpCiAgICAgICAgICAgICAgICBicmVhawogICAgICAgIGlmIGFyY2hpdmVfaW5kZXggaXMgTm9uZToKICAgICAgICAgICAgIyBGYWxsYmFjazogaWYgb25seSBvbmUgYXJjaGl2ZSB3YXMgaW5kZXhlZCwgdXNlIHRoYXQgb25lLgogICAgICAgICAgICBpZiBsZW4ocmVucHkubG9hZGVyLmFyY2hpdmVzKSA9PSAxOgogICAgICAgICAgICAgICAgYXJjaGl2ZV9pbmRleCA9IDAKICAgICAgICAgICAgZWxzZToKICAgICAgICAgICAgICAgIGluZGV4ZWQgPSBbYVswXSBmb3IgYSBpbiByZW5weS5sb2FkZXIuYXJjaGl2ZXNdCiAgICAgICAgICAgICAgICByYWlzZSBWYWx1ZUVycm9yKAogICAgICAgICAgICAgICAgICAgICdjb3VsZCBub3QgZmluZCBhcmNoaXZlICJ7MH0iIGFtb25nIHRoZSBhcmNoaXZlcyBpbmRleGVkIGJ5ICcKICAgICAgICAgICAgICAgICAgICAnUmVuXCdQeS4gTG9va2VkIGZvciBiYXNlbmFtZSAiezF9IiBpbiBzZWFyY2hwYXRoICJ7Mn0iLiAnCiAgICAgICAgICAgICAgICAgICAgJ0FyY2hpdmVzIFJlblwnUHkgYWN0dWFsbHkgaW5kZXhlZDogezN9Jy5mb3JtYXQoCiAgICAgICAgICAgICAgICAgICAgICAgIGZpbGVuYW1lLCBiYXNlLCBhcmNoaXZlX2RpciwgaW5kZXhlZCkpCgogICAgICAgIGl0ZW1zID0gcmVucHkubG9hZGVyLmFyY2hpdmVzW2FyY2hpdmVfaW5kZXhdWzFdLml0ZW1zKCkKICAgICAgICBmb3IgZmlsZSwgaW5kZXggaW4gaXRlbXM6CiAgICAgICAgICAgIHNlbGYuaW5kZXhlc1tmaWxlXSA9IGluZGV4CgoKaWYgX19uYW1lX18gPT0gIl9fbWFpbl9fIjoKICAgIGltcG9ydCBhcmdwYXJzZQoKICAgIHBhcnNlciA9IGFyZ3BhcnNlLkFyZ3VtZW50UGFyc2VyKAogICAgICAgIGRlc2NyaXB0aW9uPSdBIHRvb2wgZm9yIHdvcmtpbmcgd2l0aCBSZW5cJ1B5IGFyY2hpdmUgZmlsZXMgKHVzZXMgUmVuXCdQeVwncyBpbnRlcm5hbCBsb2FkZXIsIHN1cHBvcnRzIGVuY3J5cHRlZC9jdXN0b20gYXJjaGl2ZXMpLicsCiAgICAgICAgZXBpbG9nPSdUaGUgRklMRSBhcmd1bWVudCBjYW4gb3B0aW9uYWxseSBiZSBpbiBBUkNISVZFPVJFQUwgZm9ybWF0LCBtYXBwaW5nIGEgZmlsZSBpbiB0aGUgYXJjaGl2ZSBmaWxlIHN5c3RlbSB0byBhIGZpbGUgb24geW91ciByZWFsIGZpbGUgc3lzdGVtLiBBbiBleGFtcGxlIG9mIHRoaXM6IHJwYXRvb2xfcmVucHkucHkgLXggdGVzdC5ycGEgc2NyaXB0LnJweWM9L2hvbWUvZm9vL3Rlc3QucnB5YycsCiAgICAgICAgYWRkX2hlbHA9RmFsc2UpCgogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnYXJjaGl2ZScsIG1ldGF2YXI9J0FSQ0hJVkUnLCBoZWxwPSdUaGUgUmVuXCdweSBhcmNoaXZlIGZpbGUgdG8gb3BlcmF0ZSBvbi4nKQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnZmlsZXMnLCBtZXRhdmFyPSdGSUxFJywgbmFyZ3M9JyonLCBhY3Rpb249J2FwcGVuZCcsIGhlbHA9J1plcm8gb3IgbW9yZSBmaWxlcyB0byBvcGVyYXRlIG9uLicpCgogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWwnLCAnLS1saXN0JywgYWN0aW9uPSdzdG9yZV90cnVlJywgaGVscD0nTGlzdCBGSUxFKFMpIGluIGFyY2hpdmUgQVJDSElWRS4nKQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLXgnLCAnLS1leHRyYWN0JywgYWN0aW9uPSdzdG9yZV90cnVlJywgaGVscD0nRXh0cmFjdCBGSUxFKFMpIGZyb20gQVJDSElWRS4nKQoKICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1vJywgJy0tb3V0ZmlsZScsIGhlbHA9J0FuIGFsdGVybmF0aXZlIG91dHB1dCBkaXJlY3Rvcnkgd2hlbiBleHRyYWN0aW5nLicpCgogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWgnLCAnLS1oZWxwJywgYWN0aW9uPSdoZWxwJywgaGVscD0nUHJpbnQgdGhpcyBoZWxwIGFuZCBleGl0LicpCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctdicsICctLXZlcmJvc2UnLCBhY3Rpb249J3N0b3JlX3RydWUnLCBoZWxwPSdCZSBhIGJpdCBtb3JlIHZlcmJvc2Ugd2hpbGUgcGVyZm9ybWluZyBvcGVyYXRpb25zLicpCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctVicsICctLXZlcnNpb24nLCBhY3Rpb249J3ZlcnNpb24nLCB2ZXJzaW9uPSdycGF0b29sdjMucHkgdjAuMSAocmVucHkubG9hZGVyIGJhY2tlbmQpJywgaGVscD0nU2hvdyB2ZXJzaW9uIGluZm9ybWF0aW9uLicpCgogICAgYXJndW1lbnRzID0gcGFyc2VyLnBhcnNlX2FyZ3MoKQoKICAgIGFyY2hpdmVfcGF0aCA9IGFyZ3VtZW50cy5hcmNoaXZlCgogICAgaWYgJ291dGZpbGUnIGluIGFyZ3VtZW50cyBhbmQgYXJndW1lbnRzLm91dGZpbGUgaXMgbm90IE5vbmU6CiAgICAgICAgb3V0cHV0ID0gYXJndW1lbnRzLm91dGZpbGUKICAgIGVsc2U6CiAgICAgICAgb3V0cHV0ID0gJy4nCgogICAgIyBOb3JtYWxpemUgZmlsZXMuCiAgICBpZiBsZW4oYXJndW1lbnRzLmZpbGVzKSA+IDAgYW5kIGlzaW5zdGFuY2UoYXJndW1lbnRzLmZpbGVzWzBdLCBsaXN0KToKICAgICAgICBhcmd1bWVudHMuZmlsZXMgPSBhcmd1bWVudHMuZmlsZXNbMF0KCiAgICB0cnk6CiAgICAgICAgYXJjaGl2ZSA9IFJlblB5QXJjaGl2ZShhcmNoaXZlX3BhdGgpCiAgICBleGNlcHQgSU9FcnJvciBhcyBlOgogICAgICAgIHByaW50KCdDb3VsZCBub3Qgb3BlbiBhcmNoaXZlIGZpbGUgezB9IGZvciByZWFkaW5nOiB7MX0nLmZvcm1hdChhcmNoaXZlX3BhdGgsIGUpLCBmaWxlPXN5cy5zdGRlcnIpCiAgICAgICAgc3lzLmV4aXQoMSkKCiAgICBpZiBhcmd1bWVudHMuZXh0cmFjdDoKICAgICAgICAjIEVpdGhlciBleHRyYWN0IHRoZSBnaXZlbiBmaWxlcywgb3IgYWxsIGZpbGVzIGlmIG5vIGZpbGVzIGFyZSBnaXZlbi4KICAgICAgICBpZiBsZW4oYXJndW1lbnRzLmZpbGVzKSA+IDA6CiAgICAgICAgICAgIGZpbGVzID0gYXJndW1lbnRzLmZpbGVzCiAgICAgICAgZWxzZToKICAgICAgICAgICAgZmlsZXMgPSBhcmNoaXZlLmxpc3QoKQoKICAgICAgICAjIENyZWF0ZSBvd"
+            <nul set /p="XRwdXQgZGlyZWN0b3J5IGlmIG5vdCBwcmVzZW50LgogICAgICAgIGlmIG5vdCBvcy5wYXRoLmV4aXN0cyhvdXRwdXQpOgogICAgICAgICAgICBvcy5tYWtlZGlycyhvdXRwdXQpCgogICAgICAgICMgSXRlcmF0ZSBvdmVyIGZpbGVzIHRvIGV4dHJhY3QuCiAgICAgICAgZm9yIGZpbGVuYW1lIGluIGZpbGVzOgogICAgICAgICAgICBpZiBmaWxlbmFtZS5maW5kKCc9JykgIT0gLTE6CiAgICAgICAgICAgICAgICAob3V0ZmlsZSwgZmlsZW5hbWUpID0gZmlsZW5hbWUuc3BsaXQoJz0nLCAyKQogICAgICAgICAgICBlbHNlOgogICAgICAgICAgICAgICAgb3V0ZmlsZSA9IGZpbGVuYW1lCgogICAgICAgICAgICB0cnk6CiAgICAgICAgICAgICAgICBpZiBhcmd1bWVudHMudmVyYm9zZToKICAgICAgICAgICAgICAgICAgICBwcmludCgnRXh0cmFjdGluZyB7MH0uLi4nLmZvcm1hdChmaWxlbmFtZSkpCgogICAgICAgICAgICAgICAgY29udGVudHMgPSBhcmNoaXZlLnJlYWQoZmlsZW5hbWUpCiAgICAgICAgICAgICAgICBpZiBjb250ZW50cyBpcyBOb25lOgogICAgICAgICAgICAgICAgICAgIHJhaXNlIElPRXJyb3IoJ3RoZSByZXF1ZXN0ZWQgZmlsZSB7MH0gZG9lcyBub3QgZXhpc3QgaW4gdGhlIGdpdmVuIFJlblwnUHkgYXJjaGl2ZScuZm9ybWF0KGZpbGVuYW1lKSkKCiAgICAgICAgICAgICAgICAjIENyZWF0ZSBvdXRwdXQgZGlyZWN0b3J5IGZvciBmaWxlIGlmIG5vdCBwcmVzZW50LgogICAgICAgICAgICAgICAgZGVzdF9kaXIgPSBvcy5wYXRoLmRpcm5hbWUob3MucGF0aC5qb2luKG91dHB1dCwgb3V0ZmlsZSkpCiAgICAgICAgICAgICAgICBpZiBkZXN0X2RpciBhbmQgbm90IG9zLnBhdGguZXhpc3RzKGRlc3RfZGlyKToKICAgICAgICAgICAgICAgICAgICBvcy5tYWtlZGlycyhkZXN0X2RpcikKCiAgICAgICAgICAgICAgICB3aXRoIG9wZW4ob3MucGF0aC5qb2luKG91dHB1dCwgb3V0ZmlsZSksICd3YicpIGFzIGZpbGU6CiAgICAgICAgICAgICAgICAgICAgZmlsZS53cml0ZShjb250ZW50cykKICAgICAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOgogICAgICAgICAgICAgICAgcHJpbnQoJ0NvdWxkIG5vdCBleHRyYWN0IGZpbGUgezB9IGZyb20gYXJjaGl2ZTogezF9Jy5mb3JtYXQoZmlsZW5hbWUsIGUpLCBmaWxlPXN5cy5zdGRlcnIpCiAgICBlbGlmIGFyZ3VtZW50cy5saXN0OgogICAgICAgICMgUHJpbnQgdGhlIHNvcnRlZCBmaWxlIGxpc3QuCiAgICAgICAgZmlsZV9saXN0ID0gYXJjaGl2ZS5saXN0KCkKICAgICAgICBmaWxlX2xpc3Quc29ydCgpCiAgICAgICAgZm9yIGZpbGUgaW4gZmlsZV9saXN0OgogICAgICAgICAgICBwcmludChmaWxlKQogICAgZWxzZToKICAgICAgICBwcmludCgnTm8gb3BlcmF0aW9uIGdpdmVuIDooJykKICAgICAgICBwcmludCgnVXNlIHswfSAtLWhlbHAgZm9yIHVzYWdlIGRldGFpbHMuJy5mb3JtYXQoc3lzLmFyZ3ZbMF0pKQo="
+        )
     )
 )
 
@@ -2013,8 +1652,11 @@ if not exist "%rpatool%" (
 )
 
 >"%altrpatool%.b64" (
-    <nul set /p="IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQoNCiMgTWFkZSBieSAoU00pIGFrYSBKb2VMdXJtZWwgQCBmOTV6b25lLnRvDQojIFRoaXMgc2NyaXB0IGlzIGxpY2Vuc2VkIHVuZGVyIEdOVSBHUEwgdjMg4oCUIHNlZSBMSUNFTlNFIGZvciBkZXRhaWxzDQoNCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgcHJpbnRfZnVuY3Rpb24NCmltcG9ydCBzeXMNCmltcG9ydCBvcw0KZnJvbSBwYXRobGliIGltcG9ydCBQYXRoDQppbXBvcnQgYXJncGFyc2UNCmltcG9ydCBoYXNobGliDQppbXBvcnQgcGlja2xlDQppbXBvcnQgemxpYg0KDQpzeXMucGF0aC5hcHBlbmQoJy4uJykNCnRyeToNCiAgICBpbXBvcnQgbWFpbiAgIyBub3FhOiBGNDAxDQpleGNlcHQ6DQogICAgcGFzcw0KDQppbXBvcnQgcmVucHkub2JqZWN0ICAjIG5vcWE6IEY0MDENCmltcG9ydCByZW5weS5jb25maWcNCmltcG9ydCByZW5weS5sb2FkZXINCnRyeToNCiAgICBpbXBvcnQgcmVucHkudXRpbCAgIyBub3FhOiBGNDAxDQpleGNlcHQ6DQogICAgcGFzcw0KDQpjbGFzcyBKQVNBcmNoaXZlSGFuZGxlckxvY2FsOg0KICAgICIiIg0KICAgIFN0YW5kYWxvbmUgSkFTIEhhbmRsZXIgKHdpdGhvdXQgUmVuJ1B5KQ0KICAgICIiIg0KDQogICAgZGVmIF9faW5pdF9fKHNlbGYsIGZpbGVfcGF0aCk6DQogICAgICAgIHNlbGYuZmlsZSA9IGZpbGVfcGF0aA0KICAgICAgICBzZWxmLmluZGV4ID0ge30NCiAgICAgICAgc2VsZi5fbG9hZF9pbmRleCgpDQoNCiAgICBkZWYgX2RlY29kZV9oZWFkZXIoc2VsZiwgaGVhZGVyKToNCiAgICAgICAgIyBUaGUgZGV2IGFsd2F5cyByZXR1cm5zIHRoaXMgc3RyaW5nLCBzbyB3ZSBjYW4gdXNlIGl0IHRvIGZpbmQgdGhlIG9mZnNldHMgYW5kIGtleQ0KICAgICAgICByZXR1cm4gImRhbnN0b25jdWxsYWJhbGF5ZXR0ZSINCg0KICAgIGRlZiBfbG9hZF9pbmRleChzZWxmKToNCiAgICAgICAgd2l0aCBvcGVuKHNlbGYuZmlsZSwgInJiIikgYXMgZjoNCiAgICAgICAgICAgIGhlYWRlciA9IGYucmVhZCg0MCkNCg0KICAgICAgICAgICAgIyAxKSBkZWNvZGUoKSDihpIgcmV0dXJucyBhIGZpeGVkIHN0cmluZw0KICAgICAgICAgICAgZGVjb2RlZCA9IHNlbGYuX2RlY29kZV9oZWFkZXIoaGVhZGVyKQ0KDQogICAgICAgICAgICAjIDIpIE1ENQ0KICAgICAgICAgICAgbWQ1aGV4ID0gaGFzaGxpYi5tZDUoZGVjb2RlZC5lbmNvZGUoKSkuaGV4ZGlnZXN0KCkNCiAgICAgICAgICAgIHg1MCA9IGludChtZDVoZXhbMF0sIDE2KSAlIDgNCiAgICAgICAgICAgIHg0QiA9IGludChtZDVoZXhbMV0sIDE2KSAlIDQNCg0KICAgICAgICAgICAgIyAzKSBleHRyYWN0aW9uIG9mIGhleCBmaWVsZHMNCiAgICAgICAgICAgIHgyMiA9IGhlYWRlcls4K3g1MCA6IDI0K3g1MF0uZGVjb2RlKCkucmVwbGFjZSgiWCIsICIwIikNCiAgICAgICAgICAgIHgyMyA9IGhlYWRlclsyNSt4NEIgOiAzMyt4NEJdLmRlY29kZSgpLnJlcGxhY2UoIlgiLCAiMCIpDQoNCiAgICAgICAgICAgIHg0RiA9IGludCh4MjIsIDE2KSAgIyBvZmZzZXQgaW5kZXgNCiAgICAgICAgICAgIHg2QiA9IGludCh4MjMsIDE2KSAgIyBYT1Iga2V5DQoNCiAgICAgICAgICAgICMgNCkgcmVhZGluZyB0aGUgaW5kZXgNCiAgICAgICAgICAgIGYuc2Vlayh4NEYpDQogICAgICAgICAgICByYXcgPSBmLnJlYWQoKQ0KICAgICAgICAgICAgdHJ5Og0KICAgICAgICAgICAgICAgIGluZGV4ID0gcGlja2xlLmxvYWRzKHpsaWIuZGVjb21wcmVzcyhyYXcpKQ0KICAgICAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbjoNCiAgICAgICAgICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoIkltcG9zc2libGUgZGUgZMOpY29tcHJlc3NlciBs4oCZaW5kZXggSkFTIikNCg0KICAgICAgICAgICAgIyA1KSBkZWNvZGluZyB0aGUgb2Zmc2V0cw0KICAgICAgICAgICAgZml4ZWQgPSB7fQ0KICAgICAgICAgICAgZm9yIG5hbWUsIGVudHJpZXMgaW4gaW5kZXguaXRlbXMoKToNCiAgICAgICAgICAgICAgICBuZXdfZW50cmllcyA9IFtdDQogICAgICAgICAgICAgICAgZm9yIGUgaW4gZW50cmllczoNCiAgICAgICAgICAgICAgICAgICAgaWYgbGVuKGUpID09IDI6DQogICAgICAgICAgICAgICAgICAgICAgICBvZmYsIHNpemUgPSBlDQogICAgICAgICAgICAgICAgICAgICAgICBuZXdfZW50cmllcy5hcHBlbmQoKG9mZiBeIHg2Qiwgc2l6ZSBeIHg2QikpDQogICAgICAgICAgICAgICAgICAgIGVsc2U6DQogICAgICAgICAgICAgICAgICAgICAgICBvZmYsIHNpemUsIGV4dHJhID0gZQ0KICAgICAgICAgICAgICAgICAgICAgICAgbmV3X2VudHJpZXMuYXBwZW5kKChvZmYgXiB4NkIsIHNpemUgXiB4NkIsIGV4dHJhKSkNCiAgICAgICAgICAgICAgICBmaXhlZFtuYW1lXSA9IG5ld19lbnRyaWVzDQoNCiAgICAgICAgICAgIHNlbGYuaW5kZXggPSBmaXhlZA0KDQogICAgZGVmIGxpc3Qoc2VsZik6DQogICAgICAgIHJldHVybiBsaXN0KHNlbGYuaW5kZXgua2V5cygpKQ0KDQogICAgZGVmIHJlYWQoc2VsZiwgZmlsZW5hbWUpOg0KICAgICAgICBlbnRyaWVzID0gc2VsZi5pbmRleC5nZXQoZmlsZW5hbWUpDQogICAgICAgIGlmIG5vdCBlbnRyaWVzOg0KICAgICAgICAgICAgcmV0dXJuIE5vbmUNCg0KICAgICAgICBvZmYsIHNpemUgPSBlbnRyaWVzWzBdWzoyXQ0KICAgICAgICB3aXRoIG9wZW4oc2VsZi5maWxlLCAicmIiKSBhcyBmOg0KICAgICAgICAgICAgZi5zZWVrKG9mZikNCiAgICAgICAgICAgIHJldHVybiBmLnJlYWQoc2l6ZSkNCg0KDQpjbGFzcyBSZW5QeUFyY2hpdmU6DQogICAgZGVmIF9faW5pdF9fKHNlbGYsIGZpbGVfcGF0aCwgaW5kZXg9MCk6DQogICAgICAgIHNlbGYuZmlsZSA9IHN0cihmaWxlX3BhdGgpDQogICAgICAgIHNlbGYuaW5kZXhlcyA9IHt9DQogICAgICAgIHNlbGYubG9hZChzZWxmLmZpbGUsIGluZGV4KQ0KDQogICAgZGVmIGNvbnZlcnRfZmlsZW5hbWUoc2VsZiwgZmlsZW5hbWUpOg0KICAgICAgICBkcml2ZSwgZmlsZW5hbWUgPSBvcy5wYXRoLnNwbGl0ZHJpdmUoDQogICAgICAgICAgICBvcy5wYXRoLm5vcm1wYXRoKGZpbGVuYW1lKS5yZXBsYWNlKG9zLnNlcCwgJy8nKQ0KICAgICAgICApDQogICAgICAgIHJldHVybiBmaWxlbmFtZQ0KDQogICAgZGVmIGxpc3Qoc2VsZik6DQogICAgICAgIHJldHVybiBsaXN0KHNlbGYuaW5kZXhlcykNCg0KICAgIGRlZiByZWFkKHNlbGYsIGZpbGVuYW1lKToNCiAgICAgICAgZmlsZW5hbWUgPSBzZWxmLmNvbnZlcnRfZmlsZW5hbWUoZmlsZW5hbWUpDQogICAgICAgIGlkeCA9IHNlbGYuaW5kZXhlcy5nZXQoZmlsZW5hbWUpDQogICAgICAgIGlmIGZpbGVuYW1lICE9ICcuJyBhbmQgaXNpbnN0YW5jZShpZHgsIGxpc3QpOg0KICAgICAgICAgICAgaWYgaGFzYXR0cihyZW5weS5sb2FkZXIsICJsb2FkX2Zyb21fYXJjaGl2ZSIpOg0KICAgICAgICAgICAgICAgIHN1YmZpbGUgPSByZW5weS5sb2FkZXIubG9hZF9mcm9tX2FyY2hpdmUoZmlsZW5hbWUpDQogICAgICAgICAgICBlbHNlOg0KICAgICAgICAgICAgICAgIHN1YmZpbGUgPSByZW5weS5sb2FkZXIubG9hZF9jb3JlKGZpbGVuYW1lKQ0KICAgICAgICAgICAgcmV0dXJuIHN1YmZpbGUucmVhZCgpDQogICAgICAgIHJldHVybiBOb25lDQoNCiAgICBkZWYgbG9hZChzZWxmLCBmaWxlbmFtZSwgaW5kZXgpOg0KICAgICAgICBiYXNlID0gb3MucGF0aC5zcGxpdGV4dChvcy5wYXRoLmJhc2VuYW1lKGZpbGVuYW1lKSlbMF0NCg0KICAgICAgICBpZiBiYXNlIG5vdCBpbiByZW5weS5jb25maWcuYXJjaGl2ZXM6DQogICAgICAgICAgICByZW5weS5jb25maWcuYXJjaGl2ZXMuYXBwZW5kKGJhc2UpDQoNCiAgICAgICAgYXJjaGl2ZV9kaXIgPSBvcy5wYXRoLmRpcm5hbWUob3MucGF0aC5yZWFscGF0aChmaWxlbmFtZSkpDQogICAgICAgIHJlbnB5LmNvbmZpZy5zZWFyY2hwYXRoID0gW2FyY2hpdmVfZGlyXQ0KICAgICAgICByZW5weS5jb25maWcuYmFzZWRpciA9IG9zLnBhdGguZGlybmFtZShyZW5weS5jb25maWcuc2VhcmNocGF0aFswXSkNCiAgICAgICAgcmVucHkubG9hZGVyLmluZGV4X2FyY2hpdmVzKCkNCg0KICAgICAgICBhcmNoaXZlc19vYmogPSByZW5weS5sb2FkZXIuYXJjaGl2ZXMNCg0KICAgICAgICAjIEF1dG8tZGV0ZWN0aW9uDQogICAgICAgIGlmIGlzaW5zdGFuY2UoYXJjaGl2ZXNfb2JqLCBkaWN0KTogICMgUmVuJ1B5IDgNCiAgICAgICAgICAgIGl0ZW1zID0gYXJjaGl2ZXNfb2JqW2Jhc2VdWzFdLml0ZW1zKCkNCiAgICAgICAgZWxzZTogICMgUmVuJ1B5IDcNCiAgICAgICAgICAgIGl0ZW1zID0gYXJjaGl2ZXNfb2JqW2luZGV4XVsxXS5pdGVtcygpDQoNCiAgICAgICAgZm9yIGYsIGlkeCBpbiBpdGVtczoNCiAgICAgICAgICAgIHNlbGYuaW5kZXhlc1tmXSA9IGlkeA0KDQoNCmRlZiBsaXN0X2FyY2hpdmUoYXJjaF9wYXRoLCBhcmNoaXZlX2NsYXNzKToNCiAgICBwcmludChmJ0NvbnRlbnUgZGUgInthcmNoX3BhdGh9IjonKQ0KICAgIGFyY2hpdmUgPSBhcmNoaXZlX2NsYXNzKGFyY2hfcGF0aCkNCiAgICBmb3IgZmlsZW5hbWUgaW4gYXJjaGl2ZS5saXN0KCk6DQogICAgICAgIHByaW50KCIgICIsIGZpbGVuYW1lKQ0KDQoNCmRlZiBkaXNjb3Zlcl9leHRlbnNpb25zKCk6DQogICAgZXh0cyA9IFtdDQogICAgaWYgaGFzYXR0cihyZW5weS5sb2FkZXIsICJhcmNoaXZlX2hhbmRsZXJzIik6DQogICAgICAgIGZvciBoYW5kbGVyIGluIHJlbnB5LmxvYWRlci5hcmNoaXZlX2hhbmRsZXJzOg0KICAgICAgICAgICAgaWYgaGFzYXR0cihoYW5kbGVyLCAiZ2V0X3N1cHBvcnRlZF9leHRlbnNpb25zIik6DQogICAgICAgICAgICAgICAgZXh0cy5leHRlbmQoaGFuZGxlci5nZXRfc3VwcG9ydGVkX2V4dGVuc2lvbnMoKSkNCiAgICAgICAgICAgIGlmIGhhc2F0dHIoaGFuZGxlciwgImdldF9zdXBwb3J0ZWRfZXh0Iik6DQogICAgICAgICAgICAgICAgZXh0cy5leHRlbmQoaGFuZGxlci5nZXRfc3VwcG9ydGVkX2V4dCgpKQ0KICAgIGVsc2U6DQogICAgICAgIGV4dHMuYXBwZW5kKCcucnBhJykNCg0KICAgICMgQWRkIG1hbnVhbGx5IGlmIHRoZSBoYW5kbGVyIGlzIG5vdCBkZXRlY3RlZA0KICAgIGlmICcuamFzJyBub3QgaW4gZXh0czoNCiAgICAgICAgZXh0cy5hcHBlbmQoJy5qYXMnKQ0KDQogICAgaWYgJy5ycGMnIG5vdCBpbiBleHRzOg0KICAgICAgICBleHRzLmFwcGVuZCgnLnJwYycpDQoNCiAgICByZXR1cm4gc29ydGVkKHNldChlLmxvd2VyKCkgZm9yIGUgaW4gZXh0cykpDQoNCg0KZGVmIGRpc2NvdmVyX2FyY2hpdmVzKHNlYXJjaF9kaXIsIGV4dGVuc2lvbnMpOg0KICAgIGFyY2hpdmVzID0gW10NCiAgICBmb3Igcm9vdCwgZGlycywgZmlsZXMgaW4gb3Mud2FsayhzdHIoc2VhcmNoX2RpcikpOg0KICAgICAgICBmb3IgZmlsZSBpbiBmaWxlczoNCiAgICAgICAgICAgIHRyeToNCiAgICAgICAgICAgICAgICBiYXNlLCBleHQgPSBmaWxlLnJzcGxpdCgnLicsIDEpDQogICAgICAgICAgICAgICAgZXh0ID0gJy4nICsgZXh0Lmxvd2VyKCkNCiAgICAgICAgICAgICAgICBpZiBleHQgaW4gZXh0ZW5zaW9ucyBhbmQgJyUnIG5vdCBpbiBmaWxlOg0KICAgICAgICAgICAgICAgICAgICBhcmNoaXZlcy5hcHBlbmQoUGF0aChyb290KSAvIGZpbGUpDQogICAgICAgICAgICBleGNlcHQgVmFsdWVFcnJvcjoNCiAgICAgICAgICAgICAgICBjb250aW51ZQ0KICAgIHJldHVybiBhcmNoaXZlcw0KDQoNCmRlZiBleHRyYWN0X2FyY2hpdmUoYXJjaF9wYXRoLCBvdXRwdXQpOg0KICAgIHByaW50KGYnICBVbnBhY2tpbmcgInthcmNoX3BhdGh9IiAuLi4nKQ0KICAgIGFyY2hpdmUgPSBSZW5QeUFyY2hpdmUoYXJjaF9wYXRoLCAwKQ0KICAgIGZpbGVzID0gYXJjaGl2ZS5saXN0KCkNCg0KICAgIG91dHB1dC5ta2RpcihwYXJlbnRzPVRydWUsIGV4aXN0X29rPVRydWUpDQoNCiAgICBmb3IgZmlsZW5hbWUgaW4gZmlsZXM6DQogICAgICAgIGNvbnRlbnRzID0gYXJjaGl2ZS5yZWFkKGZpbGVuYW1lKQ0KICAgICAgICBpZiBjb250ZW50cyBpcyBub3QgTm9uZToNCiAgICAgICAgICAgIG91dGZpbGUgPSBvdXRwdXQgLyBmaWxlbmFtZQ0KICAgICAgICAgICAgb3V0ZmlsZS5wYXJlbnQubWtkaXIocGFyZW50cz1UcnVlLCBleGlzdF9vaz1UcnVlKQ0KICAgICAgICAgICAgd2l0aCBvcGVuKG91dGZpbGUsICd3YicpIGFzIGY6DQogICAgICAgI"
-    <nul set /p="CAgICAgICAgZi53cml0ZShjb250ZW50cykNCg0KDQpkZWYgbWFpbigpOg0KICAgIHBhcnNlciA9IGFyZ3BhcnNlLkFyZ3VtZW50UGFyc2VyKA0KICAgICAgICBkZXNjcmlwdGlvbj0iVG9vbCBmb3Igd29ya2luZyB3aXRoIFJlbidQeSBhcmNoaXZlIGZpbGVzLiIsDQogICAgICAgIGFkZF9oZWxwPVRydWUNCiAgICApDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWwnLCAnLS1saXN0JywgYWN0aW9uPSJzdG9yZV90cnVlIiwgZGVzdD0nbGlzdF9vbmx5JywNCiAgICAgICAgICAgICAgICAgICAgICAgIGhlbHA9Ikxpc3QgdGhlIGNvbnRlbnRzIG9mIHRoZSBhcmNoaXZlIHdpdGhvdXQgZXh0cmFjdGluZyB0aGVtIikNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctcicsIGFjdGlvbj0ic3RvcmVfdHJ1ZSIsIGRlc3Q9J3JlbW92ZScsDQogICAgICAgICAgICAgICAgICAgICAgICBoZWxwPSdSZW1vdmUgYXJjaGl2ZXMgYWZ0ZXIgZXh0cmFjdGlvbi4nKQ0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy14JywgZGVzdD0nYXJjaGl2ZScsIHR5cGU9c3RyLA0KICAgICAgICAgICAgICAgICAgICAgICAgaGVscD0nU3BlY2lmaWMgYXJjaGl2ZSBmaWxlIHRvIGV4dHJhY3QgKGZ1bGwgcGF0aCkuJykNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctbycsIGRlc3Q9J291dHB1dCcsIHR5cGU9c3RyLCBkZWZhdWx0PScuJywNCiAgICAgICAgICAgICAgICAgICAgICAgIGhlbHA9J091dHB1dCBkaXJlY3RvcnkgZm9yIGV4dHJhY3RlZCBmaWxlcy4nKQ0KICAgIGFyZ3MgPSBwYXJzZXIucGFyc2VfYXJncygpDQoNCiAgICBvdXRwdXQgPSBQYXRoKGFyZ3Mub3V0cHV0KS5yZXNvbHZlKCkNCiAgICBhcmNoaXZlX2ZpbHRlciA9IGFyZ3MuYXJjaGl2ZQ0KICAgIHJlbW92ZSA9IGFyZ3MucmVtb3ZlDQoNCiAgICBleHRlbnNpb25zID0gZGlzY292ZXJfZXh0ZW5zaW9ucygpDQoNCiAgICAjIC14IG1vZGU6IGV4dHJhY3Qgb25seSB0aGUgc3BlY2lmaWVkIGFyY2hpdmUgKGV4YWN0IHBhdGgpDQogICAgaWYgYXJjaGl2ZV9maWx0ZXI6DQogICAgICAgIHRhcmdldCA9IFBhdGgoYXJjaGl2ZV9maWx0ZXIpLnJlc29sdmUoKQ0KDQogICAgICAgIGlmIG5vdCB0YXJnZXQuZXhpc3RzKCk6DQogICAgICAgICAgICBiYXNlbmFtZSA9IG9zLnBhdGguYmFzZW5hbWUoYXJjaGl2ZV9maWx0ZXIpDQogICAgICAgICAgICBmb3VuZCA9IE5vbmUNCiAgICAgICAgICAgIGZvciByb290LCBkaXJzLCBmaWxlcyBpbiBvcy53YWxrKCcuJyk6DQogICAgICAgICAgICAgICAgaWYgYmFzZW5hbWUgaW4gZmlsZXM6DQogICAgICAgICAgICAgICAgICAgIGZvdW5kID0gUGF0aChyb290KSAvIGJhc2VuYW1lDQogICAgICAgICAgICAgICAgICAgIGJyZWFrDQogICAgICAgICAgICBpZiBmb3VuZCBpcyBOb25lOg0KICAgICAgICAgICAgICAgIHByaW50KGYnQXJjaGl2ZSAie2FyY2hpdmVfZmlsdGVyfSIgbm90IGZvdW5kLicpDQogICAgICAgICAgICAgICAgc3lzLmV4aXQoMSkNCiAgICAgICAgICAgIHRhcmdldCA9IGZvdW5kLnJlc29sdmUoKQ0KDQogICAgICAgICMgQ2hvb3NpbmcgYSBoYW5kbGVyDQogICAgICAgIGlmIHRhcmdldC5zdWZmaXgubG93ZXIoKSA9PSAiLmphcyI6DQogICAgICAgICAgICBoYW5kbGVyID0gSkFTQXJjaGl2ZUhhbmRsZXJMb2NhbA0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgaGFuZGxlciA9IFJlblB5QXJjaGl2ZQ0KDQogICAgICAgIGlmIGFyZ3MubGlzdF9vbmx5Og0KICAgICAgICAgICAgbGlzdF9hcmNoaXZlKHRhcmdldCwgaGFuZGxlcikNCiAgICAgICAgICAgIHJldHVybg0KDQogICAgICAgIGV4dHJhY3RfYXJjaGl2ZSh0YXJnZXQsIG91dHB1dCwgaGFuZGxlcikNCg0KICAgICAgICBpZiByZW1vdmU6DQogICAgICAgICAgICBvcy5yZW1vdmUoc3RyKHRhcmdldCkpDQogICAgICAgIHJldHVybg0KDQogICAgIyBEZWZhdWx0IG1vZGUNCiAgICBhcmNoaXZlcyA9IGRpc2NvdmVyX2FyY2hpdmVzKFBhdGgoJy4nKSwgZXh0ZW5zaW9ucykNCg0KICAgIGlmIG5vdCBhcmNoaXZlczoNCiAgICAgICAgcHJpbnQoIk5vIGFyY2hpdmVzIGZvdW5kLiIpDQogICAgICAgIHJldHVybg0KDQogICAgZm9yIGFyY2ggaW4gYXJjaGl2ZXM6DQogICAgICAgIGlmIGFyY2guc3VmZml4Lmxvd2VyKCkgPT0gIi5qYXMiOg0KICAgICAgICAgICAgaGFuZGxlciA9IEpBU0FyY2hpdmVIYW5kbGVyTG9jYWwNCiAgICAgICAgZWxzZToNCiAgICAgICAgICAgIGhhbmRsZXIgPSBSZW5QeUFyY2hpdmUNCg0KICAgICAgICBpZiBhcmdzLmxpc3Rfb25seToNCiAgICAgICAgICAgIGxpc3RfYXJjaGl2ZShhcmNoLCBoYW5kbGVyKQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgZXh0cmFjdF9hcmNoaXZlKGFyY2gsIG91dHB1dCwgaGFuZGxlcikNCg0KICAgIGlmIHJlbW92ZToNCiAgICAgICAgZm9yIGFyY2ggaW4gYXJjaGl2ZXM6DQogICAgICAgICAgICBvcy5yZW1vdmUoc3RyKGFyY2gpKQ0KDQoNCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6DQogICAgbWFpbigpDQo="
+    <nul set /p="IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQojIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLQ0KDQojIE1hZGUgYnkgKFNNKSBha2EgSm9lTHVybWVsIEAgZjk1em9uZS50bw0KIyBUaGlzIHNjcmlwdCBpcyBsaWNlbnNlZCB1bmRlciBHTlUgR1BMIHYzIC0gc2VlIExJQ0VOU0UgZm9yIGRldGFpbHMNCiMNCiMgQ29tcGF0aWJsZSB3aXRoIFB5dGhvbiAyLjcgYW5kIFB5dGhvbiAzLnguDQojDQojIERlZmF1bHQgYmVoYXZpb3I6IGV4dHJhY3QgcmVndWxhciBSZW4nUHkgYXJjaGl2ZXMgKC5ycGEpLg0KIyBPcHRpb25hbCBmZWF0dXJlcywgb25seSB1c2VkIHdoZW4gdGhlIGNvcnJlc3BvbmRpbmcgZGF0YSBpcyBlbmNvdW50ZXJlZDoNCiMgICAtIC5qYXMgYXJjaGl2ZXMgICAgICAgICAgICAtPiBKQVNBcmNoaXZlSGFuZGxlckxvY2FsDQojICAgLSAiSUwiLWVuY3J5cHRlZCBmaWxlcyAgICAgLT4gZGV0ZWN0ZWQgdGhyb3VnaCB0aGVpciBtYWdpYyBoZWFkZXIgYW5kDQojICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZGVjcnlwdGVkIGxpa2UgdGhlIGdhbWUncyBsb2FkZXIgaG9vayBkb2VzDQoNCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgcHJpbnRfZnVuY3Rpb24NCmltcG9ydCBzeXMNCmltcG9ydCBvcw0KaW1wb3J0IGFyZ3BhcnNlDQppbXBvcnQgaGFzaGxpYg0KaW1wb3J0IHBpY2tsZQ0KaW1wb3J0IHpsaWINCmltcG9ydCBzdHJ1Y3QNCmltcG9ydCBiaW5hc2NpaQ0KaW1wb3J0IHVuaWNvZGVkYXRhDQoNCnN5cy5wYXRoLmFwcGVuZCgnLi4nKQ0KdHJ5Og0KICAgIGltcG9ydCBtYWluICAjIG5vcWE6IEY0MDENCmV4Y2VwdDoNCiAgICBwYXNzDQoNCmltcG9ydCByZW5weS5vYmplY3QgICMgbm9xYTogRjQwMQ0KIyBSZWNlbnQgUmVuJ1B5ICg4LjQrKTogcmVucHkvY29uZmlnLnB5IHJlZmVyZW5jZXMgcmVucHkuZXJyb3IgaW4gYSB0eXBlDQojIGFubm90YXRpb24sIHNvIGl0IG11c3QgYmUgaW1wb3J0ZWQgYmVmb3JlIHJlbnB5LmNvbmZpZy4gTWlzc2luZyBvbiBvbGRlciB2ZXJzaW9ucy4NCnRyeToNCiAgICBpbXBvcnQgcmVucHkuZXJyb3IgICMgbm9xYTogRjQwMQ0KZXhjZXB0IEltcG9ydEVycm9yOg0KICAgIHBhc3MNCmltcG9ydCByZW5weS5jb25maWcNCmltcG9ydCByZW5weS5sb2FkZXINCnRyeToNCiAgICBpbXBvcnQgcmVucHkudXRpbCAgIyBub3FhOiBGNDAxDQpleGNlcHQ6DQogICAgcGFzcw0KDQoNCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tDQojIFB5dGhvbiAyIC8gMyBoZWxwZXJzDQojIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQ0KDQpfVEVYVCA9IHR5cGUodScnKQ0KDQoNCmRlZiBfdG9fYnl0ZXMocyk6DQogICAgaWYgaXNpbnN0YW5jZShzLCBieXRlcyk6DQogICAgICAgIHJldHVybiBzDQogICAgcmV0dXJuIHMuZW5jb2RlKCd1dGYtOCcsICdyZXBsYWNlJykNCg0KDQpkZWYgX21ha2VkaXJzKHBhdGgpOg0KICAgIGlmIG5vdCBwYXRoOg0KICAgICAgICByZXR1cm4NCiAgICBpZiBub3Qgb3MucGF0aC5pc2RpcihwYXRoKToNCiAgICAgICAgdHJ5Og0KICAgICAgICAgICAgb3MubWFrZWRpcnMocGF0aCkNCiAgICAgICAgZXhjZXB0IE9TRXJyb3I6DQogICAgICAgICAgICBpZiBub3Qgb3MucGF0aC5pc2RpcihwYXRoKToNCiAgICAgICAgICAgICAgICByYWlzZQ0KDQoNCmRlZiBfc2FmZV9qb2luKGJhc2UsIG5hbWUpOg0KICAgICIiIkpvaW4gcGF0aHMsIHJlZnVzaW5nIG5hbWVzIHRoYXQgd291bGQgZXNjYXBlIHRoZSBvdXRwdXQgZGlyZWN0b3J5LiIiIg0KICAgIG5hbWUgPSBuYW1lLnJlcGxhY2UoJ1xcJywgJy8nKQ0KICAgIHBhcnRzID0gW3AgZm9yIHAgaW4gbmFtZS5zcGxpdCgnLycpIGlmIHAgbm90IGluICgnJywgJy4nKV0NCiAgICBpZiBub3QgcGFydHMgb3IgJy4uJyBpbiBwYXJ0czoNCiAgICAgICAgcmV0dXJuIE5vbmUNCiAgICByZXR1cm4gb3MucGF0aC5qb2luKGJhc2UsICpwYXJ0cykNCg0KDQojIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQ0KIyBTSEFLRS0yNTY6IGhhc2hsaWIgd2hlbiBhdmFpbGFibGUgKFB5dGhvbiAzLjYrKSwgb3RoZXJ3aXNlIGEgcHVyZSBQeXRob24NCiMgaW1wbGVtZW50YXRpb24gKG5lZWRlZCBmb3IgUHl0aG9uIDIuNykuIFNsb3dlciwgYnV0IGdpdmVzIGlkZW50aWNhbCBvdXRwdXQuDQojIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQ0KDQpfTTY0ID0gMHhGRkZGRkZGRkZGRkZGRkZGDQoNCl9LRUNDQUtfUkMgPSBbDQogICAgMHgwMDAwMDAwMDAwMDAwMDAxLCAweDAwMDAwMDAwMDAwMDgwODIsIDB4ODAwMDAwMDAwMDAwODA4QSwNCiAgICAweDgwMDAwMDAwODAwMDgwMDAsIDB4MDAwMDAwMDAwMDAwODA4QiwgMHgwMDAwMDAwMDgwMDAwMDAxLA0KICAgIDB4ODAwMDAwMDA4MDAwODA4MSwgMHg4MDAwMDAwMDAwMDA4MDA5LCAweDAwMDAwMDAwMDAwMDAwOEEsDQogICAgMHgwMDAwMDAwMDAwMDAwMDg4LCAweDAwMDAwMDAwODAwMDgwMDksIDB4MDAwMDAwMDA4MDAwMDAwQSwNCiAgICAweDAwMDAwMDAwODAwMDgwOEIsIDB4ODAwMDAwMDAwMDAwMDA4QiwgMHg4MDAwMDAwMDAwMDA4MDg5LA0KICAgIDB4ODAwMDAwMDAwMDAwODAwMywgMHg4MDAwMDAwMDAwMDA4MDAyLCAweDgwMDAwMDAwMDAwMDAwODAsDQogICAgMHgwMDAwMDAwMDAwMDA4MDBBLCAweDgwMDAwMDAwODAwMDAwMEEsIDB4ODAwMDAwMDA4MDAwODA4MSwNCiAgICAweDgwMDAwMDAwMDAwMDgwODAsIDB4MDAwMDAwMDA4MDAwMDAwMSwgMHg4MDAwMDAwMDgwMDA4MDA4LA0KXQ0KDQpfS0VDQ0FLX1JPVCA9IFsNCiAgICBbMCwgMzYsIDMsIDQxLCAxOF0sDQogICAgWzEsIDQ0LCAxMCwgNDUsIDJdLA0KICAgIFs2MiwgNiwgNDMsIDE1LCA2MV0sDQogICAgWzI4LCA1NSwgMjUsIDIxLCA1Nl0sDQogICAgWzI3LCAyMCwgMzksIDgsIDE0XSwNCl0NCg0KDQpkZWYgX3JvbDY0KGEsIG4pOg0KICAgIG4gJT0gNjQNCiAgICBpZiBuID09IDA6DQogICAgICAgIHJldHVybiBhDQogICAgcmV0dXJuICgoYSA8PCBuKSB8IChhID4+ICg2NCAtIG4pKSkgJiBfTTY0DQoNCg0KZGVmIF9rZWNjYWtfZihsYW5lcyk6DQogICAgZm9yIHJuZCBpbiByYW5nZSgyNCk6DQogICAgICAgICMgdGhldGENCiAgICAgICAgYyA9IFtsYW5lc1t4XSBeIGxhbmVzW3ggKyA1XSBeIGxhbmVzW3ggKyAxMF0gXiBsYW5lc1t4ICsgMTVdIF4gbGFuZXNbeCArIDIwXQ0KICAgICAgICAgICAgIGZvciB4IGluIHJhbmdlKDUpXQ0KICAgICAgICBkID0gW2NbKHggLSAxKSAlIDVdIF4gX3JvbDY0KGNbKHggKyAxKSAlIDVdLCAxKSBmb3IgeCBpbiByYW5nZSg1KV0NCiAgICAgICAgbGFuZXMgPSBbbGFuZXNbaV0gXiBkW2kgJSA1XSBmb3IgaSBpbiByYW5nZSgyNSldDQogICAgICAgICMgcmhvICsgcGkNCiAgICAgICAgYiA9IFswXSAqIDI1DQogICAgICAgIGZvciB4IGluIHJhbmdlKDUpOg0KICAgICAgICAgICAgZm9yIHkgaW4gcmFuZ2UoNSk6DQogICAgICAgICAgICAgICAgYlt5ICsgNSAqICgoMiAqIHggKyAzICogeSkgJSA1KV0gPSBfcm9sNjQobGFuZXNbeCArIDUgKiB5XSwNCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBfS0VDQ0FLX1JPVFt4XVt5XSkNCiAgICAgICAgIyBjaGkNCiAgICAgICAgbGFuZXMgPSBbYlt4ICsgNSAqIHldIF4gKCh+YlsoeCArIDEpICUgNSArIDUgKiB5XSkgJiBiWyh4ICsgMikgJSA1ICsgNSAqIHldKQ0KICAgICAgICAgICAgICAgICBmb3IgeSBpbiByYW5nZSg1KSBmb3IgeCBpbiByYW5nZSg1KV0NCiAgICAgICAgIyBpb3RhDQogICAgICAgIGxhbmVzWzBdIF49IF9LRUNDQUtfUkNbcm5kXQ0KICAgIHJldHVybiBsYW5lcw0KDQoNCmRlZiBfc2hha2UyNTZfcHVyZShkYXRhLCBuKToNCiAgICByYXRlID0gMTM2DQogICAgYnVmID0gYnl0ZWFycmF5KGRhdGEpDQogICAgYnVmLmFwcGVuZCgweDFGKQ0KICAgIHdoaWxlIGxlbihidWYpICUgcmF0ZToNCiAgICAgICAgYnVmLmFwcGVuZCgwKQ0KICAgIGJ1ZlstMV0gfD0gMHg4MA0KDQogICAgbGFuZXMgPSBbMF0gKiAyNQ0KICAgIGZvciBvZmYgaW4gcmFuZ2UoMCwgbGVuKGJ1ZiksIHJhdGUpOg0KICAgICAgICBibG9jayA9IHN0cnVjdC51bnBhY2soJzwxN1EnLCBieXRlcyhidWZbb2ZmOm9mZiArIHJhdGVdKSkNCiAgICAgICAgZm9yIGkgaW4gcmFuZ2UoMTcpOg0KICAgICAgICAgICAgbGFuZXNbaV0gXj0gYmxvY2tbaV0NCiAgICAgICAgbGFuZXMgPSBfa2VjY2FrX2YobGFuZXMpDQoNCiAgICBvdXQgPSBieXRlYXJyYXkoKQ0KICAgIHdoaWxlIFRydWU6DQogICAgICAgIG91dCArPSBzdHJ1Y3QucGFjaygnPDE3UScsICpsYW5lc1s6MTddKQ0KICAgICAgICBpZiBsZW4ob3V0KSA+PSBuOg0KICAgICAgICAgICAgYnJlYWsNCiAgICAgICAgbGFuZXMgPSBfa2VjY2FrX2YobGFuZXMpDQogICAgcmV0dXJuIGJ5dGVzKG91dFs6bl0pDQoNCg0KZGVmIF9zaGFrZTI1NihkYXRhLCBuKToNCiAgICBpZiBoYXNhdHRyKGhhc2hsaWIsICdzaGFrZV8yNTYnKToNCiAgICAgICAgcmV0dXJuIGhhc2hsaWIuc2hha2VfMjU2KGRhdGEpLmRpZ2VzdChuKQ0KICAgIHJldHVybiBfc2hha2UyNTZfcHVyZShkYXRhLCBuKQ0KDQoNCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tDQojICJJTCIgZW5jcnlwdGlvbiAob3B0aW9uYWw6IG9ubHkgYXBwbGllZCB3aGVuIHRoZSBtYWdpYyBoZWFkZXIgaXMgcHJlc2VudCkNCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tDQoNCl9LRCA9IFsweDEzLCAweDE2LCAweDA1LCAweDBBLCAweDA4LCAweDE1LCAweDBFLCAweDFGLA0KICAgICAgIDB4MTksIDB4MEUsIDB4MDUsIDB4NjgsIDB4NkEsIDB4NjgsIDB4NkYsIDB4MDUsIDB4MkMsIDB4NjhdDQpfU0sgPSBieXRlcyhieXRlYXJyYXkoYiBeIDB4NUEgZm9yIGIgaW4gX0tEKSkNCg0KX01IID0gYidceDAwXHg0OVx4NENceDAxJw0KX01ITCA9IGxlbihfTUgpDQoNCg0KZGVmIF9rcyhmaWxlbmFtZSwgbik6DQogICAgIiIiS2V5c3RyZWFtIGZvciBhIGZpbGU6IFNIQUtFLTI1NihzZWNyZXQgKyBmaWxlIG5hbWUpLiIiIg0KICAgIHJldHVybiBfc2hha2UyNTYoX1NLICsgX3RvX2J5dGVzKGZpbGVuYW1lKSwgbikNCg0KDQpkZWYgX3hvcihhLCBiKToNCiAgICAiIiJYT1IgdHdvIGJ5dGUgc3RyaW5ncyBvZiBlcXVhbCBsZW5ndGggKGZhc3QsIHdvcmtzIG9uIFB5dGhvbiAyIGFuZCAzKS4iIiINCiAgICBuID0gbGVuKGEpDQogICAgaWYgbiA9PSAwOg0KICAgICAgICByZXR1cm4gYicnDQogICAgdmFsID0gaW50KGJpbmFzY2lpLmhleGxpZnkoYSksIDE2KSBeIGludChiaW5hc2NpaS5oZXhsaWZ5KGIpLCAxNikNCiAgICByZXR1cm4gYmluYXNjaWkudW5oZXhsaWZ5KCclMCp4JyAlICgyICogbiwgdmFsKSkNCg0KDQpkZWYgaXNfaWxfZW5jcnlwdGVkKGRhdGEpOg0KICAgIHJldHVybiBib29sKGRhdGEpIGFuZCBsZW4oZGF0YSkgPiBfTUhMIGFuZCBkYXRhWzpfTUhMXSA9PSBfTUgNCg0KDQpkZWYgX3NpZ19jaGVjayhleHQsIGhlYWQpOg0KICAgICIiIkNoZWNrIHRoZSBmaWxlIHNpZ25hdHVyZSBmb3IgYW4gZXh0ZW5zaW9uLg0KDQogICAgUmV0dXJucyBUcnVlL0ZhbHNlIHdoZW4gdGhlIHNpZ25hdHVyZSBmb3IgYGV4dGAgaXMga25vd24sIE5vbmUgb3RoZXJ3aXNlLg0KICAgICIiIg0KICAgIGlmIGV4dCA9PSAnLnBuZyc6DQogICAgICAgIHJldHVybiBoZWFkLnN0YXJ0c3dpdGgoYidceDg5UE5HJykNCiAgICBpZiBleHQgaW4gKCcuanBnJywgJy5qcGVnJywgJy5qcGUnKToNCiAgICAgICAgcmV0dXJuIGhlYWQuc3RhcnRzd2l0aChiJ1x4ZmZceGQ4XHhmZicpDQogICAgaWYgZXh0ID09ICcuZ2lmJzoNCiAgICAgICAgcmV0dXJuIGhlYWQuc3RhcnRzd2l0aChiJ"
+    <nul set /p="0dJRjgnKQ0KICAgIGlmIGV4dCA9PSAnLmJtcCc6DQogICAgICAgIHJldHVybiBoZWFkLnN0YXJ0c3dpdGgoYidCTScpDQogICAgaWYgZXh0ID09ICcud2VicCc6DQogICAgICAgIHJldHVybiBoZWFkWzo0XSA9PSBiJ1JJRkYnIGFuZCBoZWFkWzg6MTJdID09IGInV0VCUCcNCiAgICBpZiBleHQgPT0gJy53YXYnOg0KICAgICAgICByZXR1cm4gaGVhZFs6NF0gPT0gYidSSUZGJyBhbmQgaGVhZFs4OjEyXSA9PSBiJ1dBVkUnDQogICAgaWYgZXh0IGluICgnLm9nZycsICcub2dhJywgJy5vZ3YnLCAnLm9wdXMnKToNCiAgICAgICAgcmV0dXJuIGhlYWQuc3RhcnRzd2l0aChiJ09nZ1MnKQ0KICAgIGlmIGV4dCA9PSAnLmZsYWMnOg0KICAgICAgICByZXR1cm4gaGVhZC5zdGFydHN3aXRoKGInZkxhQycpDQogICAgaWYgZXh0ID09ICcubXAzJzoNCiAgICAgICAgcmV0dXJuIGhlYWQuc3RhcnRzd2l0aChiJ0lEMycpIG9yICgNCiAgICAgICAgICAgIGxlbihoZWFkKSA+IDEgYW5kIGJ5dGVhcnJheShoZWFkWzoyXSlbMF0gPT0gMHhGRg0KICAgICAgICAgICAgYW5kIChieXRlYXJyYXkoaGVhZFs6Ml0pWzFdICYgMHhFMCkgPT0gMHhFMCkNCiAgICBpZiBleHQgaW4gKCcud2VibScsICcubWt2Jyk6DQogICAgICAgIHJldHVybiBoZWFkLnN0YXJ0c3dpdGgoYidceDFhXHg0NVx4ZGZceGEzJykNCiAgICBpZiBleHQgaW4gKCcubXA0JywgJy5tNGEnLCAnLm00dicsICcuYXZpZicpOg0KICAgICAgICByZXR1cm4gaGVhZFs0OjhdID09IGInZnR5cCcNCiAgICBpZiBleHQgPT0gJy50dGYnOg0KICAgICAgICByZXR1cm4gaGVhZFs6NF0gaW4gKGInXHgwMFx4MDFceDAwXHgwMCcsIGIndHJ1ZScsIGIndHRjZicpDQogICAgaWYgZXh0ID09ICcub3RmJzoNCiAgICAgICAgcmV0dXJuIGhlYWQuc3RhcnRzd2l0aChiJ09UVE8nKQ0KICAgIHJldHVybiBOb25lDQoNCg0KX1NOSUZGX0VYVFMgPSAoJy5wbmcnLCAnLmpwZycsICcuZ2lmJywgJy53ZWJwJywgJy53YXYnLCAnLm9nZycsICcuZmxhYycsDQogICAgICAgICAgICAgICAnLm1wMycsICcud2VibScsICcubXA0JywgJy50dGYnLCAnLm90ZicsICcuYm1wJykNCg0KDQpkZWYgX3NuaWZmX2FueShoZWFkKToNCiAgICAiIiJUcnVlIGlmIHRoZSBkYXRhIGxvb2tzIGxpa2UgYW55IGtub3duIGZvcm1hdCwgd2hhdGV2ZXIgdGhlIGV4dGVuc2lvbi4iIiINCiAgICBmb3IgZXh0IGluIF9TTklGRl9FWFRTOg0KICAgICAgICBpZiBfc2lnX2NoZWNrKGV4dCwgaGVhZCk6DQogICAgICAgICAgICByZXR1cm4gVHJ1ZQ0KICAgIHJldHVybiBGYWxzZQ0KDQoNCmRlZiBfbmFtZV92YXJpYW50cyhmaWxlbmFtZSk6DQogICAgIiIiQ2FuZGlkYXRlIGtleSBuYW1lczogdGhlIGdhbWUgbWF5IHJlcXVlc3QgYSBuYW1lIHRoYXQgZGlmZmVycyBmcm9tIHRoZSBpbmRleC4iIiINCiAgICBvdXQgPSBbXQ0KDQogICAgZGVmIGFkZChuKToNCiAgICAgICAgaWYgbiBub3QgaW4gb3V0Og0KICAgICAgICAgICAgb3V0LmFwcGVuZChuKQ0KDQogICAgYWRkKGZpbGVuYW1lKQ0KICAgIG4gPSBmaWxlbmFtZS5yZXBsYWNlKCdcXCcsICcvJykNCiAgICBhZGQobikNCiAgICBpZiBuLnN0YXJ0c3dpdGgoJ2dhbWUvJyk6DQogICAgICAgIGFkZChuWzU6XSkNCiAgICBlbHNlOg0KICAgICAgICBhZGQoJ2dhbWUvJyArIG4pDQogICAgYWRkKG4ubG93ZXIoKSkNCiAgICBhZGQobi5zcGxpdCgnLycpWy0xXSkNCiAgICBpZiBpc2luc3RhbmNlKG4sIF9URVhUKToNCiAgICAgICAgYWRkKHVuaWNvZGVkYXRhLm5vcm1hbGl6ZSgnTkZDJywgbikpDQogICAgICAgIGFkZCh1bmljb2RlZGF0YS5ub3JtYWxpemUoJ05GRCcsIG4pKQ0KICAgIHJldHVybiBvdXQNCg0KDQpkZWYgZGVjcnlwdF9pbF9jaGVja2VkKGZpbGVuYW1lLCBkYXRhKToNCiAgICAiIiJEZWNyeXB0IElMIGRhdGEgKG1hZ2ljIGhlYWRlciBpbmNsdWRlZCkgYW5kIHZlcmlmeSB0aGUgcmVzdWx0Lg0KDQogICAgUmV0dXJucyAoY29udGVudCwgc3RhdHVzKSB3aGVyZSBzdGF0dXMgaXM6DQogICAgICAnb2snICAgICAgICAgICB0aGUgZGVjcnlwdGVkIGRhdGEgaGFzIGEgdmFsaWQgZmlsZSBzaWduYXR1cmUNCiAgICAgICd1bnZlcmlmaWVkJyAgIG5vIGtub3duIHNpZ25hdHVyZSBmb3IgdGhpcyBleHRlbnNpb24gKGZpbGUgbmFtZSB1c2VkIGFzIGtleSkNCiAgICAgICd1bnJlY29nbml6ZWQnIG5vIGtleSBuYW1lIHByb2R1Y2VkIGEgcmVjb2duaXphYmxlIGZpbGUNCiAgICAiIiINCiAgICBwYXlsb2FkID0gZGF0YVtfTUhMOl0NCiAgICBleHQgPSBvcy5wYXRoLnNwbGl0ZXh0KGZpbGVuYW1lKVsxXS5sb3dlcigpDQogICAgaGVhZF9sZW4gPSBtaW4oMTYsIGxlbihwYXlsb2FkKSkNCg0KICAgIGlmIF9zaWdfY2hlY2soZXh0LCBiJycpIGlzIE5vbmU6DQogICAgICAgICMgTm8ga25vd24gc2lnbmF0dXJlIGZvciB0aGlzIGV4dGVuc2lvbjogbm90aGluZyB0byB2ZXJpZnkgYWdhaW5zdC4NCiAgICAgICAgcmV0dXJuIF94b3IocGF5bG9hZCwgX2tzKGZpbGVuYW1lLCBsZW4ocGF5bG9hZCkpKSwgJ3VudmVyaWZpZWQnDQoNCiAgICBoZWFkID0gcGF5bG9hZFs6aGVhZF9sZW5dDQogICAgZm9yIGNhbmQgaW4gX25hbWVfdmFyaWFudHMoZmlsZW5hbWUpOg0KICAgICAgICAjIFNIQUtFIGlzIGEgc3RyZWFtOiBkaWdlc3QoMTYpIGlzIHRoZSBiZWdpbm5pbmcgb2YgZGlnZXN0KG4pLg0KICAgICAgICBpZiBfc2lnX2NoZWNrKGV4dCwgX3hvcihoZWFkLCBfa3MoY2FuZCwgaGVhZF9sZW4pKSk6DQogICAgICAgICAgICByZXR1cm4gX3hvcihwYXlsb2FkLCBfa3MoY2FuZCwgbGVuKHBheWxvYWQpKSksICdvaycNCg0KICAgICMgTm8gbmFtZSBtYXRjaGVzIHRoZSBleHRlbnNpb246IHRoZSBjb250ZW50IG1heSBzaW1wbHkgYmUgYW5vdGhlciBmb3JtYXQNCiAgICAjIHRoYW4gaXRzIGV4dGVuc2lvbiBzYXlzIChlLmcuIGFuIE1QMyBuYW1lZCAub2dnKS4gQWNjZXB0IGFueSBrbm93biBmb3JtYXQuDQogICAgaWYgX3NuaWZmX2FueShfeG9yKGhlYWQsIF9rcyhmaWxlbmFtZSwgaGVhZF9sZW4pKSk6DQogICAgICAgIHJldHVybiBfeG9yKHBheWxvYWQsIF9rcyhmaWxlbmFtZSwgbGVuKHBheWxvYWQpKSksICdvaycNCg0KICAgIHJldHVybiBfeG9yKHBheWxvYWQsIF9rcyhmaWxlbmFtZSwgbGVuKHBheWxvYWQpKSksICd1bnJlY29nbml6ZWQnDQoNCg0KY2xhc3MgSUxTdGF0cyhvYmplY3QpOg0KICAgICIiIkNvbGxlY3RzIHRoZSByZXN1bHRzIG9mIElMIGRlY3J5cHRpb24gYW5kIHByaW50cyBhIHNob3J0IHJlcG9ydC4iIiINCg0KICAgIGRlZiBfX2luaXRfXyhzZWxmLCB1bnJlY29nbml6ZWRfd3JpdHRlbj1UcnVlKToNCiAgICAgICAgc2VsZi51bnJlY29nbml6ZWRfd3JpdHRlbiA9IHVucmVjb2duaXplZF93cml0dGVuDQogICAgICAgIHNlbGYub2sgPSAwDQogICAgICAgIHNlbGYudW52ZXJpZmllZCA9IDANCiAgICAgICAgc2VsZi51bnJlY29nbml6ZWQgPSBbXQ0KDQogICAgZGVmIGFkZChzZWxmLCBmaWxlbmFtZSwgc3RhdHVzKToNCiAgICAgICAgaWYgc3RhdHVzID09ICdvayc6DQogICAgICAgICAgICBzZWxmLm9rICs9IDENCiAgICAgICAgZWxpZiBzdGF0dXMgPT0gJ3VudmVyaWZpZWQnOg0KICAgICAgICAgICAgc2VsZi51bnZlcmlmaWVkICs9IDENCiAgICAgICAgZWxzZToNCiAgICAgICAgICAgIHNlbGYudW5yZWNvZ25pemVkLmFwcGVuZChmaWxlbmFtZSkNCg0KICAgIGRlZiB0b3RhbChzZWxmKToNCiAgICAgICAgcmV0dXJuIHNlbGYub2sgKyBzZWxmLnVudmVyaWZpZWQgKyBsZW4oc2VsZi51bnJlY29nbml6ZWQpDQoNCiAgICBkZWYgcmVwb3J0KHNlbGYpOg0KICAgICAgICBpZiBub3Qgc2VsZi50b3RhbCgpOg0KICAgICAgICAgICAgcmV0dXJuDQogICAgICAgIHByaW50KCcgIElMOiAlZCBmaWxlKHMpIGRlY3J5cHRlZCAoJWQgdmVyaWZpZWQsICVkIHVudmVyaWZpZWQsICVkIHVucmVjb2duaXplZCknDQogICAgICAgICAgICAgICUgKHNlbGYudG90YWwoKSwgc2VsZi5vaywgc2VsZi51bnZlcmlmaWVkLCBsZW4oc2VsZi51bnJlY29nbml6ZWQpKSkNCiAgICAgICAgbm90ZSA9ICd3cml0dGVuJyBpZiBzZWxmLnVucmVjb2duaXplZF93cml0dGVuIGVsc2UgJ2xlZnQgdW50b3VjaGVkJw0KICAgICAgICBmb3IgbmFtZSBpbiBzZWxmLnVucmVjb2duaXplZFs6MTBdOg0KICAgICAgICAgICAgcHJpbnQoJyAgWyFdIFVucmVjb2duaXplZCBzaWduYXR1cmUgKCVzKTogJXMnICUgKG5vdGUsIG5hbWUpKQ0KICAgICAgICBpZiBsZW4oc2VsZi51bnJlY29nbml6ZWQpID4gMTA6DQogICAgICAgICAgICBwcmludCgnICBbIV0gLi4uIGFuZCAlZCBtb3JlJyAlIChsZW4oc2VsZi51bnJlY29nbml6ZWQpIC0gMTApKQ0KICAgICAgICBpZiBub3QgaGFzYXR0cihoYXNobGliLCAnc2hha2VfMjU2Jyk6DQogICAgICAgICAgICBwcmludCgnICAocHVyZSBQeXRob24gU0hBS0UtMjU2IGluIHVzZTogc2xvd2VyIHRoYW4gaGFzaGxpYiknKQ0KDQoNCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tDQojIEFyY2hpdmUgaGFuZGxlcnMNCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tDQoNCmNsYXNzIEpBU0FyY2hpdmVIYW5kbGVyTG9jYWwob2JqZWN0KToNCiAgICAiIiINCiAgICBTdGFuZGFsb25lIEpBUyBIYW5kbGVyICh3aXRob3V0IFJlbidQeSkNCiAgICAiIiINCg0KICAgIGRlZiBfX2luaXRfXyhzZWxmLCBmaWxlX3BhdGgpOg0KICAgICAgICBzZWxmLmZpbGUgPSBzdHIoZmlsZV9wYXRoKQ0KICAgICAgICBzZWxmLmluZGV4ID0ge30NCiAgICAgICAgc2VsZi5fbG9hZF9pbmRleCgpDQoNCiAgICBkZWYgX2RlY29kZV9oZWFkZXIoc2VsZiwgaGVhZGVyKToNCiAgICAgICAgIyBUaGUgZGV2IGFsd2F5cyByZXR1cm5zIHRoaXMgc3RyaW5nLCBzbyB3ZSBjYW4gdXNlIGl0IHRvIGZpbmQgdGhlIG9mZnNldHMgYW5kIGtleQ0KICAgICAgICByZXR1cm4gImRhbnN0b25jdWxsYWJhbGF5ZXR0ZSINCg0KICAgIEBzdGF0aWNtZXRob2QNCiAgICBkZWYgX2xvYWRzKHJhdyk6DQogICAgICAgIGlmIHN5cy52ZXJzaW9uX2luZm9bMF0gPj0gMzoNCiAgICAgICAgICAgIHRyeToNCiAgICAgICAgICAgICAgICByZXR1cm4gcGlja2xlLmxvYWRzKHJhdywgZW5jb2Rpbmc9InV0Zi04IikNCiAgICAgICAgICAgIGV4Y2VwdCBVbmljb2RlRGVjb2RlRXJyb3I6DQogICAgICAgICAgICAgICAgcmV0dXJuIHBpY2tsZS5sb2FkcyhyYXcsIGVuY29kaW5nPSJsYXRpbjEiKQ0KICAgICAgICByZXR1cm4gcGlja2xlLmxvYWRzKHJhdykNCg0KICAgIGRlZiBfbG9hZF9pbmRleChzZWxmKToNCiAgICAgICAgd2l0aCBvcGVuKHNlbGYuZmlsZSwgInJiIikgYXMgZjoNCiAgICAgICAgICAgIGhlYWRlciA9IGYucmVhZCg0MCkNCg0KICAgICAgICAgICAgIyAxKSBkZWNvZGUoKSAtPiByZXR1cm5zIGEgZml4ZWQgc3RyaW5nDQogICAgICAgICAgICBkZWNvZGVkID0gc2VsZi5fZGVjb2RlX2hlYWRlcihoZWFkZXIpDQoNCiAgICAgICAgICAgICMgMikgTUQ1DQogICAgICAgICAgICBtZDVoZXggPSBoYXNobGliLm1kNShkZWNvZGVkLmVuY29kZSgpKS5oZXhkaWdlc3QoKQ0KICAgICAgICAgICAgeDUwID0gaW50KG1kNWhleFswXSwgMTYpICUgOA0KICAgICAgICAgICAgeDRCID0gaW50KG1kNWhleFsxXSwgMTYpICUgNA0KDQogICAgICAgICAgICAjIDMpIGV4dHJhY3Rpb24gb2YgaGV4IGZpZWxkcw0KICAgICAgICAgICAgeDIyID0gaGVhZGVyWzggKyB4NTA6IDI0ICsgeDUwXS5kZWNvZGUoKS5yZXBsYWNlKCJYIiwgIjAiKQ0KICAgICAgICAgICAgeDIzID0gaGVhZGVyWzI1ICsgeDRCOiAzMyArIHg0Ql0uZGVjb2RlKCkucmVwbGFjZSgiWCIsICIwIikNCg0KICAgICAgICAgICAgeDRGID0gaW50KHgyMiwgMTYpICAjIG9mZnNldCBpbmRleA0KICAgICAgICAgICAgeDZCID0gaW50KHgyMywgMTYpICAjIFhPUiBrZXkNCg0KICAgICAgICAgICAgIyA0KSByZWFkaW5nIHRoZSBpbmRleA0KICAgICAgICAgICAgZi5zZWVrKHg0RikNCiAgICAgICAgICAgIHJhdyA9IGYucmVhZCgpDQogICAgICAgICAgICB0cnk6DQogICAgIC"
+    <nul set /p="AgICAgICAgICAgaW5kZXggPSBzZWxmLl9sb2Fkcyh6bGliLmRlY29tcHJlc3MocmF3KSkNCiAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb246DQogICAgICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCJVbmFibGUgdG8gZGVjb21wcmVzcyB0aGUgSkFTIGluZGV4IikNCg0KICAgICAgICAgICAgIyA1KSBkZWNvZGluZyB0aGUgb2Zmc2V0cw0KICAgICAgICAgICAgZml4ZWQgPSB7fQ0KICAgICAgICAgICAgZm9yIG5hbWUsIGVudHJpZXMgaW4gaW5kZXguaXRlbXMoKToNCiAgICAgICAgICAgICAgICBuZXdfZW50cmllcyA9IFtdDQogICAgICAgICAgICAgICAgZm9yIGUgaW4gZW50cmllczoNCiAgICAgICAgICAgICAgICAgICAgaWYgbGVuKGUpID09IDI6DQogICAgICAgICAgICAgICAgICAgICAgICBvZmYsIHNpemUgPSBlDQogICAgICAgICAgICAgICAgICAgICAgICBuZXdfZW50cmllcy5hcHBlbmQoKG9mZiBeIHg2Qiwgc2l6ZSBeIHg2QikpDQogICAgICAgICAgICAgICAgICAgIGVsc2U6DQogICAgICAgICAgICAgICAgICAgICAgICBvZmYsIHNpemUsIGV4dHJhID0gZQ0KICAgICAgICAgICAgICAgICAgICAgICAgbmV3X2VudHJpZXMuYXBwZW5kKChvZmYgXiB4NkIsIHNpemUgXiB4NkIsIGV4dHJhKSkNCiAgICAgICAgICAgICAgICBmaXhlZFtuYW1lXSA9IG5ld19lbnRyaWVzDQoNCiAgICAgICAgICAgIHNlbGYuaW5kZXggPSBmaXhlZA0KDQogICAgZGVmIGxpc3Qoc2VsZik6DQogICAgICAgIHJldHVybiBsaXN0KHNlbGYuaW5kZXgua2V5cygpKQ0KDQogICAgZGVmIHJlYWQoc2VsZiwgZmlsZW5hbWUpOg0KICAgICAgICBlbnRyaWVzID0gc2VsZi5pbmRleC5nZXQoZmlsZW5hbWUpDQogICAgICAgIGlmIG5vdCBlbnRyaWVzOg0KICAgICAgICAgICAgcmV0dXJuIE5vbmUNCg0KICAgICAgICBvZmYsIHNpemUgPSBlbnRyaWVzWzBdWzoyXQ0KICAgICAgICB3aXRoIG9wZW4oc2VsZi5maWxlLCAicmIiKSBhcyBmOg0KICAgICAgICAgICAgZi5zZWVrKG9mZikNCiAgICAgICAgICAgIHJldHVybiBmLnJlYWQoc2l6ZSkNCg0KDQpjbGFzcyBSZW5QeUFyY2hpdmUob2JqZWN0KToNCiAgICAiIiJBcmNoaXZlIHJlYWRlciBiYXNlZCBvbiBSZW4nUHkncyBvd24gbG9hZGVyLiIiIg0KDQogICAgZGVmIF9faW5pdF9fKHNlbGYsIGZpbGVfcGF0aCwgaW5kZXg9MCk6DQogICAgICAgIHNlbGYuZmlsZSA9IHN0cihmaWxlX3BhdGgpDQogICAgICAgIHNlbGYuaW5kZXhlcyA9IHt9DQogICAgICAgIHNlbGYubG9hZChzZWxmLmZpbGUsIGluZGV4KQ0KDQogICAgZGVmIGNvbnZlcnRfZmlsZW5hbWUoc2VsZiwgZmlsZW5hbWUpOg0KICAgICAgICBkcml2ZSwgZmlsZW5hbWUgPSBvcy5wYXRoLnNwbGl0ZHJpdmUoDQogICAgICAgICAgICBvcy5wYXRoLm5vcm1wYXRoKGZpbGVuYW1lKS5yZXBsYWNlKG9zLnNlcCwgJy8nKQ0KICAgICAgICApDQogICAgICAgIHJldHVybiBmaWxlbmFtZQ0KDQogICAgZGVmIGxpc3Qoc2VsZik6DQogICAgICAgIHJldHVybiBsaXN0KHNlbGYuaW5kZXhlcykNCg0KICAgIGRlZiByZWFkKHNlbGYsIGZpbGVuYW1lKToNCiAgICAgICAgZmlsZW5hbWUgPSBzZWxmLmNvbnZlcnRfZmlsZW5hbWUoZmlsZW5hbWUpDQogICAgICAgIGlkeCA9IHNlbGYuaW5kZXhlcy5nZXQoZmlsZW5hbWUpDQogICAgICAgIGlmIGZpbGVuYW1lICE9ICcuJyBhbmQgaXNpbnN0YW5jZShpZHgsIGxpc3QpOg0KICAgICAgICAgICAgaWYgaGFzYXR0cihyZW5weS5sb2FkZXIsICJsb2FkX2Zyb21fYXJjaGl2ZSIpOg0KICAgICAgICAgICAgICAgIHN1YmZpbGUgPSByZW5weS5sb2FkZXIubG9hZF9mcm9tX2FyY2hpdmUoZmlsZW5hbWUpDQogICAgICAgICAgICBlbHNlOg0KICAgICAgICAgICAgICAgIHN1YmZpbGUgPSByZW5weS5sb2FkZXIubG9hZF9jb3JlKGZpbGVuYW1lKQ0KICAgICAgICAgICAgcmV0dXJuIHN1YmZpbGUucmVhZCgpDQogICAgICAgIHJldHVybiBOb25lDQoNCiAgICBkZWYgbG9hZChzZWxmLCBmaWxlbmFtZSwgaW5kZXgpOg0KICAgICAgICBiYXNlID0gb3MucGF0aC5zcGxpdGV4dChvcy5wYXRoLmJhc2VuYW1lKGZpbGVuYW1lKSlbMF0NCg0KICAgICAgICBpZiBiYXNlIG5vdCBpbiByZW5weS5jb25maWcuYXJjaGl2ZXM6DQogICAgICAgICAgICByZW5weS5jb25maWcuYXJjaGl2ZXMuYXBwZW5kKGJhc2UpDQoNCiAgICAgICAgYXJjaGl2ZV9kaXIgPSBvcy5wYXRoLmRpcm5hbWUob3MucGF0aC5yZWFscGF0aChmaWxlbmFtZSkpDQogICAgICAgIHJlbnB5LmNvbmZpZy5zZWFyY2hwYXRoID0gW2FyY2hpdmVfZGlyXQ0KICAgICAgICByZW5weS5jb25maWcuYmFzZWRpciA9IG9zLnBhdGguZGlybmFtZShyZW5weS5jb25maWcuc2VhcmNocGF0aFswXSkNCiAgICAgICAgcmVucHkubG9hZGVyLmluZGV4X2FyY2hpdmVzKCkNCg0KICAgICAgICBhcmNoaXZlc19vYmogPSByZW5weS5sb2FkZXIuYXJjaGl2ZXMNCg0KICAgICAgICAjIEF1dG8tZGV0ZWN0aW9uOiBkaWN0IChvbGRlciBSZW4nUHkgOCkgb3IgbGlzdCBvZiAocHJlZml4LCBpbmRleCkgdHVwbGVzDQogICAgICAgIGVudHJ5ID0gTm9uZQ0KICAgICAgICBpZiBpc2luc3RhbmNlKGFyY2hpdmVzX29iaiwgZGljdCk6DQogICAgICAgICAgICBlbnRyeSA9IGFyY2hpdmVzX29iai5nZXQoYmFzZSkNCiAgICAgICAgZWxzZToNCiAgICAgICAgICAgIGZvciBlIGluIGFyY2hpdmVzX29iajoNCiAgICAgICAgICAgICAgICBpZiBlWzBdID09IGJhc2U6DQogICAgICAgICAgICAgICAgICAgIGVudHJ5ID0gZQ0KICAgICAgICAgICAgICAgICAgICBicmVhaw0KICAgICAgICAgICAgaWYgZW50cnkgaXMgTm9uZSBhbmQgMCA8PSBpbmRleCA8IGxlbihhcmNoaXZlc19vYmopOg0KICAgICAgICAgICAgICAgIGVudHJ5ID0gYXJjaGl2ZXNfb2JqW2luZGV4XQ0KDQogICAgICAgIGlmIGVudHJ5IGlzIE5vbmU6DQogICAgICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoIlJlbidQeSBkaWQgbm90IGluZGV4IHRoZSBhcmNoaXZlICclcyciICUgYmFzZSkNCg0KICAgICAgICBmb3IgZiwgaWR4IGluIGVudHJ5WzFdLml0ZW1zKCk6DQogICAgICAgICAgICBzZWxmLmluZGV4ZXNbZl0gPSBpZHgNCg0KDQpkZWYgX3BpY2tsZV9sb2Fkc19ieXRlcyhyYXcpOg0KICAgIGlmIHN5cy52ZXJzaW9uX2luZm9bMF0gPj0gMzoNCiAgICAgICAgcmV0dXJuIHBpY2tsZS5sb2FkcyhyYXcsIGVuY29kaW5nPSJieXRlcyIpDQogICAgcmV0dXJuIHBpY2tsZS5sb2FkcyhyYXcpDQoNCg0KZGVmIF9ub3JtX25hbWUobmFtZSk6DQogICAgaWYgc3lzLnZlcnNpb25faW5mb1swXSA+PSAzIGFuZCBpc2luc3RhbmNlKG5hbWUsIGJ5dGVzKToNCiAgICAgICAgdHJ5Og0KICAgICAgICAgICAgcmV0dXJuIG5hbWUuZGVjb2RlKCJ1dGYtOCIpDQogICAgICAgIGV4Y2VwdCBVbmljb2RlRGVjb2RlRXJyb3I6DQogICAgICAgICAgICByZXR1cm4gbmFtZS5kZWNvZGUoImxhdGluLTEiKQ0KICAgIHJldHVybiBuYW1lDQoNCg0KZGVmIF9ub3JtX3ByZWZpeChwcmVmaXgpOg0KICAgIGlmIHByZWZpeCBpcyBOb25lOg0KICAgICAgICByZXR1cm4gYicnDQogICAgaWYgaXNpbnN0YW5jZShwcmVmaXgsIGJ5dGVzKToNCiAgICAgICAgcmV0dXJuIHByZWZpeA0KICAgIHJldHVybiBwcmVmaXguZW5jb2RlKCJsYXRpbi0xIikNCg0KDQpjbGFzcyBSUEFMb2NhbEhhbmRsZXIob2JqZWN0KToNCiAgICAiIiINCiAgICBTdGFuZGFsb25lIFJQQS0yLjAgLyAzLjAgLyAzLjIgcmVhZGVyICh3aXRob3V0IFJlbidQeSkuDQogICAgVXNlZCBhcyBhIGZhbGxiYWNrIHdoZW4gUmVuJ1B5J3MgbG9hZGVyIGNhbm5vdCBpbmRleCB0aGUgYXJjaGl2ZS4NCiAgICAiIiINCg0KICAgIGRlZiBfX2luaXRfXyhzZWxmLCBmaWxlX3BhdGgpOg0KICAgICAgICBzZWxmLmZpbGUgPSBzdHIoZmlsZV9wYXRoKQ0KICAgICAgICBzZWxmLmluZGV4ID0ge30NCiAgICAgICAgc2VsZi5fbG9hZF9pbmRleCgpDQoNCiAgICBkZWYgX2xvYWRfaW5kZXgoc2VsZik6DQogICAgICAgIHdpdGggb3BlbihzZWxmLmZpbGUsICJyYiIpIGFzIGY6DQogICAgICAgICAgICBwYXJ0cyA9IGYucmVhZGxpbmUoMjAwKS5zcGxpdCgpDQogICAgICAgICAgICBpZiBub3QgcGFydHMgb3Igbm90IHBhcnRzWzBdLnN0YXJ0c3dpdGgoYiJSUEEtIik6DQogICAgICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCJVbnJlY29nbml6ZWQgUlBBIGhlYWRlciIpDQoNCiAgICAgICAgICAgIHZlcnNpb24gPSBwYXJ0c1swXQ0KICAgICAgICAgICAgb2Zmc2V0ID0gaW50KHBhcnRzWzFdLCAxNikNCiAgICAgICAgICAgIGlmIHZlcnNpb24uc3RhcnRzd2l0aChiIlJQQS0zLjIiKToNCiAgICAgICAgICAgICAgICBrZXlzID0gcGFydHNbMzpdDQogICAgICAgICAgICBlbGlmIHZlcnNpb24uc3RhcnRzd2l0aChiIlJQQS0zIik6DQogICAgICAgICAgICAgICAga2V5cyA9IHBhcnRzWzI6XQ0KICAgICAgICAgICAgZWxzZTogICMgUlBBLTIuMDogbm8ga2V5DQogICAgICAgICAgICAgICAga2V5cyA9IFtdDQoNCiAgICAgICAgICAgIGtleSA9IDANCiAgICAgICAgICAgIGZvciBrIGluIGtleXM6DQogICAgICAgICAgICAgICAga2V5IF49IGludChrLCAxNikNCg0KICAgICAgICAgICAgZi5zZWVrKG9mZnNldCkNCiAgICAgICAgICAgIHJhdyA9IHpsaWIuZGVjb21wcmVzcyhmLnJlYWQoKSkNCg0KICAgICAgICBkYXRhID0gX3BpY2tsZV9sb2Fkc19ieXRlcyhyYXcpDQogICAgICAgIGZvciBuYW1lLCBlbnRyaWVzIGluIGRhdGEuaXRlbXMoKToNCiAgICAgICAgICAgIGZpeGVkID0gW10NCiAgICAgICAgICAgIGZvciBlIGluIGVudHJpZXM6DQogICAgICAgICAgICAgICAgb2ZmLCBzaXplID0gZVswXSBeIGtleSwgZVsxXSBeIGtleQ0KICAgICAgICAgICAgICAgIHByZWZpeCA9IF9ub3JtX3ByZWZpeChlWzJdKSBpZiBsZW4oZSkgPiAyIGVsc2UgYicnDQogICAgICAgICAgICAgICAgZml4ZWQuYXBwZW5kKChvZmYsIHNpemUsIHByZWZpeCkpDQogICAgICAgICAgICBzZWxmLmluZGV4W19ub3JtX25hbWUobmFtZSldID0gZml4ZWQNCg0KICAgIGRlZiBsaXN0KHNlbGYpOg0KICAgICAgICByZXR1cm4gbGlzdChzZWxmLmluZGV4LmtleXMoKSkNCg0KICAgIGRlZiByZWFkKHNlbGYsIGZpbGVuYW1lKToNCiAgICAgICAgZW50cmllcyA9IHNlbGYuaW5kZXguZ2V0KGZpbGVuYW1lKQ0KICAgICAgICBpZiBub3QgZW50cmllczoNCiAgICAgICAgICAgIHJldHVybiBOb25lDQogICAgICAgIG9mZiwgc2l6ZSwgcHJlZml4ID0gZW50cmllc1swXQ0KICAgICAgICB3aXRoIG9wZW4oc2VsZi5maWxlLCAicmIiKSBhcyBmOg0KICAgICAgICAgICAgZi5zZWVrKG9mZikNCiAgICAgICAgICAgIHJldHVybiBwcmVmaXggKyBmLnJlYWQoc2l6ZSAtIGxlbihwcmVmaXgpKQ0KDQoNCmRlZiBwaWNrX2hhbmRsZXIocGF0aCk6DQogICAgIiIiUmVuUHlBcmNoaXZlIGJ5IGRlZmF1bHQ7IEpBUyBvbmx5IGZvciAuamFzIGZpbGVzLiIiIg0KICAgIGlmIG9zLnBhdGguc3BsaXRleHQoc3RyKHBhdGgpKVsxXS5sb3dlcigpID09ICIuamFzIjoNCiAgICAgICAgcmV0dXJuIEpBU0FyY2hpdmVIYW5kbGVyTG9jYWwNCiAgICByZXR1cm4gUmVuUHlBcmNoaXZlDQoNCg0KZGVmIF9yZWFkX2hlYWRlcihwYXRoLCBuPTQ4KToNCiAgICB0cnk6DQogICAgICAgIHdpdGggb3BlbihwYXRoLCAicmIiKSBhcyBmOg0KICAgICAgICAgICAgcmV0dXJuIGYucmVhZChuKQ0KICAgIGV4Y2VwdCAoSU9FcnJvciwgT1NFcnJvcik6DQogICAgICAgIHJldHVybiBiJycNCg0KDQpkZWYgb3Blbl9hcmNoaXZlKHBhdGgsIGFyY2hpdmVfY2xhc3M9Tm9uZSk6DQogICAgIiIiT3BlbiBhbiBhcmNoaXZlIHdpdGggdGhlIGNob3NlbiBoYW5kbGVyLg0KDQogICAgSWYgUmVuJ1B5J3MgbG9hZGVyIGZhaWxzLCBmYWxsIGJhY2sgdG8gdGhlIGJ1aWx0LWluIFJQQSByZWFkZXIsIHRoZW4gdG8gSkFTLg0KICAgICIiIg0KICAgIGlmIGFyY2hpdmVfY2xhc3MgaXMgTm9uZToNCiAgICAgICAgYXJjaGl2ZV9jbGFzcyA9IHBpY2tfaGFuZGxlcihwYXRoKQ0KICAgIHRyeToNCiAgICAgICAgcmV0dXJuIGFyY2hpdmVfY2xhc3MocGF0aCkNCiAgICBleGNlcHQgRXhjZXB0aW9uOg0KICAgICAgICBpZiBhcmNoaXZlX2NsYXNzIGlzIG5vdCBSZW5QeUF"
+    <nul set /p="yY2hpdmU6DQogICAgICAgICAgICByYWlzZQ0KDQogICAgaWYgX3JlYWRfaGVhZGVyKHBhdGgpLnN0YXJ0c3dpdGgoYidSUEEtJyk6DQogICAgICAgIHByaW50KCIgIFJlbidQeSBsb2FkZXIgdW5hdmFpbGFibGUsIHVzaW5nIHRoZSBidWlsdC1pbiBSUEEgcmVhZGVyIikNCiAgICAgICAgcmV0dXJuIFJQQUxvY2FsSGFuZGxlcihwYXRoKQ0KDQogICAgdHJ5Og0KICAgICAgICBhcmNoaXZlID0gSkFTQXJjaGl2ZUhhbmRsZXJMb2NhbChwYXRoKQ0KICAgICAgICBpZiBhcmNoaXZlLmluZGV4Og0KICAgICAgICAgICAgcHJpbnQoJyAgSkFTIGFyY2hpdmUgZGV0ZWN0ZWQnKQ0KICAgICAgICAgICAgcmV0dXJuIGFyY2hpdmUNCiAgICBleGNlcHQgRXhjZXB0aW9uOg0KICAgICAgICBwYXNzDQoNCiAgICByYWlzZSBSdW50aW1lRXJyb3IoIlVucmVjb2duaXplZCBhcmNoaXZlIGZvcm1hdDogJXMiICUgcGF0aCkNCg0KDQojIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQ0KIyBNYWluIGxvZ2ljDQojIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQ0KDQpkZWYgbGlzdF9hcmNoaXZlKGFyY2hfcGF0aCwgYXJjaGl2ZV9jbGFzcz1Ob25lKToNCiAgICBwcmludCgnQ29udGVudHMgb2YgIiVzIjonICUgYXJjaF9wYXRoKQ0KICAgIGFyY2hpdmUgPSBvcGVuX2FyY2hpdmUoYXJjaF9wYXRoLCBhcmNoaXZlX2NsYXNzKQ0KICAgIGZvciBmaWxlbmFtZSBpbiBhcmNoaXZlLmxpc3QoKToNCiAgICAgICAgcHJpbnQoIiAgIiwgZmlsZW5hbWUpDQoNCg0KZGVmIF9jb2xsZWN0X2V4dHMob2JqKToNCiAgICAiIiJFeHRlbnNpb25zIGRlY2xhcmVkIGJ5IGEgaGFuZGxlciAob3IgYnkgYW4gb2JqZWN0IGhvbGRpbmcgaGFuZGxlcnMpLiIiIg0KICAgIGV4dHMgPSBbXQ0KICAgIGZvciBhdHRyIGluICgiZ2V0X3N1cHBvcnRlZF9leHRlbnNpb25zIiwgImdldF9zdXBwb3J0ZWRfZXh0Iik6DQogICAgICAgIGZuID0gZ2V0YXR0cihvYmosIGF0dHIsIE5vbmUpDQogICAgICAgIGlmIGNhbGxhYmxlKGZuKToNCiAgICAgICAgICAgIHRyeToNCiAgICAgICAgICAgICAgICBleHRzLmV4dGVuZChmbigpKQ0KICAgICAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbjoNCiAgICAgICAgICAgICAgICBwYXNzDQogICAgcmV0dXJuIGV4dHMNCg0KDQpkZWYgZGlzY292ZXJfZXh0ZW5zaW9ucygpOg0KICAgIGV4dHMgPSBbXQ0KICAgIGhhbmRsZXJzID0gZ2V0YXR0cihyZW5weS5sb2FkZXIsICJhcmNoaXZlX2hhbmRsZXJzIiwgTm9uZSkNCg0KICAgIGlmIGhhbmRsZXJzIGlzIG5vdCBOb25lOg0KICAgICAgICAjIFJlY2VudCBSZW4nUHk6IGFuIEFyY2hpdmVIYW5kbGVycyBvYmplY3QgZXhwb3NpbmcgdGhlIGV4dGVuc2lvbnMgZGlyZWN0bHkNCiAgICAgICAgZXh0cy5leHRlbmQoX2NvbGxlY3RfZXh0cyhoYW5kbGVycykpDQoNCiAgICAgICAgIyBPbGRlciBSZW4nUHk6IGEgcGxhaW4gbGlzdCBvZiBoYW5kbGVycw0KICAgICAgICB0cnk6DQogICAgICAgICAgICBmb3IgaGFuZGxlciBpbiBoYW5kbGVyczoNCiAgICAgICAgICAgICAgICBleHRzLmV4dGVuZChfY29sbGVjdF9leHRzKGhhbmRsZXIpKQ0KICAgICAgICBleGNlcHQgVHlwZUVycm9yOg0KICAgICAgICAgICAgIyBOb3QgaXRlcmFibGU6IHRyeSBpdHMgaW50ZXJuYWwgY29udGFpbmVycw0KICAgICAgICAgICAgZm9yIGF0dHIgaW4gKCJoYW5kbGVycyIsICJfaGFuZGxlcnMiKToNCiAgICAgICAgICAgICAgICBzdWIgPSBnZXRhdHRyKGhhbmRsZXJzLCBhdHRyLCBOb25lKQ0KICAgICAgICAgICAgICAgIGlmIHN1YiBpcyBOb25lOg0KICAgICAgICAgICAgICAgICAgICBjb250aW51ZQ0KICAgICAgICAgICAgICAgIHRyeToNCiAgICAgICAgICAgICAgICAgICAgZm9yIGhhbmRsZXIgaW4gc3ViOg0KICAgICAgICAgICAgICAgICAgICAgICAgZXh0cy5leHRlbmQoX2NvbGxlY3RfZXh0cyhoYW5kbGVyKSkNCiAgICAgICAgICAgICAgICBleGNlcHQgVHlwZUVycm9yOg0KICAgICAgICAgICAgICAgICAgICBwYXNzDQoNCiAgICAjIE5vcm1hbGl6ZSB0byAiLmV4dCINCiAgICBleHRzID0gW2UgaWYgZS5zdGFydHN3aXRoKCcuJykgZWxzZSAnLicgKyBlIGZvciBlIGluIGV4dHMgaWYgZV0NCg0KICAgIGlmIG5vdCBleHRzOg0KICAgICAgICBleHRzLmFwcGVuZCgnLnJwYScpDQoNCiAgICAjIEFkZCBtYW51YWxseSBpZiB0aGUgaGFuZGxlciBpcyBub3QgZGV0ZWN0ZWQNCiAgICBpZiAnLmphcycgbm90IGluIGV4dHM6DQogICAgICAgIGV4dHMuYXBwZW5kKCcuamFzJykNCg0KICAgIGlmICcucnBjJyBub3QgaW4gZXh0czoNCiAgICAgICAgZXh0cy5hcHBlbmQoJy5ycGMnKQ0KDQogICAgcmV0dXJuIHNvcnRlZChzZXQoZS5sb3dlcigpIGZvciBlIGluIGV4dHMpKQ0KDQoNCmRlZiBkaXNjb3Zlcl9hcmNoaXZlcyhzZWFyY2hfZGlyLCBleHRlbnNpb25zKToNCiAgICBhcmNoaXZlcyA9IFtdDQogICAgZm9yIHJvb3QsIGRpcnMsIGZpbGVzIGluIG9zLndhbGsoc3RyKHNlYXJjaF9kaXIpKToNCiAgICAgICAgZm9yIGZpbGUgaW4gZmlsZXM6DQogICAgICAgICAgICBleHQgPSBvcy5wYXRoLnNwbGl0ZXh0KGZpbGUpWzFdLmxvd2VyKCkNCiAgICAgICAgICAgIGlmIGV4dCBhbmQgZXh0IGluIGV4dGVuc2lvbnMgYW5kICclJyBub3QgaW4gZmlsZToNCiAgICAgICAgICAgICAgICBhcmNoaXZlcy5hcHBlbmQob3MucGF0aC5qb2luKHJvb3QsIGZpbGUpKQ0KICAgIHJldHVybiBhcmNoaXZlcw0KDQoNCmRlZiBleHRyYWN0X2FyY2hpdmUoYXJjaF9wYXRoLCBvdXRwdXQsIGFyY2hpdmVfY2xhc3M9Tm9uZSk6DQogICAgaWYgYXJjaGl2ZV9jbGFzcyBpcyBOb25lOg0KICAgICAgICBhcmNoaXZlX2NsYXNzID0gcGlja19oYW5kbGVyKGFyY2hfcGF0aCkNCg0KICAgIHByaW50KCcgIFVucGFja2luZyAiJXMiIC4uLicgJSBhcmNoX3BhdGgpDQogICAgYXJjaGl2ZSA9IG9wZW5fYXJjaGl2ZShhcmNoX3BhdGgsIGFyY2hpdmVfY2xhc3MpDQogICAgZmlsZXMgPSBhcmNoaXZlLmxpc3QoKQ0KDQogICAgX21ha2VkaXJzKG91dHB1dCkNCg0KICAgIGlsID0gSUxTdGF0cygpDQogICAgd3JpdHRlbiA9IDANCiAgICBza2lwcGVkID0gMA0KICAgIGZvciBmaWxlbmFtZSBpbiBmaWxlczoNCiAgICAgICAgY29udGVudHMgPSBhcmNoaXZlLnJlYWQoZmlsZW5hbWUpDQogICAgICAgIGlmIGNvbnRlbnRzIGlzIE5vbmU6DQogICAgICAgICAgICBza2lwcGVkICs9IDENCiAgICAgICAgICAgIGNvbnRpbnVlDQoNCiAgICAgICAgIyBPcHRpb25hbDogb25seSB3aGVuIHRoZSBJTCBtYWdpYyBoZWFkZXIgaXMgZGV0ZWN0ZWQNCiAgICAgICAgaWYgaXNfaWxfZW5jcnlwdGVkKGNvbnRlbnRzKToNCiAgICAgICAgICAgIGNvbnRlbnRzLCBzdGF0dXMgPSBkZWNyeXB0X2lsX2NoZWNrZWQoZmlsZW5hbWUsIGNvbnRlbnRzKQ0KICAgICAgICAgICAgaWwuYWRkKGZpbGVuYW1lLCBzdGF0dXMpDQoNCiAgICAgICAgb3V0ZmlsZSA9IF9zYWZlX2pvaW4ob3V0cHV0LCBmaWxlbmFtZSkNCiAgICAgICAgaWYgb3V0ZmlsZSBpcyBOb25lOg0KICAgICAgICAgICAgcHJpbnQoJyAgWyFdIFNraXBwZWQgaW52YWxpZCBwYXRoOiAlcycgJSBmaWxlbmFtZSkNCiAgICAgICAgICAgIHNraXBwZWQgKz0gMQ0KICAgICAgICAgICAgY29udGludWUNCg0KICAgICAgICBfbWFrZWRpcnMob3MucGF0aC5kaXJuYW1lKG91dGZpbGUpKQ0KICAgICAgICB3aXRoIG9wZW4ob3V0ZmlsZSwgJ3diJykgYXMgZjoNCiAgICAgICAgICAgIGYud3JpdGUoY29udGVudHMpDQogICAgICAgIHdyaXR0ZW4gKz0gMQ0KDQogICAgaWwucmVwb3J0KCkNCiAgICBwcmludCgnICAlZCBmaWxlKHMpIGV4dHJhY3RlZCcgJSB3cml0dGVuKQ0KICAgIGlmIHNraXBwZWQ6DQogICAgICAgIHByaW50KCcgIFshXSAlZCBlbnRyeShpZXMpIHNraXBwZWQnICUgc2tpcHBlZCkNCg0KDQpkZWYgZGVjcnlwdF90cmVlKHJvb3QsIHF1aWV0PUZhbHNlKToNCiAgICAiIiJEZWNyeXB0IElMLWVuY3J5cHRlZCBsb29zZSBmaWxlcyAob3V0c2lkZSBhcmNoaXZlcykgaW4gcGxhY2UuDQoNCiAgICBUaGUga2V5IG5hbWUgaXMgdGhlIHBhdGggcmVsYXRpdmUgdG8gYHJvb3RgIChpLmUuIHJlbGF0aXZlIHRvIHRoZSBnYW1lIGZvbGRlciwNCiAgICB3aGljaCBpcyB3aGF0IHRoZSBnYW1lIHJlcXVlc3RzKS4gRmlsZXMgd2hvc2Ugc2lnbmF0dXJlIGlzIG5vdCByZWNvZ25pemVkDQogICAgYWZ0ZXIgZGVjcnlwdGlvbiBhcmUgbGVmdCB1bnRvdWNoZWQuDQogICAgIiIiDQogICAgcm9vdCA9IG9zLnBhdGguYWJzcGF0aChyb290KQ0KICAgIHN0cmlwX2dhbWUgPSBvcy5wYXRoLmJhc2VuYW1lKHJvb3QpLmxvd2VyKCkgIT0gJ2dhbWUnDQogICAgaWwgPSBJTFN0YXRzKHVucmVjb2duaXplZF93cml0dGVuPUZhbHNlKQ0KICAgIGZvciBkaXJwYXRoLCBkaXJzLCBmaWxlcyBpbiBvcy53YWxrKHJvb3QpOg0KICAgICAgICBmb3IgZm4gaW4gZmlsZXM6DQogICAgICAgICAgICBmdWxsID0gb3MucGF0aC5qb2luKGRpcnBhdGgsIGZuKQ0KICAgICAgICAgICAgdHJ5Og0KICAgICAgICAgICAgICAgIHdpdGggb3BlbihmdWxsLCAncmInKSBhcyBmOg0KICAgICAgICAgICAgICAgICAgICBoZWFkID0gZi5yZWFkKF9NSEwgKyAxKQ0KICAgICAgICAgICAgICAgICAgICBpZiBub3QgaXNfaWxfZW5jcnlwdGVkKGhlYWQpOg0KICAgICAgICAgICAgICAgICAgICAgICAgY29udGludWUNCiAgICAgICAgICAgICAgICAgICAgZGF0YSA9IGhlYWQgKyBmLnJlYWQoKQ0KICAgICAgICAgICAgZXhjZXB0IChJT0Vycm9yLCBPU0Vycm9yKToNCiAgICAgICAgICAgICAgICBjb250aW51ZQ0KICAgICAgICAgICAgcmVsID0gb3MucGF0aC5yZWxwYXRoKGZ1bGwsIHJvb3QpLnJlcGxhY2Uob3Muc2VwLCAnLycpDQogICAgICAgICAgICBpZiBzdHJpcF9nYW1lIGFuZCByZWwuc3RhcnRzd2l0aCgnZ2FtZS8nKToNCiAgICAgICAgICAgICAgICByZWwgPSByZWxbNTpdDQogICAgICAgICAgICBjb250ZW50cywgc3RhdHVzID0gZGVjcnlwdF9pbF9jaGVja2VkKHJlbCwgZGF0YSkNCiAgICAgICAgICAgIGlsLmFkZChyZWwsIHN0YXR1cykNCiAgICAgICAgICAgIGlmIHN0YXR1cyAhPSAndW5yZWNvZ25pemVkJzoNCiAgICAgICAgICAgICAgICB3aXRoIG9wZW4oZnVsbCwgJ3diJykgYXMgZjoNCiAgICAgICAgICAgICAgICAgICAgZi53cml0ZShjb250ZW50cykNCiAgICBpZiBub3QgaWwudG90YWwoKToNCiAgICAgICAgaWYgbm90IHF1aWV0Og0KICAgICAgICAgICAgcHJpbnQoJ05vIElMLWVuY3J5cHRlZCBmaWxlcyBmb3VuZCBpbiAiJXMiLicgJSByb290KQ0KICAgICAgICByZXR1cm4NCiAgICBwcmludCgnICBJTC1lbmNyeXB0ZWQgZmlsZXMgb3V0c2lkZSBhcmNoaXZlcyBpbiAiJXMiOicgJSByb290KQ0KICAgIGlsLnJlcG9ydCgpDQoNCg0KZGVmIG1haW4oKToNCiAgICBwYXJzZXIgPSBhcmdwYXJzZS5Bcmd1bWVudFBhcnNlcigNCiAgICAgICAgZGVzY3JpcHRpb249IlRvb2wgZm9yIHdvcmtpbmcgd2l0aCBSZW4nUHkgYXJjaGl2ZSBmaWxlcy4iLA0KICAgICAgICBhZGRfaGVscD1UcnVlDQogICAgKQ0KICAgIHBhcnNlci5hZGRfYXJndW1lbnQoJy1sJywgJy0tbGlzdCcsIGFjdGlvbj0ic3RvcmVfdHJ1ZSIsIGRlc3Q9J2xpc3Rfb25seScsDQogICAgICAgICAgICAgICAgICAgICAgICBoZWxwPSJMaXN0IHRoZSBjb250ZW50cyBvZiB0aGUgYXJjaGl2ZSB3aXRob3V0IGV4dHJhY3RpbmcgdGhlbSIpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLXInLCBhY3Rpb249InN0b3JlX3RydWUiLCBkZXN0PSdyZW1vdmUnLA0KICAgICAgICAgICAgICAgICAgICAgICAgaGVscD0nUmVtb3ZlIGFyY2hpdmVzIGFmdGVyIGV4dHJhY3Rpb24uJykNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCcteCcsIGRlc3Q9J2FyY2hpdmUnLCB0eXBlPXN0ciwNCiAgICAgICAgICAgICAgICAgICAgICAgIGhlbHA9J1NwZWNpZmljIGFyY2hpdmUgZmlsZSB0byBleHRyYWN0IChmdWxsIHBhdGgpLicpDQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgnLWQnLCBkZXN0PSdkZWNyeXB0X2RpcicsIHR5"
+    <nul set /p="cGU9c3RyLA0KICAgICAgICAgICAgICAgICAgICAgICAgaGVscD0nRGVjcnlwdCBJTC1lbmNyeXB0ZWQgbG9vc2UgZmlsZXMgaW4gcGxhY2UgaW4gdGhpcyBmb2xkZXIgJw0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAnKHBhdGhzIHJlbGF0aXZlIHRvIGl0LCBlLmcuIHRoZSBnYW1lIGZvbGRlcikuJykNCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCctbycsIGRlc3Q9J291dHB1dCcsIHR5cGU9c3RyLCBkZWZhdWx0PScuJywNCiAgICAgICAgICAgICAgICAgICAgICAgIGhlbHA9J091dHB1dCBkaXJlY3RvcnkgZm9yIGV4dHJhY3RlZCBmaWxlcy4nKQ0KICAgIGFyZ3MgPSBwYXJzZXIucGFyc2VfYXJncygpDQoNCiAgICBpZiBhcmdzLmRlY3J5cHRfZGlyOg0KICAgICAgICBkZWNyeXB0X3RyZWUoYXJncy5kZWNyeXB0X2RpcikNCiAgICAgICAgcmV0dXJuDQoNCiAgICBvdXRwdXQgPSBvcy5wYXRoLmFic3BhdGgoYXJncy5vdXRwdXQpDQogICAgYXJjaGl2ZV9maWx0ZXIgPSBhcmdzLmFyY2hpdmUNCiAgICByZW1vdmUgPSBhcmdzLnJlbW92ZQ0KDQogICAgZXh0ZW5zaW9ucyA9IGRpc2NvdmVyX2V4dGVuc2lvbnMoKQ0KDQogICAgIyAteCBtb2RlOiBleHRyYWN0IG9ubHkgdGhlIHNwZWNpZmllZCBhcmNoaXZlIChleGFjdCBwYXRoKQ0KICAgIGlmIGFyY2hpdmVfZmlsdGVyOg0KICAgICAgICB0YXJnZXQgPSBvcy5wYXRoLmFic3BhdGgoYXJjaGl2ZV9maWx0ZXIpDQoNCiAgICAgICAgaWYgbm90IG9zLnBhdGguZXhpc3RzKHRhcmdldCk6DQogICAgICAgICAgICBiYXNlbmFtZSA9IG9zLnBhdGguYmFzZW5hbWUoYXJjaGl2ZV9maWx0ZXIpDQogICAgICAgICAgICBmb3VuZCA9IE5vbmUNCiAgICAgICAgICAgIGZvciByb290LCBkaXJzLCBmaWxlcyBpbiBvcy53YWxrKCcuJyk6DQogICAgICAgICAgICAgICAgaWYgYmFzZW5hbWUgaW4gZmlsZXM6DQogICAgICAgICAgICAgICAgICAgIGZvdW5kID0gb3MucGF0aC5qb2luKHJvb3QsIGJhc2VuYW1lKQ0KICAgICAgICAgICAgICAgICAgICBicmVhaw0KICAgICAgICAgICAgaWYgZm91bmQgaXMgTm9uZToNCiAgICAgICAgICAgICAgICBwcmludCgnQXJjaGl2ZSAiJXMiIG5vdCBmb3VuZC4nICUgYXJjaGl2ZV9maWx0ZXIpDQogICAgICAgICAgICAgICAgc3lzLmV4aXQoMSkNCiAgICAgICAgICAgIHRhcmdldCA9IG9zLnBhdGguYWJzcGF0aChmb3VuZCkNCg0KICAgICAgICBoYW5kbGVyID0gcGlja19oYW5kbGVyKHRhcmdldCkNCg0KICAgICAgICBpZiBhcmdzLmxpc3Rfb25seToNCiAgICAgICAgICAgIGxpc3RfYXJjaGl2ZSh0YXJnZXQsIGhhbmRsZXIpDQogICAgICAgICAgICByZXR1cm4NCg0KICAgICAgICBleHRyYWN0X2FyY2hpdmUodGFyZ2V0LCBvdXRwdXQsIGhhbmRsZXIpDQogICAgICAgIGRlY3J5cHRfdHJlZShvdXRwdXQsIHF1aWV0PVRydWUpICAjIElMLWVuY3J5cHRlZCBmaWxlcyBvdXRzaWRlIGFyY2hpdmVzLCBpZiBhbnkNCg0KICAgICAgICBpZiByZW1vdmU6DQogICAgICAgICAgICBvcy5yZW1vdmUodGFyZ2V0KQ0KICAgICAgICByZXR1cm4NCg0KICAgICMgRGVmYXVsdCBtb2RlDQogICAgYXJjaGl2ZXMgPSBkaXNjb3Zlcl9hcmNoaXZlcygnLicsIGV4dGVuc2lvbnMpDQoNCiAgICBpZiBub3QgYXJjaGl2ZXM6DQogICAgICAgIHByaW50KCJObyBhcmNoaXZlcyBmb3VuZC4iKQ0KICAgICAgICByZXR1cm4NCg0KICAgIGZvciBhcmNoIGluIGFyY2hpdmVzOg0KICAgICAgICBoYW5kbGVyID0gcGlja19oYW5kbGVyKGFyY2gpDQoNCiAgICAgICAgaWYgYXJncy5saXN0X29ubHk6DQogICAgICAgICAgICBsaXN0X2FyY2hpdmUoYXJjaCwgaGFuZGxlcikNCiAgICAgICAgZWxzZToNCiAgICAgICAgICAgIGV4dHJhY3RfYXJjaGl2ZShhcmNoLCBvdXRwdXQsIGhhbmRsZXIpDQoNCiAgICBpZiBub3QgYXJncy5saXN0X29ubHk6DQogICAgICAgIGRlY3J5cHRfdHJlZShvdXRwdXQsIHF1aWV0PVRydWUpICAjIElMLWVuY3J5cHRlZCBmaWxlcyBvdXRzaWRlIGFyY2hpdmVzLCBpZiBhbnkNCg0KICAgIGlmIHJlbW92ZToNCiAgICAgICAgZm9yIGFyY2ggaW4gYXJjaGl2ZXM6DQogICAgICAgICAgICBvcy5yZW1vdmUoYXJjaCkNCg0KDQppZiBfX25hbWVfXyA9PSAiX19tYWluX18iOg0KICAgIG1haW4oKQ=="
 )
 call :pwsh_exp "!extm9a.%LNG%!..." "%altrpatool%"
 if not exist "%altrpatool%" (
@@ -2098,10 +1740,12 @@ for /R "game" %%f in (*.%rpaExt%) do (
         set "usealt=1"
         call :elog .
         call :elog "!extm24.%LNG%!"
+    ) else if !OPTION! EQU 3 (
+        set "usealt=0"
     )
     if exist "!rpafile!" if not "!relativePath!" == "saves\persistent" (
-        if %DEBUGLEVEL% GEQ 1 echo "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "!detect_archive!" "!rpafile!" >> "%UNRENLOG%"
-        "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "!detect_archive!" "!rpafile!" %DEBUGREDIR%
+        echo %PYTHONSYST% "!detect_archive!" "!rpafile!" >> "%UNRENLOG%"
+        %PYTHONSYST% "!detect_archive!" "!rpafile!" %DEBUGREDIR%
         if !errorlevel! EQU 1 if !OPTION! NEQ 7 (
             set "usealt=1"
             call :elog .
@@ -2111,18 +1755,18 @@ for /R "game" %%f in (*.%rpaExt%) do (
             call :elog .
             set "qmark=?"
             if "%LNG%" == "fr" set "qmark= ?"
-            if %DEBUGLEVEL% GEQ 1 echo !extm16.%LNG%! !relativePath! - !rpasize! !UNIT.%LNG%!!qmark! >> "%UNRENLOG%"
-            call :choiceEx "!extm16.%LNG%! !relativePath! - !rpasize! !UNIT.%LNG%!!qmark! !ENTERYN.%LNG%! " "OSJYN" "N" "%CTIME%" "-rawMsg"
+            echo !extm16.%LNG%! !relativePath! - !rpasize! !UNIT.%LNG%!!qmark! >> "%UNRENLOG%"
+            call :choiceEx "!extm16.%LNG%! %YEL%!relativePath!%RES% - %YEL%!rpasize!%RES% !UNIT.%LNG%!!qmark! !ENTERYN.%LNG%! " "OSJYN" "N" "%CTIME%" "-rawMsg"
             if errorlevel 5 (
                 call :elog "%SKIP%" "!extm18.%LNG%!%RES%"
             ) else (
                 if !usealt! EQU 0 (
-                    if %DEBUGLEVEL% GEQ 1 echo "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "!rpatool!" -o game -x "!rpafile!" >> "%UNRENLOG%"
-                    "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "!rpatool!" -o game -x "!rpafile!" %DEBUGREDIR%
+                    echo %PYTHONGAME% "!rpatool!" -o game -x "!rpafile!" >> "%UNRENLOG%"
+                    %PYTHONGAME% "!rpatool!" -o game -x "!rpafile!" %DEBUGREDIR%
                     set "elevel=!errorlevel!"
                 ) else if !usealt! EQU 1 (
-                    if %DEBUGLEVEL% GEQ 1 echo "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "!altrpatool!" -o .\game -x "!rpafile!" >> "%UNRENLOG%"
-                    "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "!altrpatool!" -o .\game -x "!rpafile!" %DEBUGREDIR%
+                    echo %PYTHONGAME% "!altrpatool!" -o .\game -x "!rpafile!" >> "%UNRENLOG%"
+                    %PYTHONGAME% "!altrpatool!" -o .\game -x "!rpafile!" %DEBUGREDIR%
                     set "elevel=!errorlevel!"
                 )
                 if !elevel! NEQ 0 (
@@ -2131,18 +1775,20 @@ for /R "game" %%f in (*.%rpaExt%) do (
                     call :elog "%OK%" "!extm20.%LNG%!%RES%"
                     if "!delrpa!" == "y" (
                         call :elog -n"%EMPTY%" "!extm21.%LNG%!%RES%"
-                        if %DEBUGLEVEL% GEQ 1 echo del /f /q "!rpafile!" >> "%UNRENLOG%"
+                        echo del /f /q "!rpafile!" >> "%UNRENLOG%"
                         del /f /q "!rpafile!" %DEBUGREDIR%
                         call :elog "%OK%"
                     ) else (
                         if not exist "!rpafile!.org" (
-                            call :elog -n "%EMPTY%" "!extm22.%LNG%!%RES%"
-                            if %DEBUGLEVEL% GEQ 1 echo move /y "!rpafile!" "!rpafile!.org" >> "%UNRENLOG%"
-                            move /y "!rpafile!" "!rpafile!.org" %DEBUGREDIR%
-                            if !errorlevel! NEQ 0 (
-                                call :elog "%NOK%" "%YEL%!LOGCHK.%LNG%!%RES%"
-                            ) else (
-                                call :elog "%OK%"
+                            if %NOBACKUP% EQU 0 (
+                                call :elog -n "%EMPTY%" "!extm22.%LNG%!%RES%"
+                                echo move /y "!rpafile!" "!rpafile!.org" >> "%UNRENLOG%"
+                                move /y "!rpafile!" "!rpafile!.org" %DEBUGREDIR%
+                                if !errorlevel! NEQ 0 (
+                                    call :elog "%NOK%" "%YEL%!LOGCHK.%LNG%!%RES%"
+                                ) else (
+                                    call :elog "%OK%"
+                                )
                             )
                         )
                     )
@@ -2153,12 +1799,12 @@ for /R "game" %%f in (*.%rpaExt%) do (
             call :elog -n "%EMPTY%" "!extm16.%LNG%! %YEL%!relativePath!%RES% - %YEL%!rpasize!%RES% !UNIT.%LNG%!"
             set "elevel=0"
             if !usealt! EQU 0 (
-                if %DEBUGLEVEL% GEQ 1 echo "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "!rpatool!" -o game -x "!rpafile!" >> "%UNRENLOG%"
-                "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "!rpatool!" -o game -x "!rpafile!" %DEBUGREDIR%
+                echo %PYTHONGAME% "!rpatool!" -o game -x "!rpafile!" >> "%UNRENLOG%"
+                %PYTHONGAME% "!rpatool!" -o game -x "!rpafile!" %DEBUGREDIR%
                 set "elevel=!errorlevel!"
             ) else if !usealt! EQU 1 (
-                if %DEBUGLEVEL% GEQ 1 echo "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "!altrpatool!" -o .\game -x "!rpafile!" >> "%UNRENLOG%"
-                "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "!altrpatool!" -o .\game -x "!rpafile!" %DEBUGREDIR%
+                echo %PYTHONGAME% "!altrpatool!" -o .\game -x "!rpafile!" >> "%UNRENLOG%"
+                %PYTHONGAME% "!altrpatool!" -o .\game -x "!rpafile!" %DEBUGREDIR%
                 set "elevel=!errorlevel!"
             )
             if !elevel! NEQ 0 (
@@ -2167,13 +1813,13 @@ for /R "game" %%f in (*.%rpaExt%) do (
                 call :elog "%OK%"
                 if "!delrpa!" == "y" (
                     call :elog -n "%EMPTY%" "!extm21.%LNG%!%RES%"
-                    if %DEBUGLEVEL% GEQ 1 echo del /f /q "!rpafile!" >> "%UNRENLOG%"
+                    echo del /f /q "!rpafile!" >> "%UNRENLOG%"
                     del /f /q "!rpafile!" %DEBUGREDIR%
                     call :elog "%OK%"
                 ) else (
                     if not exist "!rpafile!.org" (
                         call :elog -n "%EMPTY%" "!extm22.%LNG%!%RES%"
-                        if %DEBUGLEVEL% GEQ 1 echo move /y "!rpafile!" "!rpafile!.org" >> "%UNRENLOG%"
+                        echo move /y "!rpafile!" "!rpafile!.org" >> "%UNRENLOG%"
                         move /y "!rpafile!" "!rpafile!.org" %DEBUGREDIR%
                         if !errorlevel! NEQ 0 (
                             call :elog "%NOK%" "%YEL%!LOGCHK.%LNG%!%RES%"
@@ -2186,6 +1832,7 @@ for /R "game" %%f in (*.%rpaExt%) do (
         )
     )
 )
+timeout /T 2 >nul
 
 :: Clean up
 :rpa_cleanup
@@ -2194,27 +1841,27 @@ call :elog -n "%EMPTY%" "!CLEANUP.%LNG%!..."
 
 set "error="
 if not "%rpatool%" == "" if exist "%rpatool%" (
-    if %DEBUGLEVEL% GEQ 1 echo del /f /q "%rpatool%" >> "%UNRENLOG%"
+    echo del /f /q "%rpatool%" >> "%UNRENLOG%"
     del /f /q "%rpatool%" %DEBUGREDIR%
     set /a error=!errorlevel!
 )
 if not "%altrpatool%" == "" if exist "%altrpatool%" (
-    if %DEBUGLEVEL% GEQ 1 echo del /f /q "%altrpatool%" >> "%UNRENLOG%"
+    echo del /f /q "%altrpatool%" >> "%UNRENLOG%"
     del /f /q "%altrpatool%" %DEBUGREDIR%
     set /a error=!error!+!errorlevel!
 )
 if exist "%WORKDIR%\__pycache__" if exist "%WORKDIR%\__pycache__" (
-    if %DEBUGLEVEL% GEQ 1 echo rmdir /q /s "%WORKDIR%\__pycache__" >> "%UNRENLOG%"
+    echo rmdir /q /s "%WORKDIR%\__pycache__" >> "%UNRENLOG%"
     rmdir /q /s "%WORKDIR%\__pycache__" %DEBUGREDIR%
     set /a error=!error!+!errorlevel!
 )
 if not "%detect_archive%" == "" if exist "%detect_archive%" (
-    if %DEBUGLEVEL% GEQ 1 echo del /f /q "%detect_archive%" >> "%UNRENLOG%"
+    echo del /f /q "%detect_archive%" >> "%UNRENLOG%"
     del /f /q "%detect_archive%" %DEBUGREDIR%
     set /a error=!error!+!errorlevel!
 )
 if not "%detect_rpa_ext%" == "" if exist "%detect_rpa_ext%" (
-    if %DEBUGLEVEL% GEQ 1 echo del /f /q "%detect_rpa_ext%" >> "%UNRENLOG%"
+    echo del /f /q "%detect_rpa_ext%" >> "%UNRENLOG%"
     del /f /q "%detect_rpa_ext%" %DEBUGREDIR%
     set /a error=!error!+!errorlevel!
 )
@@ -2224,18 +1871,12 @@ if !error! NEQ 0 (
 ) else (
     call :elog "%OK%"
 )
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 
 if "%OPTION%" == "5" call :decompile
 if "%OPTION%" == "6" call :decompile
 goto :eof
 
-
-:: Use unrpa instead of rpatool which offer the ability to extract RPA archives with a different header.
-:extract_wkey
-call :elog .
-goto :unavailable
-goto :eof
 
 :: Decrypt all RPYC files with the WOS SHIELD
 :wos_decrypt_all
@@ -2274,15 +1915,15 @@ if not exist "%wos_decrypt_all%" (
 )
 
 call :elog -n "%EMPTY%" "!wosmsg1.%LNG%!"
-if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%python.exe" %PYNOASSERT% "%wos_decrypt_all%" >> "%UNRENLOG%"
-"%PYTHONHOME%python.exe" %PYNOASSERT% "%wos_decrypt_all%" 2>> "%UNRENLOG%"
+echo %PYTHONGAME% "%wos_decrypt_all%" >> "%UNRENLOG%"
+%PYTHONGAME% "%wos_decrypt_all%" 2>> "%UNRENLOG%"
 if %errorlevel% NEQ 0 (
     call :elog "%NOK%" "!LOGCHK.%LNG%!"
 ) else (
     call :elog "%OK%"
 )
 
-if %DEBUGLEVEL% GEQ 1 echo del /f /q "%wos_decrypt_all%" >> "%UNRENLOG%"
+echo del /f /q "%wos_decrypt_all%" >> "%UNRENLOG%"
 del /f /q "%wos_decrypt_all%" %DEBUGREDIR%
 goto :eof
 
@@ -2407,6 +2048,14 @@ set "decm12.de=WOS-SCHILD ERKANNT, Entschlüsselung vor der Dekompilierung."
 set "decm12.ru=ОБНАРУЖЕН ЩИТ WOS, расшифровка перед декомпиляцией."
 set "decm12.zh=检测到 WOS 盾牌，正在解密后 进行反编译。"
 
+set "decm13.en=Decompiling all RPYC files in the game directory."
+set "decm13.fr=Décompilation de tous les fichiers RPYC dans le répertoire du jeu."
+set "decm13.es=Descompilando todos los archivos RPYC en el directorio del juego."
+set "decm13.it=Decompilazione di tutti i file RPYC nella directory di gioco."
+set "decm13.de=Dekompilierung aller RPYC-Dateien im Spieledirectory."
+set "decm13.ru=Декомпиляция всех файлов RPYC в каталоге игры."
+set "decm13.zh=正在反编译游戏目录中的所有 RPYC 文件。"
+
 setlocal disabledelayedexpansion
 for /f "delims=" %%A in ("%WORKDIR%") do (
     endlocal
@@ -2443,8 +2092,8 @@ if not exist "%detect_rpyc_version%" (
     call :exitn 3
 )
 
-if %DEBUGLEVEL% GEQ 1 echo "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "%detect_rpyc_version%" >> "%UNRENLOG%"
-"%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "%detect_rpyc_version%" %DEBUGREDIR%
+echo %PYTHONSYST% "%detect_rpyc_version%" >> "%UNRENLOG%"
+%PYTHONSYST% "%detect_rpyc_version%" %DEBUGREDIR%
 if %errorlevel% EQU 0 (
     if %RENPYVERSION% GEQ 8 (
         call :elog "%WARN%" "%RED%v2%RES%,"
@@ -2460,7 +2109,7 @@ if %errorlevel% EQU 0 (
         call :elog "%OK%" "%YEL%v2%RES%."
     )
 )
-if %DEBUGLEVEL% GEQ 1 echo del /f /q "%detect_rpyc_version%" >> "%UNRENLOG%"
+echo del /f /q "%detect_rpyc_version%" >> "%UNRENLOG%"
 del /f /q "%detect_rpyc_version%" %DEBUGREDIR%
 
 :: Display all the variables in the log for debugging purpose
@@ -2515,15 +2164,21 @@ if not exist "%decompcab%" (
 	call :elog "%OK%"
 )
 
-call :elog .
-call :elog "!decm3.%LNG%!"
-call :choiceEx "!ENTERYN.%LNG%! " "OSJYN" "N" "%CTIME%" "-rawMsg"
-if errorlevel 5 (
-	set "owrpy=n"
-	call :elog "    %YEL%!decm4.%LNG%!%RES%"
+if %OVERWRITE% EQU 0 (
+    call :elog .
+    call :elog "!decm3.%LNG%!"
+    call :choiceEx "!ENTERYN.%LNG%! " "OSJYN" "N" "%CTIME%" "-rawMsg"
+    if errorlevel 5 (
+    	set "owrpy=n"
+    	call :elog "    %YEL%!decm4.%LNG%!%RES%"
+    ) else (
+    	set "owrpy=y"
+    	call :elog "    %YEL%!decm5.%LNG%!%RES%"
+    )
 ) else (
-	set "owrpy=y"
-	call :elog "    %YEL%!decm5.%LNG%!%RES%"
+    set "owrpy=y"
+    call :elog .
+    call :elog "    %YEL%!decm5.%LNG%!%RES%"
 )
 
 call :DisplayVars "RPYC extract phase"
@@ -2561,73 +2216,113 @@ call :elog .
 call :elog .
 call :elog "!decm8.%LNG%!..."
 
-set "prevDir="
-for /R "game" %%f in (*.rpyc) do (
-    set "currDir=%%~dpf"
-    set "error=0"
-    set "rpycname=%%~nf"
-	set "rpyfile=%%~dpnf.rpy"
-	set "relativerpy=!rpyfile:%WORKDIR%\game\=!"
-	set "relativePath=%%f"
-	set "relativePath=!relativePath:%WORKDIR%\game\=!"
-    set "size=%%~zf"
+if %PROCESSALL% EQU 0 (
+    set "prevDir="
+    for /R "game" %%f in (*.rpyc) do (
+        set "currDir=%%~dpf"
+        set "error=0"
+        set "rpycname=%%~nf"
+    	set "rpyfile=%%~dpnf.rpy"
+    	set "relativerpy=!rpyfile:%WORKDIR%\game\=!"
+    	set "relativePath=%%f"
+    	set "relativePath=!relativePath:%WORKDIR%\game\=!"
+        set "size=%%~zf"
 
-    if not "!prevDir!" == "!currDir!" (
-        call :elog .
-        call :elog "!MTITLE.%LNG%! %YEL%!currDir!%RES%"
-        set "prevDir=!currDir!"
-    )
-
-	if not exist !rpyfile! (
-		call :elog -n "%EMPTY%" "!decm9.%LNG%! %YEL%!rpycname!.rpyc%RES% - %YEL%!size!%RES% !UNIT.%LNG%!"
-		if "%OPTION%" == "7" (
-			if %DEBUGLEVEL% GEQ 1 echo "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "%unrpycpy%" %OFFSET% --try-harder "%%f" >>"%UNRENLOG%"
-			"%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "%unrpycpy%" %OFFSET% --try-harder "%%f" >>"%UNRENLOG%" 2>&1
-			set "error=!errorlevel!"
-		) else (
-			if %DEBUGLEVEL% GEQ 1 echo "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "%unrpycpy%" %OFFSET% "%%f" >>"%UNRENLOG%"
-			"%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "%unrpycpy%" %OFFSET% "%%f" >>"%UNRENLOG%" 2>&1
-			set "error=!errorlevel!"
-		)
-        if !error! NEQ 0 (
-            call :elog "%NOK%" "!LOGCHK.%LNG%!"
-        ) else (
-            call :elog "%OK%"
+        if not "!prevDir!" == "!currDir!" (
+            call :elog .
+            call :elog "!MTITLE.%LNG%! %YEL%!currDir!%RES%"
+            set "prevDir=!currDir!"
         )
-	) else if exist !rpyfile! if "%owrpy%" == "y" (
-		if not exist "!rpyfile!.org" (
-            call :elog -n "%EMPTY%" "!decm10.%LNG%! %YEL%!rpycname!.rpy%RES% !decm10a.%LNG%! %YEL%!rpycname!.rpy.org%RES%"
-			copy /y "!rpyfile!" "!rpyfile!.org" %DEBUGREDIR%
-            if !errorlevel! NEQ 0 (
+
+    	if not exist !rpyfile! (
+    		call :elog -n "%EMPTY%" "!decm9.%LNG%! %YEL%!rpycname!.rpyc%RES% - %YEL%!size!%RES% !UNIT.%LNG%!"
+    		if "%OPTION%" == "7" (
+    			echo %PYTHONSYST% "%unrpycpy%" %OFFSET% --try-harder "%%f" >>"%UNRENLOG%"
+    			%PYTHONSYST% "%unrpycpy%" %OFFSET% --try-harder "%%f" >>"%UNRENLOG%" 2>&1
+    			set "error=!errorlevel!"
+    		) else (
+    			echo %PYTHONSYST% "%unrpycpy%" %OFFSET% "%%f" >>"%UNRENLOG%"
+    			%PYTHONSYST% "%unrpycpy%" %OFFSET% "%%f" >>"%UNRENLOG%" 2>&1
+    			set "error=!errorlevel!"
+    		)
+            if !error! NEQ 0 (
                 call :elog "%NOK%" "!LOGCHK.%LNG%!"
             ) else (
                 call :elog "%OK%"
             )
-        ) else if exist !rpyfile! if "%owrpy%" == "n" (
-            call :elog "%SKIP%"
-		)
+    	) else if exist !rpyfile! if "%owrpy%" == "y" (
+    		if not exist "!rpyfile!.org" (
+                if %NOBACKUP% EQU 0 (
+                    call :elog -n "%EMPTY%" "!decm10.%LNG%! %YEL%!rpycname!.rpy%RES% !decm10a.%LNG%! %YEL%!rpycname!.rpy.org%RES%"
+        			copy /y "!rpyfile!" "!rpyfile!.org" %DEBUGREDIR%
+                    if !errorlevel! NEQ 0 (
+                        call :elog "%NOK%" "!LOGCHK.%LNG%!"
+                    ) else (
+                        call :elog "%OK%"
+                    )
+                )
+            ) else if exist !rpyfile! if "%owrpy%" == "n" (
+                call :elog "%SKIP%"
+    		)
 
-		call :elog -n "%EMPTY%" "!decm11.%LNG%! %YEL%!rpycname!.rpy%RES%"
-        if "%OPTION%" == "6" set "OPTION=4"
-		if "%OPTION%" == "4" (
-			if %DEBUGLEVEL% GEQ 1 echo "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "%unrpycpy%" --clobber %OFFSET% --try-harder "%%f" >>"%UNRENLOG%"
-			"%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "%unrpycpy%" --clobber %OFFSET% --try-harder "%%f" >>"%UNRENLOG%" 2>&1
-			set "error=!errorlevel!"
-		) else (
-			if %DEBUGLEVEL% GEQ 1 echo "%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "%unrpycpy%" --clobber %OFFSET% "%%f" >>"%UNRENLOG%"
-			"%PYTHONEXE%" %PYVERSION% %PYTHONSYSTEM% "%unrpycpy%" --clobber %OFFSET% "%%f" >>"%UNRENLOG%" 2>&1
-			set "error=!errorlevel!"
-		)
-        if !error! NEQ 0 (
-            call :elog "%NOK%" "!LOGCHK.%LNG%!"
-        ) else (
-            call :elog "%OK%"
+    		call :elog -n "%EMPTY%" "!decm11.%LNG%! %YEL%!rpycname!.rpy%RES%"
+            if "%OPTION%" == "6" set "OPTION=4"
+    		if "%OPTION%" == "4" (
+    			echo %PYTHONSYST% "%unrpycpy%" --clobber %OFFSET% --try-harder "%%f" >>"%UNRENLOG%"
+    			%PYTHONSYST% "%unrpycpy%" --clobber %OFFSET% --try-harder "%%f" >>"%UNRENLOG%" 2>&1
+    			set "error=!errorlevel!"
+    		) else (
+    			echo %PYTHONSYST% "%unrpycpy%" --clobber %OFFSET% "%%f" >>"%UNRENLOG%"
+    			%PYTHONSYST% "%unrpycpy%" --clobber %OFFSET% "%%f" >>"%UNRENLOG%" 2>&1
+    			set "error=!errorlevel!"
+    		)
+            if !error! NEQ 0 (
+                call :elog "%NOK%" "!LOGCHK.%LNG%!"
+            ) else (
+                call :elog "%OK%"
+            )
+    	) else (
+            call :elog "%SKIP%" "!decm9.%LNG%! %YEL%!rpycname!.rpyc%RES% - %YEL%!size!%RES% !UNIT.%LNG%!"
         )
-	) else (
-        call :elog "%SKIP%" "!decm9.%LNG%! %YEL%!rpycname!.rpyc%RES% - %YEL%!size!%RES% !UNIT.%LNG%!"
+
+    )
+) else (
+    if %NOBACKUP% EQU 0 (
+        for /R "game" %%f in (*.rpy) do (
+            set "rpyfile=%%~dpnf.rpy"
+            set "rpycfile=%%~dpnf.rpyc"
+            set "rpycname=%%~nf"
+            if exist !rpyfile! if not exist !rpyfile!.org (
+                call :elog -n "%EMPTY%" "!decm10.%LNG%! %YEL%!rpycname!.rpy%RES% !decm10a.%LNG%! %YEL%!rpycname!.rpy.org%RES%"
+                copy /y "!rpyfile!" "!rpyfile!.org" %DEBUGREDIR%
+                if !errorlevel! NEQ 0 (
+                    call :elog "%NOK%" "!LOGCHK.%LNG%!"
+                ) else (
+                    call :elog "%OK%"
+                )
+            )
+        )
     )
 
+    call :elog -n "%EMPTY%" "!decm13.%LNG%!..."
+    set "clobber="
+    if %OVERWRITE% EQU 1 set "clobber=--clobber"
+    if "%OPTION%" == "7" (
+        echo %PYTHONSYST% "%unrpycpy%" %clobber% %OFFSET% --try-harder "game" >>"%UNRENLOG%"
+        %PYTHONSYST% "%unrpycpy%" %clobber% %OFFSET% --try-harder "game" >>"%UNRENLOG%" 2>&1
+        set "error=!errorlevel!"
+    ) else (
+        echo %PYTHONSYST% "%unrpycpy%" %clobber% %OFFSET% "game" >>"%UNRENLOG%"
+        %PYTHONSYST% "%unrpycpy%" %clobber% %OFFSET% "game" >>"%UNRENLOG%" 2>&1
+        set "error=!errorlevel!"
+    )
+    if !error! NEQ 0 (
+        call :elog "%NOK%" "!LOGCHK.%LNG%!"
+    ) else (
+        call :elog "%OK%"
+    )
 )
+timeout /T 2 >nul
 
 :: Clean up
 call :elog .
@@ -2671,7 +2366,7 @@ if !error! NEQ 0 (
 ) else (
     call :elog "%OK%"
 )
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -2703,7 +2398,7 @@ if exist "%unren-console%" (
         call :elog "%OK%"
     )
 )
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -2735,7 +2430,7 @@ if exist "%unren-debug%" (
         call :elog "%OK%"
     )
 )
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -2767,7 +2462,7 @@ if exist "%unren-skip%" (
         call :elog "%OK%"
     )
 )
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -2799,7 +2494,7 @@ if exist "%unren-skipall%" (
         call :elog "%OK%"
     )
 )
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -2831,7 +2526,7 @@ if exist "%unren-rollback%" (
         call :elog "%OK%"
     )
 )
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -2863,7 +2558,7 @@ if exist "%unren-quick%" (
         call :elog "%OK%"
     )
 )
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -2895,7 +2590,7 @@ if exist "%unren-qmenu%" (
         call :elog "%OK%"
     )
 )
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -2919,7 +2614,7 @@ call :elog "%YEL%%ugudir%\ZLZK_UGU_soft%RES%"
 call :elog .
 call :elog -n "%EMPTY%" "!choiceh.%LNG%!.."
 
-if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%uguzip%')" >> "%UNRENLOG%"
+echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%uguzip%')" >> "%UNRENLOG%"
 "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%uguzip%')" %DEBUGREDIR%
 if %errorlevel% NEQ 0 (
     call :elog "%NOK%" "!UNDWNLD.%LNG%! %MAG%%url%%RES%"
@@ -2927,7 +2622,7 @@ if %errorlevel% NEQ 0 (
     goto :skip_ugu
 
 ) else (
-    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%uguzip%' '%TEMP%'" >> "%UNRENLOG%"
+    echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%uguzip%' '%TEMP%'" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%uguzip%' '%TEMP%'" %DEBUGREDIR%
     if not exist "%uguhardzip%" (
         call :elog "%NOK%" "!FNOTFOUND.%LNG%! %YEL%%uguhardzip%%RES%"
@@ -2939,7 +2634,7 @@ if %errorlevel% NEQ 0 (
         call :elog .
         goto :skip_ugu
     )
-    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%ugusoftzip%' '%WORKDIR%'" >> "%UNRENLOG%"
+    echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%ugusoftzip%' '%WORKDIR%'" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%ugusoftzip%' '%WORKDIR%'" %DEBUGREDIR%
     if !errorlevel! NEQ 0 (
         call :elog "%NOK%" "!UNEXTRACT.%LNG%! %YEL%%ugusoftzip%%RES%"
@@ -2953,7 +2648,7 @@ if %errorlevel% NEQ 0 (
     del /f /q "%uguzip%" %DEBUGREDIR%
     del /f /q "%TEMP%\readme.txt" %DEBUGREDIR%
 )
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -2977,14 +2672,14 @@ call :elog "%YEL%%ucddir%%RES%"
 call :elog .
 call :elog -n "%EMPTY%" "!choicei.%LNG%!.."
 
-if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%ucdzip%')" >> "%UNRENLOG%"
+echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%ucdzip%')" >> "%UNRENLOG%"
 "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%ucdzip%')" %DEBUGREDIR%
 if not exist "%ucdzip%" (
 	call :elog "%NOK%" "!UNDWNLD.%LNG%! %MAG%%url%%RES%"
     call :elog .
 	goto :skip_ucd
 ) else (
-    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%ucdzip%' '%TEMP%'" >> "%UNRENLOG%"
+    echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%ucdzip%' '%TEMP%'" >> "%UNRENLOG%"
 	"%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%ucdzip%' '%TEMP%'" %DEBUGREDIR%
     if not exist "%ucdzip_part1%" (
         call :elog "%NOK%" "!FNOTFOUND.%LNG%! %YEL%%ucdzip_part1%%RES%"
@@ -3000,13 +2695,13 @@ if not exist "%ucdzip%" (
     ) else (
         move /y "%ucdzip_part2%" %TEMP%\part2.zip %DEBUGREDIR%
     )
-    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%TEMP%\part1.zip' '%WORKDIR%'" >> "%UNRENLOG%"
+    echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%TEMP%\part1.zip' '%WORKDIR%'" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%TEMP%\part1.zip' '%WORKDIR%'" %DEBUGREDIR%
     if !errorlevel! NEQ 0 (
         call :elog "%NOK%" "!UNEXTRACT.%LNG%! %YEL%%ucdzip_part1%%RES%"
         goto :skip_ucd
     )
-    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%TEMP%\part2.zip' '%WORKDIR%'" >> "%UNRENLOG%"
+    echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%TEMP%\part2.zip' '%WORKDIR%'" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%TEMP%\part2.zip' '%WORKDIR%'" %DEBUGREDIR%
     if !errorlevel! NEQ 0 (
         call :elog "%NOK%" "!UNEXTRACT.%LNG%! %YEL%%ucdzip_part2%%RES%"
@@ -3022,7 +2717,7 @@ if not exist "%ucdzip%" (
     del /f /q "%TEMP%\part2.zip" %DEBUGREDIR%
     del /f /q "%TEMP%\readme.txt" %DEBUGREDIR%
 )
-timeout /T i %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -3047,7 +2742,7 @@ call :elog -n "%EMPTY%" "!utboxmsg.%LNG%!.."
 if not exist "%_7ZIPLOC%" (
     call :elog "%NOK%" "!FNOTFOUND.%LNG%! %YEL%%_7ZIPLOC%%RES%"
     call :elog .
-    timeout /T 1 %DEBUGREDIR%
+    timeout /T 2 >nul
     goto :skip_utbox
 ) else (
     call :elog "%OK%"
@@ -3063,14 +2758,14 @@ call :elog "!INCASEDEL.%LNG%!%RES%"
 call :elog "%YEL%%utbox_file%%RES%"
 call :elog .
 call :elog -n "%EMPTY%" "!choicej.%LNG%!.."
-if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%utboxzip%')" >> "%UNRENLOG%"
+echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%utboxzip%')" >> "%UNRENLOG%"
 "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%utboxzip%')" %DEBUGREDIR%
 if not exist "%utboxzip%" (
     call :elog "%NOK%" "!UNDWNLD.%LNG%! %MAG%%url%%RES%"
     call :elog .
     goto :skip_utbox
 ) else (
-    if %DEBUGLEVEL% GEQ 1 echo "%_7ZIPLOC%" x -y -o"%utbox_tdir%" "%utboxzip%" >> "%UNRENLOG%"
+    echo "%_7ZIPLOC%" x -y -o"%utbox_tdir%" "%utboxzip%" >> "%UNRENLOG%"
     "%_7ZIPLOC%" x -y -o"%utbox_tdir%" "%utboxzip%" %DEBUGREDIR%
     if not exist "%utbox_tdir%\game\y_outline.rpy" (
         call :elog "%NOK%" "!UNEXTRACT.%LNG%! %YEL%%utboxzip%%RES%"
@@ -3090,7 +2785,7 @@ if not exist "%utboxzip%" (
 if exist "%utboxzip%" if not %utboxzip% == "" (del /f /q "%utboxzip%" %DEBUGREDIR%)
 if exist "%utbox_tdir%" if not %utbox_tdir% == "" (rd /s /q "%utbox_tdir%" %DEBUGREDIR%)
 
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -3112,7 +2807,7 @@ call :elog "%YEL%%urm_rpa%%RES%"
 call :elog .
 call :elog -n "%EMPTY%" "!choicek.%LNG%!.."
 
-if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%urm_zip%.tmp')" >> "%UNRENLOG%"
+echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%urm_zip%.tmp')" >> "%UNRENLOG%"
 "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%url%','%urm_zip%.tmp')" %DEBUGREDIR%
 if not exist "%urm_zip%.tmp" (
 	call :elog "%NOK%" "!UNDWNLD.%LNG%! %YEL%!urm_name!.zip.%RES%"
@@ -3120,7 +2815,7 @@ if not exist "%urm_zip%.tmp" (
     goto :skip_urm
 ) else (
     move /y "%urm_zip%.tmp" "%urm_zip%" %DEBUGREDIR%
-    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%urm_zip%' '%WORKDIR%\game'" >> "%UNRENLOG%"
+    echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%urm_zip%' '%WORKDIR%\game'" >> "%UNRENLOG%"
 	"%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%urm_zip%' '%WORKDIR%\game'" %DEBUGREDIR%
 	if !errorlevel! NEQ 0 (
 		call :elog "%NOK%" "!FNOTFOUND.%LNG%! %YEL%!urm_name!%RES%"
@@ -3131,7 +2826,7 @@ if not exist "%urm_zip%.tmp" (
     :skip_urm
 	del /f /q "%urm_zip%" %DEBUGREDIR%
 )
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -3175,12 +2870,12 @@ if not defined addon_path (
 set "addon_path=%addon_path:"=%"
 
 :: Check if it's a URL or local path
-echo %addon_path% | "%SystemRoot%\System32\findstr.exe" /r "^https\?://" >nul
+echo %addon_path% | %SystemRoot%\System32\findstr.exe /r "^https\?://" >nul
 if %errorlevel% EQU 0 (
     :: It's a URL
     set "temp_zip=%TEMP%\custom_addon.zip"
     call :elog -n "%EMPTY%" "!download.%LNG%!.."
-    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%addon_path%','%temp_zip%')" >> "%UNRENLOG%"
+    echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%addon_path%','%temp_zip%')" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%addon_path%','%temp_zip%')" %DEBUGREDIR%
     if !errorlevel! NEQ 0 (
         call :elog "%NOK%" "!UNDWNLD.%LNG%! %MAG%%addon_path%%RES%"
@@ -3209,7 +2904,7 @@ if exist "%source%\*" (
 ) else (
     :: Assume it's an archive
     call :elog -n "%EMPTY%" "Extracting archive..."
-    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%source%' '%WORKDIR%\game'" >> "%UNRENLOG%"
+    echo "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%source%' '%WORKDIR%\game'" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "Expand-Archive -Force '%source%' '%WORKDIR%\game'" %DEBUGREDIR%
     if !errorlevel! NEQ 0 (
         call :elog "%NOK%" "!UNEXTRACT.%LNG%! %YEL%%source%%RES%"
@@ -3220,7 +2915,7 @@ if exist "%source%\*" (
 )
 
 :skip_custom
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -3302,9 +2997,9 @@ if not exist "%unr-unkonwn%" (
     goto :anynameend
 ) else (
     del /f /q "%unr-unkonwn%.b64" %DEBUGREDIR%
-    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-unkonwn%.tmp') -replace 'newname', '%newname%' | Set-Content '%unr-unkonwn%'" >> "%UNRENLOG%"
+    echo "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-unkonwn%.tmp') -replace 'newname', '%newname%' | Set-Content '%unr-unkonwn%'" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-unkonwn%.tmp') -replace 'newname', '%newname%' | Set-Content '%unr-unkonwn%'" %DEBUGREDIR%
-    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-unkonwn%') -replace 'oldname', '%oldname%' | Set-Content '%unr-unkonwn%'" >> "%UNRENLOG%"
+    echo "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-unkonwn%') -replace 'oldname', '%oldname%' | Set-Content '%unr-unkonwn%'" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "(Get-Content '%unr-unkonwn%') -replace 'oldname', '%oldname%' | Set-Content '%unr-unkonwn%'" %DEBUGREDIR%
     if not exist "%unr-unkonwn%" (
         call :elog "%NOK%" "!FNOTFOUND.%LNG%! %YEL%!unr-unkonwn!%RES%"
@@ -3326,7 +3021,7 @@ if not exist "%unr-unkonwn%" (
 )
 
 :anynameend
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -3363,7 +3058,7 @@ if exist "%unren-nsync%" (
         call :elog "%OK%"
     )
 )
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -3419,7 +3114,7 @@ if %file_found% EQU 0 (
     call :elog "%SKIP%" "!NOTFOUND.%LNG%!."
     call :elog .
 )
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -3475,7 +3170,7 @@ if !file_found! EQU 0 (
     call :elog .
     exit /b 1
 )
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -3562,7 +3257,7 @@ set "etext8.zh=请先使用选项 1 来解压游戏。"
 :: Check if needed files for extraction are present
 set "RpysFound=0"
 for /r ".\game" %%F in (*.rpy) do (
-    echo %%F | "%SystemRoot%\System32\findstr.exe" /i /c:"\\tl\\" >nul 2>&1
+    echo %%F | %SystemRoot%\System32\findstr.exe /i /c:"\\tl\\" >nul
     if errorlevel 1 set /a RpysFound+=1
 )
 if %RpysFound% LEQ 3 (
@@ -3570,7 +3265,7 @@ if %RpysFound% LEQ 3 (
     call :elog "%NOK%" "!etext6.%LNG%!"
     set "RpycFound=0"
     for /r ".\game" %%F in (*.rpyc) do (
-        echo %%F | "%SystemRoot%\System32\findstr.exe" /i /c:"\\tl\\" >nul 2>&1
+        echo %%F | %SystemRoot%\System32\findstr.exe /i /c:"\\tl\\" >nul
         if errorlevel 1 set /a RpycFound+=1
     )
     if !RpycFound! GTR 0 (
@@ -3578,7 +3273,7 @@ if %RpysFound% LEQ 3 (
     ) else (
         call :elog "%NOK%" "!etext8.%LNG%!"
     )
-    timeout /T 1 %DEBUGREDIR%
+    timeout /T 2 >nul
     exit /b 1
 )
 
@@ -3595,7 +3290,7 @@ for %%e in (exe py) do (
         set "tempfname=%%~nf"
 
         REM Check if this name has already been processed
-        echo !processed! | "%SystemRoot%\System32\findstr.exe" /i "\!tempfname!" >nul
+        echo !processed! | %SystemRoot%\System32\findstr.exe /i "\!tempfname!" >nul
         if errorlevel 1 (
             REM Count how many files with this name exist
             set /a count=0
@@ -3627,7 +3322,7 @@ if "%fname%" == "" (
     call :elog "%NOK%" "!etext2.%LNG%!"
     goto :input_name
 ) else (
-    if not exist "%WORKDIR%\%fname%.exe" (
+    if not exist %WORKDIR%\%fname%.exe (
         call :elog "%NOK%" "!etext2.%LNG%!"
         goto :input_name
     )
@@ -3653,20 +3348,21 @@ for /f "delims=" %%A in ("%WORKDIR%") do (
     endlocal
     cd /d "%%A"
 )
-if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%python.exe" %PYNOASSERT% "%fname%.py" game translate "%translation_lang%" >> "%UNRENLOG%"
-"%PYTHONHOME%python.exe" %PYNOASSERT% "%fname%.py" game translate "%translation_lang%" %DEBUGREDIR%
+echo %PYTHONGAME% "%fname%.py" game translate "%translation_lang%" >> "%UNRENLOG%"
+%PYTHONGAME% "%fname%.py" game translate "%translation_lang%" %DEBUGREDIR%
 if %errorlevel% NEQ 0 (
 	call :elog "%NOK%" "!etext4.%LNG%!"
 ) else (
     call :elog "%OK%"
 )
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
 :: Check if old registry key is present and require Administrator rights to remove it
 :check_old_reg
-"%SystemRoot%\System32\reg.exe" query "HKLM\Software\Classes\Directory\shell\Run%SCRIPTNAME%" %DEBUGREDIR%
+echo %REGEXE% query "HKLM\Software\Classes\Directory\shell\Run%SCRIPTNAME%" >> %UNRENLOG%
+%REGEXE% query "HKLM\Software\Classes\Directory\shell\Run%SCRIPTNAME%" %DEBUGREDIR%
 if %errorlevel% EQU 0 (
     set OLDREG=1
 ) else (
@@ -3677,8 +3373,6 @@ goto :eof
 
 :: Add entry to registry
 :add_reg
-set "reg=%SystemRoot%\System32\reg.exe"
-
 set "areg1.en=This will add an entry to the right-click menu for folders."
 set "areg1.fr=Cela ajoutera une entrée au menu contextuel pour les dossiers."
 set "areg1.es=Esto añadirá una entrada al menú contextual para las carpetas."
@@ -3743,17 +3437,17 @@ call :elog "!areg2a.%LNG%!%RES%"
 call :elog .
 call :elog -n "%EMPTY%" "!areg3.%LNG%!..."
 
-"%regexe%" add "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" /ve /d "!areg4.%LNG%!" /f %DEBUGREDIR%
+%REGEXE% add "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" /ve /d "!areg4.%LNG%!" /f %DEBUGREDIR%
 set error=%errorlevel%
-"%regexe%" add "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" /v "Icon" /d "%SystemRoot%\System32\shell32.dll,-154" /f %DEBUGREDIR%
+%REGEXE% add "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" /v "Icon" /d "%SystemRoot%\System32\shell32.dll,-154" /f %DEBUGREDIR%
 set /a error=%error%+%errorlevel%
-"%regexe%" add "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%\command" /ve /d "%SystemRoot%\System32\cmd.exe /c cd /d \"%%V\" && \"%SCRIPTDIR%%SCRIPTNAME%\" \"%%V\"" /f %DEBUGREDIR%
+%REGEXE% add "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%\command" /ve /d "%SystemRoot%\System32\cmd.exe /c cd /d \"%%V\" && \"%SCRIPTDIR%%SCRIPTNAME%\" \"%%V\"" /f %DEBUGREDIR%
 set /a error=%error%+%errorlevel%
-"%regexe%" add "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /ve /d "!areg4.%LNG%!" /f %DEBUGREDIR%
+%REGEXE% add "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /ve /d "!areg4.%LNG%!" /f %DEBUGREDIR%
 set error=%errorlevel%
-"%regexe%" add "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /v "Icon" /d "%SystemRoot%\System32\shell32.dll,-154" /f %DEBUGREDIR%
+%REGEXE% add "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /v "Icon" /d "%SystemRoot%\System32\shell32.dll,-154" /f %DEBUGREDIR%
 set /a error=%error%+%errorlevel%
-"%regexe%" add "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%\command" /ve /d "%SystemRoot%\System32\cmd.exe /c cd /d \"%%V\" && \"%SCRIPTDIR%%SCRIPTNAME%\" \"%%V\"" /f %DEBUGREDIR%
+%REGEXE% add "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%\command" /ve /d "%SystemRoot%\System32\cmd.exe /c cd /d \"%%V\" && \"%SCRIPTDIR%%SCRIPTNAME%\" \"%%V\"" /f %DEBUGREDIR%
 set /a error=%error%+%errorlevel%
 if %error% EQU 0 (
 	call :elog "%OK%"
@@ -3762,14 +3456,12 @@ if %error% EQU 0 (
 )
 call :elog .
 
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
 :: Remove entry from registry
 :remove_reg
-set "regexe=%SystemRoot%\System32\reg.exe"
-
 set "rreg1.en=This will remove the previously added entry from the right-click menu for folders."
 set "rreg1.fr=Cela supprimera l'entrée précédemment ajoutée du menu contextuel pour les dossiers."
 set "rreg1.es=Esto eliminará la entrada previamente añadida del menú contextual para las carpetas."
@@ -3802,19 +3494,19 @@ call :elog -n "%EMPTY%" "!rreg2.%LNG%!..."
 
 set error=0
 if %OLDREG% EQU 1 (
-    "!regexe!" query "HKLM\SOFTWARE\Classes\Directory\shell\RunUnrenForAll" %DEBUGREDIR%
+    "!REGEXE!" query "HKLM\SOFTWARE\Classes\Directory\shell\RunUnrenForAll" %DEBUGREDIR%
     if !errorlevel! EQU 0 (
-        "!regexe!" delete "HKLM\SOFTWARE\Classes\Directory\shell\RunUnrenForAll" /f %DEBUGREDIR%
+        "!REGEXE!" delete "HKLM\SOFTWARE\Classes\Directory\shell\RunUnrenForAll" /f %DEBUGREDIR%
         set error=!errorlevel!
     )
-    "!regexe!" query "HKLM\SOFTWARE\Classes\Directory\shell\Run%SCRIPTNAME%" %DEBUGREDIR%
+    "!REGEXE!" query "HKLM\SOFTWARE\Classes\Directory\shell\Run%SCRIPTNAME%" %DEBUGREDIR%
     if !errorlevel! EQU 0 (
-        "!regexe!" delete "HKLM\SOFTWARE\Classes\Directory\shell\Run%SCRIPTNAME%" /f %DEBUGREDIR%
+        "!REGEXE!" delete "HKLM\SOFTWARE\Classes\Directory\shell\Run%SCRIPTNAME%" /f %DEBUGREDIR%
         set /a error=!error!+!errorlevel!
     )
-    "!regexe!" query "HKLM\SOFTWARE\Classes\Directory\Background\shell\Run%SCRIPTNAME%" %DEBUGREDIR%
+    "!REGEXE!" query "HKLM\SOFTWARE\Classes\Directory\Background\shell\Run%SCRIPTNAME%" %DEBUGREDIR%
     if !errorlevel! EQU 0 (
-        "!regexe!" delete "HKLM\SOFTWARE\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /f %DEBUGREDIR%
+        "!REGEXE!" delete "HKLM\SOFTWARE\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /f %DEBUGREDIR%
         set /a error=!error!+!errorlevel!
     )
     if !error! NEQ 0 (
@@ -3825,14 +3517,14 @@ if %OLDREG% EQU 1 (
         call :exitn 3
     )
 ) else (
-    "!regexe!" query "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" %DEBUGREDIR%
+    "!REGEXE!" query "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" %DEBUGREDIR%
     if !errorlevel! EQU 0 (
-        "!regexe!" delete "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" /f %DEBUGREDIR%
+        "!REGEXE!" delete "HKCU\Software\Classes\Directory\shell\Run%SCRIPTNAME%" /f %DEBUGREDIR%
         set error=!errorlevel!
     )
-    "!regexe!" query "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" %DEBUGREDIR%
+    "!REGEXE!" query "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" %DEBUGREDIR%
     if !errorlevel! EQU 0 (
-        "!regexe!" delete "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /f %DEBUGREDIR%
+        "!REGEXE!" delete "HKCU\Software\Classes\Directory\Background\shell\Run%SCRIPTNAME%" /f %DEBUGREDIR%
         set /a error=!error!+!errorlevel!
     )
     if !error! NEQ 0 (
@@ -3844,7 +3536,7 @@ if !error! EQU 0 (
     set OLDREG=0
 )
 
-timeout /T 1 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -3888,8 +3580,8 @@ if %errorlevel% EQU 0 (
     call :elog "!admright2.%LNG%!"
     call :elog "!admright3.%LNG%!"
     call :elog .
-    timeout /T 2 %DEBUGREDIR%
-    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "Start-Process '%~f0' -ArgumentList '%WORKDIR%' -Verb RunAs" >> "%UNRENLOG%"
+    timeout /T 2 >nul
+    echo "%PWRSHELL%" -NoProfile -Command "Start-Process '%~f0' -ArgumentList '%WORKDIR%' -Verb RunAs" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "Start-Process '%~f0' -ArgumentList '%WORKDIR%' -Verb RunAs" %DEBUGREDIR%
 
     goto :exitn
@@ -3920,7 +3612,7 @@ set "batch_name=%~1"
 set "running_batch=%~nx0"
 
 :: If no difference do nothing
-"%SystemRoot%\System32\fc.exe" "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%.bat" %DEBUGREDIR%
+%SystemRoot%\System32\fc.exe "%UPD_TDIR%\%batch_name%.bat" "%SCRIPTDIR%%batch_name%.bat" %DEBUGREDIR%
 if %errorlevel% EQU 0 (
     goto :eof
 )
@@ -3947,7 +3639,7 @@ if %errorlevel% NEQ 0 (
 ) else (
     call :elog "%OK%"
 )
-timeout /T 2 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -3977,7 +3669,7 @@ goto :eof
 
 :: When it's not unavailable, show message and exit
 :unavailable
-setlocal
+setlocal enabledelayedexpansion
 if "%RENPYVERSION%" == "7" (
     set "unavailable.en=This feature is unavailable in this version."
     set "unavailable.fr=Cette fonctionnalité n'est pas disponible dans cette version."
@@ -4000,7 +3692,7 @@ if "%RENPYVERSION%" == "8" (
 call :elog .
 call :elog "%WARN%" "!unavailable.%LNG%!"
 
-timeout /T 2 %DEBUGREDIR%
+timeout /T 2 >nul
 endlocal
 goto :menu
 
@@ -4082,7 +3774,7 @@ set "cupd8.zh=未找到下载更新链接。"
 call :elog .
 call :elog -n "%EMPTY%" "!cupd1.%LNG%!..."
 del /f /q "%TEMP%\%upd_link%.tmp" %DEBUGREDIR%
-if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%upd_url%', '%TEMP%\%upd_link%.tmp')" >> "%UNRENLOG%"
+echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%upd_url%', '%TEMP%\%upd_link%.tmp')" >> "%UNRENLOG%"
 "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%upd_url%', '%TEMP%\%upd_link%.tmp')" %DEBUGREDIR%
 if not exist "%TEMP%\%upd_link%.tmp" (
     call :elog "%NOK%" "!cupd6.%LNG%!"
@@ -4092,7 +3784,7 @@ if not exist "%TEMP%\%upd_link%.tmp" (
     if not exist "%SCRIPTDIR%%upd_link%.txt" (
         copy /y nul "%SCRIPTDIR%%upd_link%.txt" %DEBUGREDIR%
     )
-    "%SystemRoot%\System32\fc.exe" "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" %DEBUGREDIR%
+    %SystemRoot%\System32\fc.exe "%TEMP%\%upd_link%.tmp" "%SCRIPTDIR%%upd_link%.txt" %DEBUGREDIR%
     if !errorlevel! GEQ 1 (
         call :elog "%OK%" "%YEL%!cupd3.%LNG%!%RES%"
 
@@ -4104,11 +3796,11 @@ if not exist "%TEMP%\%upd_link%.tmp" (
         if not defined forall_url (
             call :elog "%NOK%" "%YEL%!cupd8.%LNG%!%RES%"
             call :elog .
-            timeout /T 1 %DEBUGREDIR%
+            timeout /T 2 >nul
             goto :eof
         )
         move /y "%SCRIPTDIR%%upd_clog%.txt" "%SCRIPTDIR%%upd_clog%.b64" %DEBUGREDIR%
-        if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllBytes('%SCRIPTDIR%%upd_clog%.tmp', [Convert]::FromBase64String((Get-Content '%SCRIPTDIR%%upd_clog%.b64' -Raw)))" >> "%UNRENLOG%"
+        echo "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllBytes('%SCRIPTDIR%%upd_clog%.tmp', [Convert]::FromBase64String((Get-Content '%SCRIPTDIR%%upd_clog%.b64' -Raw)))" >> "%UNRENLOG%"
         "%PWRSHELL%" -NoProfile -Command "[IO.File]::WriteAllBytes('%SCRIPTDIR%%upd_clog%.tmp', [Convert]::FromBase64String((Get-Content '%SCRIPTDIR%%upd_clog%.b64' -Raw)))" %DEBUGREDIR%
         call :elog .
         type "%SCRIPTDIR%%upd_clog%.tmp"
@@ -4133,12 +3825,12 @@ call :elog "%MAG%%URL_REF%%RES%"
 if %new_upd% EQU 1 (
     call :elog .
     call :elog -n "%EMPTY%" "!cupd4.%LNG%! %YEL%%forall_url%%RES%..."
-    if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%forall_url%','%TEMP%\%upd_file%.tmp')" >> "%UNRENLOG%"
+    echo "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%forall_url%','%TEMP%\%upd_file%.tmp')" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "(New-Object System.Net.WebClient).DownloadFile('%forall_url%','%TEMP%\%upd_file%.tmp')" %DEBUGREDIR%
     if not exist "%TEMP%\%upd_file%.tmp" (
         call :elog "%NOK%" "%YEL%!cupd6.%LNG%!%RES%"
         call :elog .
-        timeout /T 1 %DEBUGREDIR%
+        timeout /T 2 >nul
 
         goto :eof
     ) else (
@@ -4146,7 +3838,7 @@ if %new_upd% EQU 1 (
         if not exist "%TEMP%\%upd_file%.zip" (
             call :elog "%NOK%" "%YEL%!cupd6.%LNG%!%RES%"
             call :elog .
-            timeout /T 1 %DEBUGREDIR%
+            timeout /T 2 >nul
 
             goto :eof
         ) else (
@@ -4157,7 +3849,7 @@ if %new_upd% EQU 1 (
             if !errorlevel! NEQ 0 (
                 call :elog "%NOK%" "%YEL%!cupd6.%LNG%!%RES%"
                 call :elog .
-                timeout /T 1 %DEBUGREDIR%
+                timeout /T 2 >nul
 
                 goto :eof
             ) else (
@@ -4170,7 +3862,7 @@ if %new_upd% EQU 1 (
             rd /s /q "%UPD_TDIR%" %DEBUGREDIR%
             if !relaunch! EQU 1 (
                 call :elog .
-                timeout /T 1 %DEBUGREDIR%
+                timeout /T 2 >nul
                 call "%SCRIPTDIR%!BASENAME!-new.bat" "%WORKDIR%"
 
                 call :exitn 0
@@ -4181,7 +3873,7 @@ if %new_upd% EQU 1 (
         )
     )
 )
-timeout /T 2 %DEBUGREDIR%
+timeout /T 2 >nul
 goto :eof
 
 
@@ -4234,6 +3926,32 @@ call :elog "%OK%"
 exit /b
 
 
+:: Remove username from the log file.
+:remove_username
+setlocal enabledelayedexpansion
+set "templog=%UNRENLOG%.temp"
+
+call :elog -n "%EMPTY%" "!choicez.%LNG%!..."
+if exist "%UNRENLOG%" (
+    echo "%PWRSHELL%" -NoProfile -Command "(Get-Content -Raw -Path '%UNRENLOG%') -replace '(?i)\\Users\\[^\\]+', '\Users\XXX' | Set-Content -Path '%templog%' -Encoding UTF8" >> %UNRENLOG%
+    "%PWRSHELL%" -NoProfile -Command "(Get-Content -Raw -Path '%UNRENLOG%') -replace '(?i)\\Users\\[^\\]+', '\Users\XXX' | Set-Content -Path '%templog%' -Encoding UTF8" %DEBUGREDIR%
+    if !errorlevel! EQU 0 (
+        move /y "%templog%" "%UNRENLOG%" %DEBUGREDIR%
+        call :elog "%OK%"
+        timeout /T 2 >nul
+    ) else (
+        call :elog "%NOK%" "!LOGCHK.%LNG%!"
+        timeout /T 2 >nul
+    )
+) else (
+    call :elog "%NOK%" "!FNOTFOUND.%LNG%! %YEL%%UNRENLOG%%RES%"
+    timeout /T 2 >nul
+)
+
+endlocal
+exit /b
+
+
 :: Params:
 :: 1 - Message to display
 :: 2 - Choices list (e.g. "YN" for Yes/No)
@@ -4241,29 +3959,30 @@ exit /b
 :: 4 - Timeout in seconds (e.g. "10" for 10 seconds)
 :: 5 - Additional options (optional) (e.g. "-rawMsg" to not encapsulate the default choice in the choice list)
 :choiceEx
+setlocal enabledelayedexpansion
 set "choiceEx=%TEMP%\choiceEx.py"
-if not exist "%choiceEx%" if not defined AlreadyCreated (
+if not exist "%choiceEx%" if not defined ALREADYCREATED (
     >"%choiceEx%.b64" (
         <nul set /p="IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQojIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLQ0KDQppbXBvcnQgc3lzDQppbXBvcnQgdGltZQ0KaW1wb3J0IG1zdmNydA0KaW1wb3J0IGNvZGVjcw0KDQppZiBzeXMudmVyc2lvbl9pbmZvWzBdIDwgMzoNCiAgICBpbXBvcnQgY3R5cGVzDQogICAgIyBGb3JjZSBsYSBjb25zb2xlIFdpbmRvd3MgZW4gVVRGLTgNCiAgICBjdHlwZXMud2luZGxsLmtlcm5lbDMyLlNldENvbnNvbGVDUCg2NTAwMSkNCiAgICBjdHlwZXMud2luZGxsLmtlcm5lbDMyLlNldENvbnNvbGVPdXRwdXRDUCg2NTAwMSkNCg0KICAgICMgQ1JVQ0lBTDogRW52ZWxvcHBlIHN0ZG91dCBhdmVjIHVuIHdyaXRlciBVVEYtOA0KICAgIHN5cy5zdGRvdXQgPSBjb2RlY3MuZ2V0d3JpdGVyKCd1dGYtOCcpKHN5cy5zdGRvdXQpDQogICAgc3lzLnN0ZGVyciA9IGNvZGVjcy5nZXR3cml0ZXIoJ3V0Zi04Jykoc3lzLnN0ZGVycikNCg0KIyBHw6hyZSBsZXMgZGV1eCBQeXRob24gMiBldCAzDQppZiBzeXMudmVyc2lvbl9pbmZvWzBdIDwgMzoNCiAgICBtc2cgPSBzeXMuYXJndlsxXS5kZWNvZGUoJ2xhdGluLTEnKSBpZiBpc2luc3RhbmNlKHN5cy5hcmd2WzFdLCBzdHIpIGVsc2Ugc3lzLmFyZ3ZbMV0NCmVsc2U6DQogICAgbXNnID0gc3lzLmFyZ3ZbMV0NCg0KY2hvaWNlcyAgICAgPSBzeXMuYXJndlsyXQ0KZGVmYXVsdCAgICAgPSBzeXMuYXJndlszXQ0KdGltZW91dCAgICAgPSBpbnQoc3lzLmFyZ3ZbNF0pDQpyYXcgICAgICAgICA9IChsZW4oc3lzLmFyZ3YpID4gNSBhbmQgc3lzLmFyZ3ZbNV0gPT0gIi1yYXdNc2ciKQ0KDQppZiByYXc6DQogICAgZGlzcGxheSA9IG1zZw0KZWxzZToNCiAgICBkaXNwID0gWyJbJXNdIiAlIGMgaWYgYyA9PSBkZWZhdWx0IGVsc2UgYyBmb3IgYyBpbiBjaG9pY2VzXQ0KICAgIGRpc3BsYXkgPSAiJXMgKCVzLCB0aW1lb3V0ICVzcykgOiAiICUgKG1zZywgJy8nLmpvaW4oZGlzcCksIHRpbWVvdXQpDQoNCnN5cy5zdGRvdXQud3JpdGUoZGlzcGxheSkNCnN5cy5zdGRvdXQuZmx1c2goKQ0KDQplbmQgPSB0aW1lLnRpbWUoKSArIHRpbWVvdXQNCnJlc3VsdCA9IGRlZmF1bHQNCg0Kd2hpbGUgdGltZS50aW1lKCkgPCBlbmQ6DQogICAgaWYgbXN2Y3J0LmtiaGl0KCk6DQogICAgICAgIGtleSA9IG1zdmNydC5nZXR3Y2goKQ0KICAgICAgICBpZiBrZXkgPT0gIlxyIjogICMgRW50ZXINCiAgICAgICAgICAgIGJyZWFrDQogICAgICAgIGtleSA9IGtleS51cHBlcigpDQogICAgICAgIGlmIGtleSBpbiBjaG9pY2VzOg0KICAgICAgICAgICAgcmVzdWx0ID0ga2V5DQogICAgICAgICAgICBicmVhaw0KICAgIHRpbWUuc2xlZXAoMC4wNSkNCg0Kc3lzLnN0ZG91dC53cml0ZShyZXN1bHQpDQpzeXMuc3Rkb3V0LndyaXRlKCJcbiIpDQpzeXMuZXhpdChjaG9pY2VzLmluZGV4KHJlc3VsdCkgKyAxKQ=="
     )
-    if defined PYTHONHOME (
-        if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%python.exe" %PYNOASSERT% "%TEMP%\b64decode.py" "%choiceEx%.b64" "%choiceEx%.tmp" >> "%UNRENLOG%"
-        "%PYTHONHOME%python.exe" %PYNOASSERT% "%TEMP%\b64decode.py" "%choiceEx%.b64" "%choiceEx%.tmp" %DEBUGREDIR%
+    if defined PYTHONSYST (
+        echo %PYTHONSYST% "%TEMP%\b64decode.py" "%choiceEx%.b64" "%choiceEx%.tmp" >> "%UNRENLOG%"
+        %PYTHONSYST% "%TEMP%\b64decode.py" "%choiceEx%.b64" "%choiceEx%.tmp" %DEBUGREDIR%
     ) else (
-        if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "& { [IO.File]::WriteAllBytes('%choiceEx%.tmp', [Convert]::FromBase64String([IO.File]::ReadAllText('%choiceEx%.b64')))}" >> "%UNRENLOG%"
+        echo "%PWRSHELL%" -NoProfile -Command "& { [IO.File]::WriteAllBytes('%choiceEx%.tmp', [Convert]::FromBase64String([IO.File]::ReadAllText('%choiceEx%.b64')))}" >> "%UNRENLOG%"
         "%PWRSHELL%" -NoProfile -Command "& { [IO.File]::WriteAllBytes('%choiceEx%.tmp', [Convert]::FromBase64String([IO.File]::ReadAllText('%choiceEx%.b64')))}" %DEBUGREDIR%
     )
-    if %DEBUGLEVEL% GEQ 1 echo move /y "%choiceEx%.tmp" "%choiceEx%" >> "%UNRENLOG%"
+    echo move /y "%choiceEx%.tmp" "%choiceEx%" >> "%UNRENLOG%"
     move /y "%choiceEx%.tmp" "%choiceEx%" %DEBUGREDIR%
-    if %DEBUGLEVEL% GEQ 1 del /f /q "%choiceEx%.b64" >> "%UNRENLOG%"
+    del /f /q "%choiceEx%.b64" >> "%UNRENLOG%"
     del /f /q "%choiceEx%.b64" %DEBUGREDIR%
-    set "AlreadyCreated=1"
+    set "alreadycreated=1"
 )
 
-if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%python.exe" %PYNOASSERT% "%choiceEx%" "%~1" "%~2" "%~3" "%~4" "%~5" >> "%UNRENLOG%"
-"%PYTHONHOME%python.exe" %PYNOASSERT% "%choiceEx%" "%~1" "%~2" "%~3" "%~4" "%~5"
+echo %PYTHONGAME% "%choiceEx%" "%~1" "%~2" "%~3" "%~4" "%~5" >> "%UNRENLOG%"
+%PYTHONGAME% "%choiceEx%" "%~1" "%~2" "%~3" "%~4" "%~5"
 
-exit /b %errorlevel%
+endlocal & set "ALREADYCREATED=%alreadycreated%" & exit /b %errorlevel%
 
 
 :: For debugging help
@@ -4272,23 +3991,24 @@ set "emsg=%~1"
 
 >> "%UNRENLOG%" echo.
 echo "%emsg%" >> "%UNRENLOG%"
+echo LNG            = %LNG% >> "%UNRENLOG%"
+echo POWERSHELL     = %PWRSHELL% >> "%UNRENLOG%"
 echo SCRIPTDIR      = %SCRIPTDIR% >> "%UNRENLOG%"
 echo WORKDIR        = %WORKDIR% >> "%UNRENLOG%"
 echo PYTHONHOME     = %PYTHONHOME% >> "%UNRENLOG%"
 echo PYTHONPATH     = %PYTHONPATH% >> "%UNRENLOG%"
-echo PYTHONEXE      = %PYTHONEXE% >> "%UNRENLOG%"
+echo PYTHONSYST     = %PYTHONSYST% >> "%UNRENLOG%"
+echo PYTHONGAME     = %PYTHONGAME% >> "%UNRENLOG%"
 echo PYNOASSERT     = [%PYNOASSERT%] >> "%UNRENLOG%"
-echo PYVERSION      = [%PYVERSION%] >> "%UNRENLOG%"
-echo PYVERSION2     = [%PYVERSION2%] >> "%UNRENLOG%"
-echo PYVERSION3     = [%PYVERSION3%] >> "%UNRENLOG%"
-echo PYTHONSYSTEM   = [%PYTHONSYSTEM%] >> "%UNRENLOG%"
+echo PYTHONV2       = [%PYTHONV2%] >> "%UNRENLOG%"
+echo PYTHONV3       = [%PYTHONV3%] >> "%UNRENLOG%"
 echo PYTHONVERS     = [%PYTHONVERS%] >> "%UNRENLOG%"
 echo RPATOOL_NEW    = %RPATOOL_NEW% >> "%UNRENLOG%"
 echo UNRPYC_NEW     = %UNRPYC_NEW% >> "%UNRENLOG%"
 echo RENPYVERSION   = [%RENPYVERSION%] >> "%UNRENLOG%"
 echo OFFSET         = [%OFFSET%] >> "%UNRENLOG%"
 >> "%UNRENLOG%" echo.
-goto :eof
+exit /b
 
 
 :: Expand a b64-encoded and save it as a file
@@ -4312,27 +4032,470 @@ if not exist "%f2expand%.b64" (
     goto :eof
 ) else (
     set "f2ps=!f2expand:'=''!"
-    if defined PYTHONHOME (
-        if %DEBUGLEVEL% GEQ 1 echo "%PYTHONHOME%python.exe" %PYNOASSERT% "%TEMP%\b64decode.py" "!f2ps!.b64" "!f2ps!.tmp" >> "%UNRENLOG%"
-        "%PYTHONHOME%python.exe" %PYNOASSERT% "%TEMP%\b64decode.py" "!f2ps!.b64" "!f2ps!.tmp"
+    if defined PYTHONSYST (
+        echo %PYTHONSYST% "%TEMP%\b64decode.py" "!f2ps!.b64" "!f2ps!.tmp" >> "%UNRENLOG%"
+        %PYTHONSYST% "%TEMP%\b64decode.py" "!f2ps!.b64" "!f2ps!.tmp"
     ) else (
-        if %DEBUGLEVEL% GEQ 1 echo "%PWRSHELL%" -NoProfile -Command "& { $src='!f2ps!.b64'; $dst='!f2ps!.tmp'; [IO.File]::WriteAllBytes($dst, [Convert]::FromBase64String([IO.File]::ReadAllText($src)))}" >> "%UNRENLOG%"
+        echo "%PWRSHELL%" -NoProfile -Command "& { $src='!f2ps!.b64'; $dst='!f2ps!.tmp'; [IO.File]::WriteAllBytes($dst, [Convert]::FromBase64String([IO.File]::ReadAllText($src)))}" >> "%UNRENLOG%"
         "%PWRSHELL%" -NoProfile -Command "& { $src='!f2ps!.b64'; $dst='!f2ps!.tmp'; [IO.File]::WriteAllBytes($dst, [Convert]::FromBase64String([IO.File]::ReadAllText($src)))}" %DEBUGREDIR%
     )
-    if %DEBUGLEVEL% GEQ 1 echo del /f /q "!f2expand!.b64" >> "%UNRENLOG%"
+    echo del /f /q "!f2expand!.b64" >> "%UNRENLOG%"
     del /f /q "!f2expand!.b64" %DEBUGREDIR%
     if not exist "%f2expand%.tmp" (
         call :elog "%NOK%" "!FCREATE.%LNG%! %YEL%!f2expand!.tmp%RES%"
         goto :eof
     ) else (
-        if %DEBUGLEVEL% GEQ 1 echo move /y "!f2expand!.tmp" "!f2expand!" >> "%UNRENLOG%"
+        echo move /y "!f2expand!.tmp" "!f2expand!" >> "%UNRENLOG%"
         move /y "!f2expand!.tmp" "!f2expand!" %DEBUGREDIR%
     )
 )
 set "expmsg=" & set "f2expand=" & set "f2ps="
 ::set DEBUGLEVEL=0
-goto :eof
+exit /b
 
+
+:: Retrieves the system language via the registry
+:CheckLanguage
+setlocal enabledelayedexpansion
+for /f "tokens=3" %%A in ('%REGEXE% query "HKCU\Control Panel\International" /v LocaleName ^| findstr LocaleName') do (
+    set "LOCALE=%%A"
+)
+
+:: Extract the first two characters of the language code (e.g., fr-FR -> fr)
+set "lng=!LOCALE:~0,2!"
+
+:: Converts to lowercase
+set "lng=!lng:EN=en!"
+set "lng=!lng:FR=fr!"
+set "lng=!lng:ES=es!"
+set "lng=!lng:IT=it!"
+set "lng=!lng:DE=de!"
+set "lng=!lng:RU=ru!"
+set "lng=!lng:ZH=zh!"
+
+:: Language support test
+:lngtest
+set "SUPPORTED= de es en fr it ru zh "
+set "find= %lng% "
+echo "%SUPPORTED%" | %SystemRoot%\System32\findstr.exe /i "%find%" >nul
+if %errorlevel% NEQ 0 set "lng=en"
+
+:: To be able to take screenshots for F95zone
+if not "%~2" == "" (
+    echo "%SUPPORTED%" | %SystemRoot%\System32\findstr.exe /i " %~2 " >nul
+    if %errorlevel% EQU 0 set "lng=%~2"
+)
+endlocal & set "LNG=%lng%"
+exit /b
+
+
+:: We need PowerShell for later, make sure it exists
+:CheckPowershell
+setlocal enabledelayedexpansion
+
+set "pshell.en=Checking PowerShell Availability"
+set "pshell.fr=Vérification de la disponibilité de PowerShell"
+set "pshell.es=Comprobando la disponibilidad de PowerShell"
+set "pshell.it=Verifica della disponibilità di PowerShell"
+set "pshell.de=Überprüfung der Verfügbarkeit von PowerShell"
+set "pshell.ru=Проверка доступности PowerShell"
+set "pshell.zh=检查 PowerShell 是否可用"
+
+set "pwrshell=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
+
+call :elog -n "%EMPTY%" "!pshell.%LNG%!..."
+
+for /f "delims=" %%A in ('%SystemRoot%\System32\where.exe pwsh.exe 2^>nul') do (
+    if not "%%A" == "" set "pwrshell=%%A"
+)
+
+if not exist "%pwrshell%" (
+    set "pshell1.en=Powershell is required"
+    set "pshell1.fr=Erreur Powershell est requis"
+    set "pshell1.es=Error Se requiere Powershell"
+    set "pshell1.it=Errore Powershell è richiesto"
+    set "pshell1.de=Fehler Powershell ist erforderlich"
+    set "pshell1.ru=Ошибка требуется PowerShell"
+    set "pshell1.zh=需要 PowerShell"
+
+    set "pshell2.en=This is included in Windows 7, 8 and 10. XP/Vista users can"
+    set "pshell2.fr=Ce programme est inclus dans Windows 7, 8 et 10. Les utilisateurs de XP/Vista peuvent"
+    set "pshell2.es=Esto está incluido en Windows 7, 8 y 10. Los usuarios de XP/Vista pueden"
+    set "pshell2.it=Questo programma è incluso in Windows 7, 8 e 10. Gli utenti di XP/Vista possono"
+    set "pshell2.de=Dieses Programm ist in Windows 7, 8 und 10 enthalten. XP/Vista-Benutzer können"
+    set "pshell2.ru=Это включено в Windows 7, 8 и 10. Пользователи XP/Vista могут"
+    set "pshell2.zh=Windows 7、8 和 10 包含此组件。XP/Vista 用户可以"
+
+    set "pshell3.en=download it here: %MAG%https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+    set "pshell3.fr=le télécharger ici : %MAG%https://learn.microsoft.com/fr-fr/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+    set "pshell3.es=descargarlo aquí: %MAG%https://learn.microsoft.com/es-es/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+    set "pshell3.it=scaricarlo qui: %MAG%https://learn.microsoft.com/it-it/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+    set "pshell3.de=es hier herunterladen: %MAG%https://learn.microsoft.com/de-de/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+    set "pshell3.ru=скачать его здесь: %MAG%https://learn.microsoft.com/ru-ru/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+    set "pshell3.zh=在此下载：%MAG%https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5%RES%"
+
+    call :elog "%NOK%"
+    call :elog .
+    call :elog "    !pshell1.%LNG%!. !UNACONT.%LNG%!"
+    call :elog "    !pshell2.%LNG%!"
+    call :elog "    !pshell3.%LNG%!"
+    call :elog .
+    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
+
+    call :exitn 3
+) else (
+    call :elog "%OK%"
+)
+
+endlocal & set "PWRSHELL=%pwrshell%"
+exit /b
+
+
+:: Check if Python is available and what version it is
+:CheckPythonSystem
+setlocal enabledelayedexpansion
+set "pysystem1.en=Checking for Python installation on the system"
+set "pysystem1.fr=Vérification de l'installation de Python sur le système"
+set "pysystem1.es=Comprobando la instalación de Python en el sistema"
+set "pysystem1.it=Controllo dell'installazione di Python sul sistema"
+set "pysystem1.de=Überprüfung der Python-Installation auf dem System"
+set "pysystem1.ru=Проверка установки Python на системе"
+set "pysystem1.zh=检查系统是否安装 Python"
+
+set "pysystem2.en=Python 2 and 3 are available on the system."
+set "pysystem2.fr=Python 2 et 3 sont disponibles sur le système."
+set "pysystem2.es=Python 2 y 3 están disponibles en el sistema."
+set "pysystem2.it=Python 2 e 3 sono disponibili sul sistema."
+set "pysystem2.de=Python 2 und 3 sind auf dem System verfügbar."
+set "pysystem2.ru=Python 2 и 3 доступны на системе."
+set "pysystem2.zh=系统上可用 Python 2 和 3。"
+
+set "pysystem3.en=Only Python 2 is available on the system."
+set "pysystem3.fr=Seul Python 2 est disponible sur le système."
+set "pysystem3.es=Solo Python 2 disponible en el sistema."
+set "pysystem3.it=Solo Python 2 è disponibile sul sistema."
+set "pysystem3.de=Nur Python 2 ist auf dem System verfügbar."
+set "pysystem3.ru=Только Python 2 доступен на системе."
+set "pysystem3.zh=只有 Python 2 可用于系统。"
+
+set "pysystem4.en=Only Python 3 is available on the system."
+set "pysystem4.fr=Seul Python 3 est disponible sur le système."
+set "pysystem4.es=Solo Python 3 disponible en el sistema."
+set "pysystem4.it=Solo Python 3 è disponibile sul sistema."
+set "pysystem4.de=Nur Python 3 ist auf dem System verfugbar."
+set "pysystem4.ru=Только Python 3 доступен на системе."
+set "pysystem4.zh=只有 Python 3 可用于系统。"
+
+set "pysystem5.en=Python is not available on the system."
+set "pysystem5.fr=Python n'est pas disponible sur le système."
+set "pysystem5.es=Python no disponible en el sistema."
+set "pysystem5.it=Python non disponibile sul sistema."
+set "pysystem5.de=Python ist auf dem System nicht verfugbar."
+set "pysystem5.ru=Python не доступен на системе."
+set "pysystem5.zh=系统上不可用 Python。"
+
+set "pythonv2="
+set "pythonv3="
+set "tmplist=%TEMP%\pylist.txt"
+
+call :elog -n "%EMPTY%" "!pysystem1.%LNG%!..."
+if exist "%SystemRoot%\py.exe" (
+    if exist "%tmplist%" del /f /q "%tmplist%" %DEBUGREDIR%
+    %SystemRoot%\py.exe --list > "%tmplist%"
+    for /f "tokens=1,2 delims=:" %%A in ('%SystemRoot%\System32\findstr.exe /i "V:" "%tmplist%"') do (
+        :: %%B contains major.minor eg: "3.14", "3.9 *", "2.7"
+        for /f "tokens=1,2 delims=." %%M in ("%%B") do (
+            :: %%M = major (eg: "3"), %%N = minor with optional " *" (eg: "14", "9 *")
+            for /f "tokens=1 delims= " %%V in ("%%N") do (
+                :: %%V = minor clean (eg: "14", "9", "7")
+                if "%%M" == "2" (
+                    if "%%V" == "7" (
+                        set "pythonv2=%SystemRoot%\py.exe -V:%%M.%%V -E"
+                    )
+                ) else if "%%M" == "3" (
+                    if %%V GEQ 7 (
+                        set "pythonv3=%SystemRoot%\py.exe -V:%%M.%%V -E"
+                    )
+                )
+            )
+        )
+    )
+)
+del /f /q "%tmplist%" %DEBUGREDIR%
+
+set "PATH=%SystemDrive%\Python27:%PATH%"
+for /f "delims=" %%A in ('%SystemRoot%\System32\where.exe python.exe 2^>nul') do (
+    if not "%%A" == "" (
+        echo "%%A" | %SystemRoot%\System32\findstr.exe /i "WindowsApps" >nul
+        if errorlevel 1 (
+            if exist "%%A" (
+                for /f "tokens=2 delims= " %%B in ('"%%A" -V 2^>^&1') do (
+                    for /f "tokens=1,2 delims=." %%M in ("%%B") do (
+                        if "%%M" == "2" (
+                            if not defined PYTHONSYST (
+                                set "pythonv2=%%A -E"
+                            )
+                        ) else if "%%M" == "3" (
+                            if %%N GEQ 9 (
+                                if not defined pythonv3 (
+                                    set "pythonv3=%%A -E"
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+if defined pythonv2 if defined pythonv3 (
+    call :elog "%OK%"
+    call :elog "         !pysystem2.%LNG%!"
+)
+if defined pythonv2 if not defined pythonv3 (
+    call :elog "%OK%"
+    call :elog "         !pysystem3.%LNG%!"
+)
+if not defined pythonv2 if defined pythonv3 (
+    call :elog "%OK%"
+    call :elog "         !pysystem4.%LNG%!"
+)
+if not defined pythonv2 if not defined pythonv3 (
+    call :elog "%SKIP%"
+    call :elog "         !pysystem5.%LNG%!"
+)
+
+endlocal & set "PYTHONV2=%pythonv2%" & set "PYTHONV3=%pythonv3%"
+exit /b
+
+
+:: Check for Python Game
+:CheckPythonGame
+setlocal enabledelayedexpansion
+set "python1.en=Checking if Python Game is available"
+set "python1.fr=Vérification de la disponibilité de Python Jeu"
+set "python1.es=Comprobando la disponibilidad de Python Juego"
+set "python1.it=Controllo della disponibilità di Python Gioco"
+set "python1.de=Python-Spiel verfugen"
+set "python1.ru=Проверка доступности Python-игры"
+set "python1.zh=检查 Python 游戏是否可用"
+
+set "python2.en=Python version:"
+set "python2.fr=Version de Python :"
+set "python2.es=Versión de Python :"
+set "python2.it=Versione di Python :"
+set "python2.de=Python-Version :"
+set "python2.ru=Версия Python :"
+set "python2.zh=Python 版本："
+
+set "python3.en=Cannot locate python directory."
+set "python3.fr=Impossible de localiser le répertoire python."
+set "python3.es=No se puede localizar el directorio de Python."
+set "python3.it=Impossibile localizzare la directory di Python."
+set "python3.de=Python-Verzeichnis kann nicht gefunden werden."
+set "python3.ru=Не удалось найти каталог Python."
+set "python3.zh=找不到 python 目录。"
+
+call :elog -n "%EMPTY%" "!python1.%LNG%!..."
+
+set "pythonhome="
+set "pythonpath="
+set "pythongame="
+:: Doublecheck to avoid issues with Milfania games
+if exist "%WORKDIR%\lib\py3-windows-x86_64\pythonw.exe" if exist "%WORKDIR%\lib\py3-windows-x86_64\python.exe" (
+    if not "%PROCESSOR_ARCHITECTURE%" == "x86" (
+        <nul set /p=.
+        set "pythonhome=%WORKDIR%\lib\py3-windows-x86_64\"
+    ) else if exist "%WORKDIR%\lib\py3-windows-i686\python.exe" (
+        <nul set /p=.
+        set "pythonhome=%WORKDIR%\lib\py3-windows-i686\"
+    )
+) else if exist "%WORKDIR%\lib\py3-windows-i686\python.exe" (
+    <nul set /p=.
+    set "pythonhome=%WORKDIR%\lib\py3-windows-i686\"
+)
+if exist "%WORKDIR%\lib\py2-windows-x86_64\python.exe" (
+    if not "%PROCESSOR_ARCHITECTURE%" == "x86" (
+        <nul set /p=.
+        set "pythonhome=%WORKDIR%\lib\py2-windows-x86_64\"
+    ) else if exist "%WORKDIR%\lib\py2-windows-i686\python.exe" (
+        <nul set /p=.
+        set "pythonhome=%WORKDIR%\lib\py2-windows-i686\"
+    )
+) else if exist "%WORKDIR%\lib\py2-windows-i686\python.exe" (
+    <nul set /p=.
+    set "pythonhome=%WORKDIR%\lib\py2-windows-i686\"
+)
+if exist "%WORKDIR%\lib\windows-x86_64\python.exe" (
+    if not "%PROCESSOR_ARCHITECTURE%" == "x86" (
+        <nul set /p=.
+        set "pythonhome=%WORKDIR%\lib\windows-x86_64\"
+    ) else if exist "%WORKDIR%\lib\windows-i686\python.exe" (
+        <nul set /p=.
+        set "pythonhome=%WORKDIR%\lib\windows-i686\"
+    )
+) else if exist "%WORKDIR%\lib\windows-i686\python.exe" (
+    <nul set /p=.
+    set "pythonhome=%WORKDIR%\lib\windows-i686\"
+)
+set "pythonpath=%pythonhome%"
+
+:: Set the PYNOASSERT according to "%PYTHONHOME%Lib".
+if exist "%pythonhome%Lib" (
+    set "pynoassert=-O"
+) else (
+    set "pynoassert="
+)
+set "pythongame=%pythonhome%python.exe %pynoassert%"
+
+for /f "tokens=2 delims= " %%a in ('%pythongame% -V 2^>^&1') do set pythonvers=%%a
+:: Extracting Major and Minor Versions
+for /f "tokens=1,2 delims=." %%b in ("%pythonvers%") do (
+    set pythonmajor=%%b
+    set pythonminor=%%c
+)
+
+set "rpatool_new=n"
+set "unrpyc_new=n"
+:: Priority to Python 3.x if present
+if %pythonmajor% GEQ 3 if exist "%WORKDIR%\lib\python%pythonmajor%.%pythonminor%" (
+    <nul set /p=.
+    set "pythonpath=%WORKDIR%\lib\python%pythonmajor%.%pythonminor%"
+    set "rpatool_new=y"
+    set "unrpyc_new=y"
+    goto :pyend
+)
+
+:: Searching for the latest version of Python 2.x
+if exist "%WORKDIR%\lib\pythonlib%PYTHONMAJOR%.%PYTHONMINOR%" (
+    <nul set /p=.
+    set "pythonpath=%WORKDIR%\lib\pythonlib%pythonmajor%.%pythonminor%"
+) else if exist "%WORKDIR%\lib\python%pythonmajor%.%pythonminor%" (
+    <nul set /p=.
+    set "pythonpath=%WORKDIR%\lib\python%pythonmajor%.%pythonminor%"
+)
+
+:pyend
+if not exist "%pythonpath%" (
+    call :elog "%NOK%"
+    call :elog .
+    call :elog "    %RED%!python3.%LNG%!%RES%. !UNACONT.%LNG%!"
+    call :elog "    !wdir2.%LNG%!"
+    call :elog .
+    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
+
+    call :exitn 3
+) else (
+    call :elog "%OK%" "!python2.%LNG%! %YEL%%PYTHONVERS%%RES%"
+)
+endlocal & set "PYTHONHOME=%pythonhome%" & set "PYTHONPATH=%pythonpath%" & set "PYTHONGAME=%pythongame%" & set "RPATOOL_NEW=%rpatool_new%" & set "UNRPYC_NEW=%unrpyc_new%" & set "PYTHONVERS=%pythonvers%" & set "PYTHONMAJOR=%pythonmajor%" & set "PYTHONMINOR=%pythonminor%" & set "PYNOASSERT=%pynoassert%"
+exit /b
+
+
+:: Check for Ren'Py version
+:CheckRenpyVersion
+setlocal enabledelayedexpansion
+set "renpyvers1.en=Ren'Py version found:"
+set "renpyvers1.fr=Version Ren'Py trouvée :"
+set "renpyvers1.es=Versión de Ren'Py encontrada:"
+set "renpyvers1.it=Versione Ren'Py rilevata:"
+set "renpyvers1.de=Ren'Py-Version gefunden:"
+set "renpyvers1.ru=Найдена версия Ren'Py:"
+set "renpyvers1.zh=检测到的 Ren'Py 版本 :"
+
+set "renpyvers2.en=Checking Ren'Py version"
+set "renpyvers2.fr=Vérification de la version de Ren'Py"
+set "renpyvers2.es=Comprobando la versión de Ren'Py"
+set "renpyvers2.it=Controllo della versione di Ren'Py"
+set "renpyvers2.de=Überprüfung der Ren'Py-Version"
+set "renpyvers2.ru=Проверка версии Ren'Py"
+set "renpyvers2.zh=检查 Ren'Py 版本"
+
+set "renpyvers3.en=Unable to detect Ren'Py version,"
+set "renpyvers3.fr=Impossible de détecter la version de Ren'Py,"
+set "renpyvers3.es=No se puede detectar la versión de Ren'Py,"
+set "renpyvers3.it=Impossibile rilevare la versione di Ren'Py,"
+set "renpyvers3.de=Unmöglich, die Ren'Py-Version zu erkennen, bitte sicherstellen,"
+set "renpyvers3.ru=Не удалось обнаружить версию Ren'Py, пожалуйста,"
+set "renpyvers3.zh=无法检测 Ren'Py 版本，"
+
+set "renpyvers4.en=please ensure the game is compatible with UnRen."
+set "renpyvers4.fr=es-tu sûr que le jeu est compatible avec UnRen ?"
+set "renpyvers4.es=asegúrese de que el juego sea compatible con UnRen."
+set "renpyvers4.it=assicurati che il gioco sia compatibile con UnRen."
+set "renpyvers4.de=dass das Spiel mit UnRen kompatibel ist."
+set "renpyvers4.ru=убедитесь, что игра совместима с UnRen."
+set "renpyvers4.zh=请确保游戏与 UnRen 兼容。"
+
+setlocal disabledelayedexpansion
+for /f "delims=" %%A in ("%WORKDIR%") do (
+    endlocal
+    cd /d "%%A"
+)
+
+set "detect_renpy_version=%WORKDIR%\detect_renpy_version.py"
+>"%detect_renpy_version%.b64" (
+    <nul set /p="IyEvdXNyL2Jpbi9lbnYgcHl0aG9uDQojIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLQ0KaW1wb3J0IG9zDQppbXBvcnQgc3lzDQppbXBvcnQgcmUNCg0KIyAtLS0gMS4gU3RhbmRhcmQgbWV0aG9kOiBpbXBvcnQgcmVucHkgLS0tDQp0cnk6DQogICAgaW1wb3J0IHJlbnB5DQogICAgcHJpbnQocmVucHkudmVyc2lvbl90dXBsZVswXSkNCiAgICBzeXMuZXhpdCgwKQ0KZXhjZXB0IEV4Y2VwdGlvbjoNCiAgICBwYXNzICAjIGZhbGxiYWNrIGJlbG93DQoNCmRlZiBkZXRlY3RfZnJvbV9zY3JpcHRfdmVyc2lvbihnYW1lX2Rpcik6DQogICAgIyAxKSBSZW4nUHkgNy84IDogc2NyaXB0X3ZlcnNpb24udHh0DQogICAgcGF0aCA9IG9zLnBhdGguam9pbihnYW1lX2RpciwgInNjcmlwdF92ZXJzaW9uLnR4dCIpDQogICAgaWYgb3MucGF0aC5pc2ZpbGUocGF0aCk6DQogICAgICAgIHRyeToNCiAgICAgICAgICAgIHdpdGggb3BlbihwYXRoLCAiciIpIGFzIGY6DQogICAgICAgICAgICAgICAgY29udGVudCA9IGYucmVhZCgpLnN0cmlwKCkNCg0KICAgICAgICAgICAgIyBUdXBsZSBmb3JtYXQgOiAoOCwgMSwgMCkNCiAgICAgICAgICAgIG0gPSByZS5zZWFyY2gocidcKFxzKihcZCspXHMqLCcsIGNvbnRlbnQpDQogICAgICAgICAgICBpZiBtOg0KICAgICAgICAgICAgICAgIHJldHVybiBpbnQobS5ncm91cCgxKSkNCg0KICAgICAgICAgICAgIyBTaW1wbGUgZm9ybWF0IDogOC4xLjAgb3UgOA0KICAgICAgICAgICAgbSA9IHJlLm1hdGNoKHInXHMqKFxkKyknLCBjb250ZW50KQ0KICAgICAgICAgICAgaWYgbToNCiAgICAgICAgICAgICAgICByZXR1cm4gaW50KG0uZ3JvdXAoMSkpDQoNCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbjoNCiAgICAgICAgICAgIHBhc3MNCg0KICAgICMgMikgUmVuJ1B5IDYgOiByZW5weS92ZXJzaW9uLnB5DQogICAgdmVyc2lvbl9weSA9IG9zLnBhdGguam9pbihnYW1lX2RpciwgInJlbnB5IiwgInZlcnNpb24ucHkiKQ0KICAgIGlmIG9zLnBhdGguaXNmaWxlKHZlcnNpb25fcHkpOg0KICAgICAgICB0cnk6DQogICAgICAgICAgICB3aXRoIG9wZW4odmVyc2lvbl9weSwgInIiKSBhcyBmOg0KICAgICAgICAgICAgICAgIGNvbnRlbnQgPSBmLnJlYWQoKQ0KDQogICAgICAgICAgICAjIHZlcnNpb24gPSAiNi45OS4xNCINCiAgICAgICAgICAgIG0gPSByZS5zZWFyY2gocid2ZXJzaW9uXHMqPVxzKiIoXGQrKScsIGNvbnRlbnQpDQogICAgICAgICAgICBpZiBtOg0KICAgICAgICAgICAgICAgIHJldHVybiBpbnQobS5ncm91cCgxKSkNCg0KICAgICAgICBleGNlcHQgRXhjZXB0aW9uOg0KICAgICAgICAgICAgcGFzcw0KDQogICAgcmV0dXJuIE5vbmUNCg0KDQpkZWYgZGV0ZWN0X2Zyb21fcnB5YyhnYW1lX2Rpcik6DQogICAgIiIiDQogICAgUmVhZHMgdGhlIG1hZ2ljIG51bWJlciBvZiAucnB5YyAvIC5ycHltYyBmaWxlcy4NCiAgICBSZW4nUHkgNjogbWFnaWMg4oCcUkVOUFkgUlBDMeKAnSAgLT4gbWFqb3IgNiAoYW5kIHNvbWUgZWFybHkgNykNCiAgICBSZW4nUHkgNzogbWFnaWMg4oCcUkVOUFkgUlBDMuKAnSAgLT4gbWFqb3IgNw0KICAgIFJlbidQeSA4OiBtYWdpYyDigJxSRU5QWSBSUEMy4oCdICB3aXRoIFB5dGhvbiAzIChjYW5ub3QgYmUgZWFzaWx5IGRpc3Rpbmd1aXNoZWQNCiAgICAgICAgICAgICAgICBmcm9tIDcgdXNpbmcgbWFnaWMgYWxvbmUsIG90aGVyIG1ldGhvZHMgYXJlIHVzZWQgdG8gY29tcGxldGUgdGhlIHByb2Nlc3MpDQogICAgTm90ZTogc29tZSBlYXJseSBSZW4nUHkgNyBtYXkgc3RpbGwgdXNlIOKAnFJFTlBZIFJQQzHigJ0gbWFnaWMsIGJ1dCB0aGV5IGFyZSByYXJlIGFuZCB3ZSBwcmlvcml0aXplIHRoZSBtb3JlIGNvbW1vbiBjYXNlLg0KICAgICIiIg0KICAgIG1hZ2ljX21hcCA9IHsNCiAgICAgICAgYiJSRU5QWSBSUEMxIjogNiwNCiAgICAgICAgYiJSRU5QWSBSUEMyIjogNywgICMgY2FuIGFsc28gYmUgOA0KICAgIH0NCiAgICBmb3Igcm9vdCwgZGlycywgZmlsZXMgaW4gb3Mud2FsayhnYW1lX2Rpcik6DQogICAgICAgIGZvciBmbmFtZSBpbiBmaWxlczoNCiAgICAgICAgICAgIGlmIGZuYW1lLmVuZHN3aXRoKCIucnB5YyIpIG9yIGZuYW1lLmVuZHN3aXRoKCIucnB5bWMiKToNCiAgICAgICAgICAgICAgICBmcGF0aCA9IG9zLnBhdGguam9pbihyb290LCBmbmFtZSkNCiAgICAgICAgICAgICAgICB0cnk6DQogICAgICAgICAgICAgICAgICAgIHdpdGggb3BlbihmcGF0aCwgInJiIikgYXMgZjoNCiAgICAgICAgICAgICAgICAgICAgICAgIGhlYWRlciA9IGYucmVhZCgxMCkNCiAgICAgICAgICAgICAgICAgICAgZm9yIG1hZ2ljLCBtYWpvciBpbiBtYWdpY19tYXAuaXRlbXMoKToNCiAgICAgICAgICAgICAgICAgICAgICAgIGlmIGhlYWRlci5zdGFydHN3aXRoKG1hZ2ljKToNCiAgICAgICAgICAgICAgICAgICAgICAgICAgICByZXR1cm4gbWFqb3INCiAgICAgICAgICAgICAgICBleGNlcHQgRXhjZXB0aW9uOg0KICAgICAgICAgICAgICAgICAgICBjb250aW51ZQ0KICAgIHJldHVybiBOb25lDQoNCg0KZGVmIGRldGVjdF9mcm9tX2V4ZWN1dGFibGUoZ2FtZV9kaXIpOg0KICAgICIiIg0KICAgIExvb2sgZm9yIHZlcnNpb24gY2x1ZXMgaW4gdGhlIGV4ZWN1dGFibGVzL2xpYnMgcHJlc2VudA0KICAgIGluIHRoZSBnYW1lIGZvbGRlciAoc3RyaW5ncyDigJw3LuKAnSBvciDigJw4LuKAnSBjbG9zZSB0byDigJxSZW4nUHnigJ0pLg0KICAgICIiIg0KICAgIGJhc2UgPSBvcy5wYXRoLmRpcm5hbWUoZ2FtZV9kaXIpICAjIHBhcmVudCBmb2xkZXIgb2YgdGhlIGdhbWUvIGZvbGRlcg0KICAgIHNlYXJjaF9kaXJzID0gW2Jhc2UsIGdhbWVfZGlyXQ0KICAgIHBhdHRlcm5zID0gWw0KICAgICAgICAocmUuY29tcGlsZShyIlJlbi4/UHlccysoXGQpXC5cZCIpLCBOb25lKSwNCiAgICAgICAgKHJlLmNvbXBpbGUociJyZW5weVtfXC1dKFxkKVwuXGQiKSwgcmUuSUdOT1JFQ0FTRSksDQogICAgXQ0KICAgIGZvciBzZGlyIGluIHNlYXJjaF9kaXJzOg0KICAgICAgICBmb3IgZm5hbWUgaW4gb3MubGlzdGRpcihzZGlyKToNCiAgICAgICAgICAgIGZwYXRoID0gb3MucGF0aC5qb2luKHNkaXIsIGZuYW1lKQ0KICAgICAgICAgICAgaWYgbm90IG9zLnBhdGguaXNmaWxlKGZwYXRoKToNCiAgICAgICAgICAgICAgICBjb250aW51ZQ0KICAgICAgICAgICAgIyBPbmx5IHNtYWxsIHRleHQgb3IgbG9nIGZpbGVzIGFyZSByZWFkLg0KICAgICAgICAgICAgaWYgZm5hbWUuZW5kc3dpdGgoKCIudHh0IiwgIi5sb2ciLCAiLmluaSIsICIuY2ZnIiwgIi5qc29uIikpOg0KICAgICAgICAgICAgICAgIHRyeToNCiAgICAgICAgICAgICAgICAgICAgd2l0aCBvcGVuKGZwYXRoLCAiciIpIGFzIGY6DQogICAgICAgICAgICAgICAgICAgICAgICBjb250ZW50ID0gZi5yZWFkKDQwOTYpDQogICAgICAgICAgICAgICAgICAgIGZvciBwYXQsIGZsYWdzIGluIHBhdHRlcm5zOg0KICAgICAgICAgICAgICAgICAgICAgICAgbSA9IHBhdC5zZWFyY2goY29udGVudCkNCiAgICAgICAgICAgICAgICAgICAgICAgIGlmIG06DQogICAgICAgICAgICAgICAgICAgICAgICAgICAgbWFqb3IgPSBpbnQobS5ncm91cCgxKSkNCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBpZiBtYWpvciBpbiAoNiwgNywgOCk6DQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHJldHVybiBtYWpvcg0KICAgICAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb246DQogICAgICAgICAgICAgICAgICAgIHBhc3MNCiAgICByZXR1cm4gTm9uZQ0KDQoNCmRlZiBkZXRlY3RfZnJvbV9hcmNoaXZlKGdhbWVfZGlyKToNCiAgICAiIiINCiAgICBJbnNwZWN0IHRoZSAucnBhIGFyY2hpdmVzIHRvIGRldGVjdCB0aGUgdmVyc2lvbi4NCiAgICBSUEEtMS4wIC0+IFJlbidQeSA2IGVhcmx5DQogICAgUlBBLTIuMCAtPiBSZW4nUHkgNg0KICAgIFJQQS0zLjAgLT4gUmVuJ1B5IDYvNw0KICAgIFJQQU4zLjAgLT4gUmVuJ1B5IDggKG5ldyBuZXV0cm9uIGFyY2hpdmUpDQogICAgWmlYLTEyQSAtPiBSZW4nUHkgOCAobmV3IG5ldXRyb24gYXJjaGl2ZSkNCiAgICBaaVgtMTJCIC0+IFJlbidQeSA4IChuZXcgbmV1dHJvbiBhcmNoaXZlKQ0KICAgICIiIg0KICAgIHJwYV9tYWpvcl9tYXAgPSB7DQogICAgICAgIGIiUlBBLTEuMCI6IDYsDQogICAgICAgIGIiUlBBLTIuMCI6IDYsDQogICAgICAgIGIiUlBBLTMuMCI6IDcsICAgIyBNYXliZSA2IGFzIHdlbGwsIGJ1dCB3ZSdsbCByZWZpbmUgaXQgbGF0ZXIuDQogICAgICAgIGIiUlBBTjMuMCI6IDgsDQogICAgICAgIGIiWmlYLTEyQSI6IDgsDQogICAgICAgIGIiWmlYLTEyQiI6IDgsDQogICAgfQ0KICAgIGZvdW5kID0gTm9uZQ0KICAgIGZvciBmbmFtZSBpbiBvcy5saXN0ZGlyKGdhbWVfZGlyKToNCiAgICAgICAgaWYgbm90IGZuYW1lLmVuZHN3aXRoKCIucnBhIik6DQogICAgICAgICAgICBjb250aW51ZQ0KICAgICAgICBmcGF0aCA9IG9zLnBhdGguam9pbihnYW1lX2RpciwgZm5hbWUpDQogICAgICAgIHRyeToNCiAgICAgICAgICAgIHdpdGggb3BlbihmcGF0aCwgInJiIikgYXMgZjoNCiAgICAgICAgICAgICAgICBoZWFkZXIgPSBmLnJlYWQoOCkNCiAgICAgICAgICAgIGZvciBtYWdpYywgbWFqb3IgaW4gcnBhX21ham9yX21hcC5pdGVtcygpOg0KICAgICAgICAgICAgICAgIGlmIGhlYWRlci5zdGFydHN3aXRoKG1hZ2ljKToNCiAgICAgICAgICAgICAgICAgICAgIyBXZSBrZWVwIHRoZSBoaWdoZXN0IG1ham9yIGZvdW5kLg0KICAgICAgICAgICAgICAgICAgICBpZiBmb3VuZCBpcyBOb25lIG9yIG1ham9yID4gZm91bmQ6DQogICAgICAgICAgICAgICAgICAgICAgICBmb3VuZCA9IG1ham9yDQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb246DQogICAgICAgICAgICBwYXNzDQogICAgcmV0dXJuIGZvdW5kDQoNCg0KZGVmIGRldGVjdF9yZW5weV9tYWpvcihnYW1lX3BhdGgpOg0KICAgICIiIg0KICAgIERldGVjdHMgdGhlIG1ham9yIFJlbidQeSB2ZXJzaW9uICg2LCA3LCBvciA4KSBmcm9tIHRoZSBnYW1lIHBhdGguDQogICAgZ2FtZV9wYXRoIGNhbiBiZSB0aGUgZ2FtZSdzIHJvb3QgZm9sZGVyIG9yIHRoZSDigJxnYW1lL+KAnSBzdWJmb2xkZXIuDQogICAgIiIiDQogICAgIyBOb3JtYWxpemU6IHdlIHdhbnQgdGhlIOKAnGdhbWUv4oCdIGZvbGRlcg0KICAgIGlmIG9zLnBhdGguYmFzZW5hbWUoZ2FtZV9wYXRoKSA9PSAiZ2FtZSI6DQogICAgICAgIGdhbWVfZGlyID0gZ2FtZV9wYXRoDQogICAgZWxzZToNCiAgICAgICAgY2FuZGlkYXRlID0gb3MucGF0aC5qb2luKGdhbWVfcGF0aCwgImdhbWUiKQ0KICAgICAgICBpZiBvcy5wYXRoLmlzZGlyKGNhbmRpZGF0ZSk6DQogICAgICAgICAgICBnYW1lX2RpciA9IGNhbmRpZGF0ZQ0KICAgICAgICBlbHNlOg0KICAgICAgICAgICAgZ2FtZV9kaXIgPSBnYW1lX3BhdGggICMgd2UgdHJ5IGRpcmVjdGx5DQoNCiAgICBpZiBub3Qgb3MucGF0aC5pc2RpcihnYW1lX2Rpcik6DQogICAgICAgIHByaW50KCJFUlJPUjogZGlyZWN0b3J5IG5vdCBmb3VuZDoge30iLmZvcm1hdChnYW1lX2RpcikpDQogICAgICAgIHN5cy5leGl0KDEpDQoNCiAgICAjIDEuIHNjcmlwdF92ZXJzaW9uLnR4dCAocHJpb3JpdHkgYnV0IG9wdGlvbmFsKQ0KICAgIG1ham9yID0gZGV0ZWN0X2Zyb21fc2NyaXB0X3ZlcnNpb24oZ2FtZV9kaXIpDQogICAgaWYgbWFqb3IgaXMgbm90IE5vbmU6DQogICAgICAgIHJldHVybiBtYWpvcg0KDQogICAgIyAyLiBBcmNoaXZlcyAucnBhIChSZWxpYWJsZSBzaWduYXR1cmVzIGZvciBSZW4nUHkgOCkNCiAgICBtYWpvciA9IGRldGVjdF9mcm9tX2FyY2hpdmUoZ2FtZV9kaXIpDQogICAgaWYgbWFqb3IgaXMgbm90IE5vbmU6DQogICAgICAgICMgUlBBLTMuMCBjYW4gYmUgNiBvciA3OyB3ZSByZWZpbmUgaXQgd2l0aCB0aGUgLnJweWMgZmlsZXMuDQogICAgICAgIGlmIG1ham9yID09IDc6DQogICAgICAgICAgICBycHljX21ham9yID0gZGV0ZWN0X2Zyb21fcnB5YyhnYW1lX2RpcikNCiAgICAgICAgICAgIGlmIHJweWNfbWFqb3IgaXMgbm90IE5vbmU6DQogICAgICAgICAgICAgICAgcmV0dXJuIHJweWNfbWFqb3INCiAgICAgICAgcmV0dXJuIG1ham9yDQoNCiAgICAjIDMuIC5ycHljIGZpbGVzICh2ZXJ5IHJlbGlhYmxlIGZvciBSZW4nUHkgNiBhbmQgN"
+    <nul set /p="ywgYnV0IGRvIG5vdCBkaXN0aW5ndWlzaCBiZXR3ZWVuIDcgYW5kIDgpOg0KICAgIG1ham9yID0gZGV0ZWN0X2Zyb21fcnB5YyhnYW1lX2RpcikNCiAgICBpZiBtYWpvciBpcyBub3QgTm9uZToNCiAgICAgICAgcmV0dXJuIG1ham9yDQoNCiAgICAjIDQuIFRleHQgZmlsZXMgaW4gdGhlIHJvb3QgZm9sZGVyIChtYXkgY29udGFpbiB2ZXJzaW9uIGluZm8sIGVzcGVjaWFsbHkgZm9yIFJlbidQeSA4KToNCiAgICBtYWpvciA9IGRldGVjdF9mcm9tX2V4ZWN1dGFibGUoZ2FtZV9kaXIpDQogICAgaWYgbWFqb3IgaXMgbm90IE5vbmU6DQogICAgICAgIHJldHVybiBtYWpvcg0KDQogICAgcmV0dXJuIE5vbmUNCg0KDQpkZWYgbWFpbigpOg0KICAgIGlmIGxlbihzeXMuYXJndikgPCAyOg0KICAgICAgICBwcmludCgiVXNhZ2U6IHt9IDxnYW1lX3BhdGg+Ii5mb3JtYXQoc3lzLmFyZ3ZbMF0pKQ0KICAgICAgICBzeXMuZXhpdCgxKQ0KDQogICAgZ2FtZV9wYXRoID0gc3lzLmFyZ3ZbMV0NCg0KICAgIG1ham9yID0gZGV0ZWN0X3JlbnB5X21ham9yKGdhbWVfcGF0aCkNCg0KICAgIGlmIG1ham9yIGlzIE5vbmU6DQogICAgICAgIHByaW50KCJFUlJPUjogaW1wb3NzaWJsZSB0byBkZXRlY3QgUmVuJ1B5IHZlcnNpb24gaW4gOiB7fSIuZm9ybWF0KGdhbWVfcGF0aCkpDQogICAgICAgIHN5cy5leGl0KDEpDQoNCiAgICBpZiBtYWpvciBub3QgaW4gKDYsIDcsIDgpOg0KICAgICAgICBwcmludCgiRVJST1I6IHVuZXhwZWN0ZWQgUmVuJ1B5IHZlcnNpb24gZGV0ZWN0ZWQgOiB7fSIuZm9ybWF0KG1ham9yKSkNCiAgICAgICAgc3lzLmV4aXQoMSkNCg0KICAgIHByaW50KG1ham9yKQ0KDQoNCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6DQogICAgbWFpbigpDQo="
+)
+
+call :pwsh_exp "!renpyvers2.%LNG%!..." "%detect_renpy_version%"
+if not exist "%detect_renpy_version%" (
+    call :elog "%NOK%"
+    call :elog .
+    call :elog "!FCREATE.%LNG%! %YEL%%detect_renpy_version%%RES%. !UNACONT.%LNG%!"
+    call :elog .
+    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
+
+    call :exitn 3
+) else (
+    echo %PYTHONGAME% "%detect_renpy_version%" "%WORKDIR%" >> "%UNRENLOG%"
+    %PYTHONGAME% "%detect_renpy_version%" "%WORKDIR%" > "%TEMP%\renpy_version.tmp"
+    set /p renpyversion=<"%TEMP%\renpy_version.tmp"
+    del "%TEMP%\renpy_version.tmp"
+    if not defined RENPYVERSION (
+        call :elog "%NOK%"
+        call :elog .
+        call :elog "    !renpyvers3.%LNG%!"
+        call :elog "    !renpyvers4.%LNG%!. !UNACONT.%LNG%!"
+        call :elog .
+        pause>nul|set /p=".      !ANYKEY.%LNG%!..."
+
+        call :exitn 3
+    ) else (
+        call :elog "%OK%" "!renpyvers1.%LNG%! %YEL%!renpyversion!%RES%"
+    )
+)
+echo del /f /q "%detect_renpy_version%" >> "%UNRENLOG%"
+del /f /q "%detect_renpy_version%" %DEBUGREDIR%
+
+set "renpyvers5.en=You have launched %SCRIPTNAME% but Ren'Py %renpyversion% is found. Please use UnRen-legacy.bat instead."
+set "renpyvers5.fr=Vous avez lancé %SCRIPTNAME% mais Ren'Py %renpyversion% a été trouvé. Veuillez utiliser UnRen-legacy.bat à la place."
+set "renpyvers5.es=Ha iniciado %SCRIPTNAME% pero se ha encontrado Ren'Py %renpyversion%. Utilice UnRen-legacy.bat en su lugar."
+set "renpyvers5.it=Hai avviato %SCRIPTNAME% ma è stato trovato Ren'Py %renpyversion%. Usa invece UnRen-legacy.bat."
+set "renpyvers5.de=Sie haben %SCRIPTNAME% gestartet, aber Ren'Py %renpyversion% wurde gefunden. Bitte verwenden Sie stattdessen UnRen-legacy.bat."
+set "renpyvers5.ru=Вы запустили %SCRIPTNAME%, но найден Ren'Py %renpyversion%. Пожалуйста, используйте UnRen-legacy.bat вместо этого."
+set "renpyvers5.zh=您已启动 %SCRIPTNAME% 但检测到 Ren'Py %renpyversion%。请改用 UnRen-legacy.bat。"
+
+set "renpyvers6.en=You have launched %SCRIPTNAME% but Ren'Py %renpyversion% is found. Please use UnRen-current.bat instead."
+set "renpyvers6.fr=Vous avez lancé %SCRIPTNAME% mais Ren'Py %renpyversion% a été trouvé. Veuillez utiliser UnRen-current.bat à la place."
+set "renpyvers6.es=Ha iniciado %SCRIPTNAME% pero se ha encontrado Ren'Py %renpyversion%. Utilice UnRen-current.bat en su lugar."
+set "renpyvers6.it=Hai avviato %SCRIPTNAME% ma è stato trovato Ren'Py %renpyversion%. Usa invece UnRen-current.bat."
+set "renpyvers6.de=Sie haben %SCRIPTNAME% gestartet, aber Ren'Py %renpyversion% wurde gefunden. Bitte verwenden Sie stattdessen UnRen-current.bat."
+set "renpyvers6.ru=Вы запустили %SCRIPTNAME%, но найден Ren'Py %renpyversion%. Пожалуйста, используйте UnRen-current.bat вместо этого."
+set "renpyvers6.zh=您已启动 %SCRIPTNAME% 但检测到 Ren'Py %renpyversion%。请改用 UnRen-current.bat。"
+:: Check to ensure you are using the correct UnRen version
+if %RENPYVERSION% LEQ 7 (
+    call :elog .
+    call :elog .
+    call :elog "!renpyvers5.%LNG%!"
+    call :elog .
+    pause>nul|set /p=".      !ANYKEY.%LNG%!..."
+
+    call :exitn 3
+)
+endlocal & set "RENPYVERSION=%renpyversion%"
+exit /b
 
 :: elog  —  Enhanced echo with optional no-newline mode
 ::
@@ -4350,13 +4513,12 @@ goto :eof
 :: ANSI codes are stripped when writing to the log file.
 :elog
 setlocal EnableDelayedExpansion
-
-if %DEBUGLEVEL% GEQ 1 (
+(
     setlocal enabledelayedexpansion
     set "arg2=%~2"
     set "arg2=!arg2:(=^(!"
     set "arg2=!arg2:)=^)!"
-    echo arg2=!arg2! >> "%UNRENLOG%"
+    if "%DEBUGLEVEL%" GEQ 1 echo arg2=!arg2! >> "%UNRENLOG%"
     endlocal
 )
 if "%~1" == "-n" (
@@ -4385,7 +4547,7 @@ if defined PREVMOD (
 
 :: Strip ANSI codes from cleanmsg
 setlocal EnableDelayedExpansion
-for %%C in (GRY RED ORA GRE YEL MAG CYA RES) do (
+for %%C in (GRY RED ORG GRE YEL MAG CYA RES) do (
     call set "cleanmsg=%%cleanmsg:!%%C!=%%"
 )
 
@@ -4422,7 +4584,7 @@ if defined msg2 (
 )
 if exist "%UNRENLOG%" >> "%UNRENLOG%" echo !cleanmsg!
 endlocal & endlocal & set "PREVMOD=" & set "PREVMSG="
-goto :eof
+exit /b
 
 
 :: Auto centering message
@@ -4432,7 +4594,7 @@ set "msg=%~1"
 
 :: Strip color variables for logging
 set "cleanmsg=%msg%"
-for %%C in (GRY RED ORA GRE YEL MAG CYA RES) do (
+for %%C in (GRY RED ORG GRE YEL MAG CYA RES) do (
     call set "cleanmsg=%%cleanmsg:!%%C!=%%"
 )
 
@@ -4454,8 +4616,9 @@ set "spaces="
 for /l %%i in (1,1,!pad!) do set "spaces=!spaces! "
 
 echo(!spaces!!msg!
+
 endlocal
-goto :eof
+exit /b
 
 
 :: Call :exitn for cleanup only or goto :exitn for ending script
@@ -4463,15 +4626,15 @@ goto :eof
 set "val=%~1"
 
 if exist "%TEMP%\b64decode.py" (
-    if %DEBUGLEVEL% GEQ 1 echo del /f /q "%TEMP%\b64decode.py" >> "%UNRENLOG%"
+    echo del /f /q "%TEMP%\b64decode.py" >> "%UNRENLOG%"
     del /f /q "%TEMP%\b64decode.py" %DEBUGREDIR%
 )
 if exist "%TEMP%\choiceEx.py" (
-    if %DEBUGLEVEL% GEQ 1 echo del /f /q "%TEMP%\choiceEx.py" >> "%UNRENLOG%"
+    echo del /f /q "%TEMP%\choiceEx.py" >> "%UNRENLOG%"
     del /f /q "%TEMP%\choiceEx.py" %DEBUGREDIR%
 )
 
-if %DEBUGLEVEL% GEQ 1 (
+(
     echo === Variables ===
     set
     echo === Variables ===
@@ -4482,13 +4645,13 @@ if %DEBUGLEVEL% GEQ 1 (
 
 :: Restore original console mode
 if not defined WT_SESSION (
-    if %DEBUGLEVEL% GEQ 1 echo "%SystemRoot%\System32\mode.com" con: cols=%ORIG_COLS% lines=%ORIG_LINES% >> "%UNRENLOG%"
+    echo "%SystemRoot%\System32\mode.com" con: cols=%ORIG_COLS% lines=%ORIG_LINES% >> "%UNRENLOG%"
     "%SystemRoot%\System32\mode.com" con: cols=%ORIG_COLS% lines=%ORIG_LINES% %DEBUGREDIR%
 )
 
 :: Remove old bug entries
-"%SystemRoot%\System32\reg.exe" delete "HKCU\Console\MyScript" /f %DEBUGREDIR%
-"%SystemRoot%\System32\reg.exe" delete "HKCU\Console\UnRen-forall.bat" /f %DEBUGREDIR%
+%REGEXE% delete "HKCU\Console\MyScript" /f %DEBUGREDIR%
+%REGEXE% delete "HKCU\Console\UnRen-forall.bat" /f %DEBUGREDIR%
 
 if defined val exit !val!
 

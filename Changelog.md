@@ -4,7 +4,41 @@ All dates are in the format MM/DD/YY.
 
 ---
 
-05/18/26:
+## 05/18/26:
+	UnRen-forall.bat 0.82, UnRen-current.bat 9.8.11 & UnRen-legacy.bat 9.8.11
+
+	Common modifications for all scripts:
+	- Code partially rewritten with the goal of improving speed and eliminating bugs.
+	- Fix for the “Date Not Set” Bug in Windows 11
+	- New code to set the correct Python system if it differs from the game's version.
+	- The log files contain more information to help diagnose the problem.
+	- Added the “Z” option to replace your login name, which appears in the log files,
+	  with “XXX.” This way, you'll remain anonymous on f95zone.to if you publish the file.
+	- A new code for detecting PowerShell 7.
+	- List of games for which RPA extraction failed an now can be extracted with the correct option:
+	  Option	Game name
+		3	CampBuddyScoutmasterSeason-1.7-pc
+		3	Roommatesv1.6
+		3	HardtoLove-0.013-pc
+		3	Tenpure
+		7	IndigoLane-0.6-pc
+
+	Modification for UnRen-forall.bat only:
+	-
+
+	Common modifications for UnRen-current.bat & UnRen-legacy.bat:
+	- Three new options have been added to UnRen-cfg.txt to skip the prompts:
+	  PROCESSALL, NOBACKUP, and OVERWRITE. See UnRen-cfg.txt for details.
+	  If you select all 3 options, the RPYC files will be decompiled with
+	  a single call to unrpyc.py.
+	- Created a new rpatool.py script for extracting standard and obfuscated RPA files
+	  (should work in 99% of cases). To use it, select option 3.
+	- In practice, use option 1 first, then option 3 if option 1 fails, and finally option 7.
+	  If that still doesn't work, you'll need to ask me for help so I can add the extraction option.
+
+---
+
+## 05/18/26:
 	UnRen-forall.bat 0.77, UnRen-current.bat 9.7.80 & UnRen-legacy.bat 9.7.60
 
 	Common modifications for all scripts:

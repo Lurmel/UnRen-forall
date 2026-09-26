@@ -1,6 +1,6 @@
 @echo off
 
-:: Version 1.2 03/20/2026
+:: Version 1.3 09/22/2026
 
 :: Configuration file for all UnRen-*.bat scripts
 :: Fichier de configuration pour tous les scripts UnRen-*.bat
@@ -50,7 +50,7 @@ set "MDEFS=acefg"
 :: Standard-Mehrfachauswahl für UnRen-legacy.bat und UnRen-current.bat
 :: Выбор по умолчанию для UnRen-legacy.bat и UnRen-current.bat
 :: UnRen-legacy.bat 和 UnRen-current.bat 的默认多选选项
-set "MDEFS2=12acefg"
+set "MDEFS2=12aceht"
 
 :: Timeout configuration for the choice menus (in seconds). It can't be set to 0 valid range 1-99.
 :: Configuration du délai d'attente pour les menus de choix (en secondes). Ne peut pas être réglé sur 0, plage valide 1-99.
@@ -59,7 +59,7 @@ set "MDEFS2=12acefg"
 :: Timeout-Konfiguration für die Auswahlmenüs (in Sekunden). Es kann nicht auf 0 gesetzt werden, gültiger Bereich 1-99.
 :: Конфигурация тайм-аута для меню выбора (в секундах). Не может быть установлено в 0, допустимый диапазон 1-99.
 :: 选择菜单的超时配置(以秒为单位).不能设置为 0,有效范围 1-99.
-set "CTIME=10"
+set "CTIME=3"
 
 :: Specify the location of the 7zip.exe file.
 :: Indiquez l'emplacement du fichier 7zip.exe.
@@ -69,6 +69,34 @@ set "CTIME=10"
 :: Укажите путь к файлу 7zip.exe.
 :: 请指定 7zip.exe 文件的位置 .
 ::set "_7ZIPLOC=!ProgramFiles!\7-Zip\7z.exe"
+
+:: If set to 1, it process all files. 0 by Default.
+:: si réglé sur 1, il fera tous les fichiers. 0 ar défaut.
+:: Si se establece en 1, procesa todos los archivos. El valor por defecto es 0.
+:: Se impostato su 1, vengono elaborati tutti i file. Il valore predefinito è 0.
+:: Bei der Einstellung 1 werden alle Dateien verarbeitet. Standardwert: 0.
+:: Если установлено значение 1, обрабатываются все файлы. По умолчанию — 0.
+:: 若设置为 1，则处理所有文件。默认值为 0。
+set "PROCESSALL=1"
+
+:: If set to 1, no rename with .org extension. 0 by Default.
+:: Si réglé sur 1, aucun renommage avec l'extension .org. 0 par défaut.
+:: Si se establece en 1, no se renombra con la extensión .org. El valor por defecto es 0.
+:: Se impostato su 1, non viene rinominato con l'estensione .org. Il valore predefinito è 0.
+:: Bei der Einstellung 1 erfolgt keine Umbenennung mit der Endung .org. Standardwert: 0.
+:: 若设置为 1，则不将文件重命名为 .org 扩展名。默认值为 0。
+:: Если установлено значение 1, переименование с расширением .org не производится. По умолчанию — 0.
+::set "NOBACKUP=1"
+
+:: If this value is set to 1, no rpy files will be overwritten. Default value: 0.
+:: Si cette valeur est définie sur 1, aucun fichier rpy ne sera écrasé. Valeur par défaut : 0.
+:: Si este valor se establece en 1, no se sobrescribirán los archivos rpy. Valor por defecto: 0.
+:: Se questo valore è impostato su 1, nessun file rpy verrà sovrascritto. Valore predefinito: 0.
+:: Wenn dieser Wert auf 1 gesetzt ist, werden keine rpy-Dateien überschrieben. Standardwert: 0.
+:: Если для этого параметра установлено значение 1, файлы rpy не будут перезаписываться. Значение по умолчанию: 0.
+:: 如果将此值设置为 1，则不会覆盖任何 rpy 文件。默认值：0。
+set "OVERWRITE=1"
+
 
 :: End of configuration file
 :: Fin du fichier de configuration
