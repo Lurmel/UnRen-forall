@@ -40,7 +40,7 @@ If you like my work: [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_
 
 ## 📥 Download
 
-[⬇️ Download latest release](https://github.com/Lurmel/UnRen-forall/releases/download/main/UnRen-forall-la_0.82.zip-le_9.8.11.zip-cu_9.8.11.zip)
+[⬇️ Download latest release](https://github.com/Lurmel/UnRen-forall/releases/download/main/UnRen-forall-la_0.82-le_9.8.11-cu_9.8.11.zip)
 
 ---
 
