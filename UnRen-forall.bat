@@ -21,7 +21,7 @@ setlocal enabledelayedexpansion
 :: DO NOT MODIFY BELOW THIS LINE unless you know what you're doing
 :: Define various global names
 set "NAME=forall"
-set "VERSION=v0.82 - 09/22/26"
+set "VERSION=v0.85 - 09/29/26"
 title UnRen-%NAME%.bat - %VERSION%
 set "URL_REF=https://f95zone.to/threads/92717/post-17110063/"
 set "SCRIPTDIR=%~dp0"
@@ -78,7 +78,7 @@ if exist "%UNREN_CFG%" (
 )
 
 :: Defined from external configuration file
-if defined LNG goto :lngtest
+if defined LNG call :lngtest
 
 call :CheckLanguage
 
@@ -371,30 +371,55 @@ if not defined WT_SESSION (
 
 :: Run only one time
 :thanks
+set "thanks1.en=A font must be installed to display the script correctly."
+set "thanks1.fr=Une police doit être installée pour afficher correctement le script."
+set "thanks1.es=Se debe instalar una fuente para mostrar correctamente el script."
+set "thanks1.it=È necessario installare un font per visualizzare correttamente lo script."
+set "thanks1.de=Eine Schriftart muss installiert werden, um das Skript korrekt anzuzeigen."
+set "thanks1.ru=Для правильного отображения скрипта необходимо установить шрифт."
+set "thanks1.zh=必须安装字体才能正确显示脚本。"
+
+set "thanks2.en=Please click Yes on the administrator prompt that will follow."
+set "thanks2.fr=Veuillez cliquer sur Oui à l'invite d'administrateur qui suivra."
+set "thanks2.es=Haga clic en Sí en el aviso de administrador que seguirá."
+set "thanks2.it=Fare clic su Sì al prompt dell'amministratore che seguirà."
+set "thanks2.de=Bitte klicken Sie auf Ja in der Administratoraufforderung, die folgen wird."
+set "thanks2.ru=Пожалуйста, нажмите Да в появившемся запросе администратора."
+set "thanks2.zh=请在随后的管理员提示中单击“是”。"
+
+set "thanks3.en=Font installed, please restart the script."
+set "thanks3.fr=Police installée, veuillez relancer le script."
+set "thanks3.es=Fuente instalada, por favor reinicie el script."
+set "thanks3.it=Font installato, si prega di riavviare lo script."
+set "thanks3.de=Schriftart installiert, bitte starten Sie das Skript neu."
+set "thanks3.ru=Шрифт установлен, пожалуйста, перезапустите скрипт."
+set "thanks3.zh=字体已安装，请重新启动脚本。"
 
 ::Force the Thanks dsplay for debug.
 ::%REGEXE% delete "HKCU\Software\UnRen" /va /f %DEBUGREDIR%
 
 :: Install the fonts if it's not already done, and add registry entry for console to be able to use it.
 :: Delete the previous entry of UnRen, to force the Thanks display at the first launch after the installation, and not on every launch.
-%REGEXE% query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Console\TrueTypeFont" /f "Unifont Moyen" %DEBUGREDIR%
-if %errorlevel% neq 0 (
-    net session %DEBUGREDIR%
-    if !errorlevel! neq 0 (
-        echo Une police doit être installée pour afficher correctement le jeu.
-        echo Cliquez Oui à la demande administrateur qui va suivre.
-        pause
-        powershell -Command "Start-Process '%~f0' -Verb RunAs"
+if exist "%SCRIPTDIR%\fonts\unifont-16.0.04.ttf" if not exist "%SystemRoot%\Fonts\unifont-16.0.04.ttf" (
+    %REGEXE% query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Console\TrueTypeFont" /f "Unifont Moyen" %DEBUGREDIR%
+    if %errorlevel% neq 0 (
+        net session %DEBUGREDIR%
+        if !errorlevel! neq 0 (
+            echo "!thanks1.%LNG%!"
+            echo "!thanks2.%LNG%!"
+            pause
+            powershell -Command "Start-Process '%~f0' -Verb RunAs"
+            exit /b
+        )
+        copy /y "%SCRIPTDIR%\fonts\unifont-16.0.04.ttf" "%SystemRoot%\Fonts" %DEBUGREDIR%
+        %REGEXE% add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Console\TrueTypeFont" /v "000" /t REG_SZ /d "Unifont Moyen" /f %DEBUGREDIR%
+        powershell -Command "Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class FontInstaller {[DllImport(\"gdi32.dll\")]public static extern int AddFontResource(string lpFileName);[DllImport(\"user32.dll\")]public static extern int SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);}';[FontInstaller]::AddFontResource('%SystemRoot%\Fonts\unifont-16.0.04.ttf');[FontInstaller]::SendMessage([IntPtr]0xFFFF, 0x001D, [IntPtr]0, [IntPtr]0);"
+        echo "!thanks3.%LNG%!"
+        pause>nul|set /p=".      !ANYKEY.%LNG%!..."
         exit /b
+    ) else (
+        REM %REGEXE% delete "HKCU\Software\UnRen" /va /f %DEBUGREDIR%
     )
-    copy /y "%SCRIPTDIR%\fonts\unifont-16.0.04.ttf" "%SystemRoot%\Fonts" %DEBUGREDIR%
-    %REGEXE% add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Console\TrueTypeFont" /v "000" /t REG_SZ /d "Unifont Moyen" /f %DEBUGREDIR%
-    powershell -Command "Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class FontInstaller {[DllImport(\"gdi32.dll\")]public static extern int AddFontResource(string lpFileName);[DllImport(\"user32.dll\")]public static extern int SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);}';[FontInstaller]::AddFontResource('%SystemRoot%\Fonts\unifont-16.0.04.ttf');[FontInstaller]::SendMessage([IntPtr]0xFFFF, 0x001D, [IntPtr]0, [IntPtr]0);"
-    echo Police installée, veuillez relancer le jeu.
-    pause
-    exit /b
-) else (
-    REM %REGEXE% delete "HKCU\Software\UnRen" /va /f %DEBUGREDIR%
 )
 %REGEXE% query "HKCU\Software\UnRen" /v Thanks %DEBUGREDIR%
 if %errorlevel% EQU 0 (
@@ -427,21 +452,21 @@ start "%SCRIPTNAME%" "%SystemRoot%\System32\cmd.exe" /c ""%~0" --norestart "%TEM
 exit /b
 
 :already_restarted
-set "thanks1.en=May the Force be with those who support me:"
-set "thanks1.fr=Que la Force soit avec celles et ceux qui me soutiennent :"
-set "thanks1.es=Que la Fuerza esté con quienes me apoyan:"
-set "thanks1.it=Che la Forza sia con chi mi supporta:"
-set "thanks1.de=Möge die Macht mit denen sein, die mich unterstützen:"
-set "thanks1.ru=Пусть Сила будет с теми, кто поддерживает меня:"
-set "thanks1.zh=愿原力与你们这些支持我的人同在："
+set "thanks4.en=May the Force be with those who support me:"
+set "thanks4.fr=Que la Force soit avec celles et ceux qui me soutiennent :"
+set "thanks4.es=Que la Fuerza esté con quienes me apoyan:"
+set "thanks4.it=Che la Forza sia con chi mi supporta:"
+set "thanks4.de=Möge die Macht mit denen sein, die mich unterstützen:"
+set "thanks4.ru=Пусть Сила будет с теми, кто поддерживает меня:"
+set "thanks4.zh=愿原力与你们这些支持我的人同在："
 
-set "thanks2.en=Like the Force, I'm grateful to all who support me on f95zone. Thank you"
-set "thanks2.fr=Comme la Force, je remercie tous ceux qui me soutiennent sur f95zone. Merci"
-set "thanks2.es=Como la Fuerza, estoy agradecido a todos los que me apoyan en f95zone. Gracias"
-set "thanks2.it=Come la Forza, sono grato a tutti quelli che mi supportano su f95zone. Grazie"
-set "thanks2.de=Wie die Macht, bin ich dankbar zu allen, die mich auf f95zone unterstutzen. Danke"
-set "thanks2.ru=Как Сила, я благодарен всем, кто поддерживает меня на f95zone. Спасибо"
-set "thanks2.zh=就如原力,我深感所有支持我的人。 谢谢"
+set "thanks5.en=Like the Force, I'm grateful to all who support me on f95zone. Thank you"
+set "thanks5.fr=Comme la Force, je remercie tous ceux qui me soutiennent sur f95zone. Merci"
+set "thanks5.es=Como la Fuerza, estoy agradecido a todos los que me apoyan en f95zone. Gracias"
+set "thanks5.it=Come la Forza, sono grato a tutti quelli che mi supportano su f95zone. Grazie"
+set "thanks5.de=Wie die Macht, bin ich dankbar zu allen, die mich auf f95zone unterstutzen. Danke"
+set "thanks5.ru=Как Сила, я благодарен всем, кто поддерживает меня на f95zone. Спасибо"
+set "thanks5.zh=就如原力,我深感所有支持我的人。 谢谢"
 
 color 0f
 echo.
@@ -489,11 +514,11 @@ echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀�
 echo                          ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡆⠀⠀⠀⠀⠀⠀⠀⠀⣸⣿⣿⢃⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣽⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠇⣿⣿⣿⣿⠀⣿⣇⣾⡇
 echo.
 echo.
-call :center "%YEL%!thanks1.%LNG%!%RES%"
+call :center "%YEL%!thanks4.%LNG%!%RES%"
 echo.
 call :center "%MAG%https://ko-fi.com/Y8Y21X6CZD%RES%"
 echo.
-call :center "!thanks2.%LNG%!"
+call :center "!thanks5.%LNG%!"
 echo.
 call :center "%CYA%Gen Urobuchi%RES%."
 
@@ -632,13 +657,13 @@ echo "%WORKDIR%" | "%SystemRoot%\System32\findstr.exe" /C:"&" >nul && (
         call set "HAS_BAD=%%HAS_BAD%%,&"
     )
 )
-if not "%WORKDIR%"=="%WORKDIR: =%" (
-    if not defined HAS_BAD (
-        call set "HAS_BAD= "
-    ) else (
-        call set "HAS_BAD=%%HAS_BAD%%, "
-    )
-)
+rem if not "%WORKDIR%"=="%WORKDIR: =%" (
+    rem if not defined HAS_BAD (
+        rem call set "HAS_BAD= "
+    rem ) else (
+        rem call set "HAS_BAD=%%HAS_BAD%%, "
+    rem )
+rem )
 endlocal & set "HAS_BAD=%HAS_BAD%"
 for %%C in ("(" ")" "=" ";" "'" "`" "[" "]" "{" "}" "+" "~") do (
     echo "%WORKDIR%" | "%SystemRoot%\System32\findstr.exe" /C:"%%~C" >nul && (
@@ -2040,7 +2065,7 @@ if %file_found% EQU 0 (
     call :elog "%SKIP%" "!NOTFOUND.%LNG%!."
     call :elog .
 )
-timeout /T 1 >nul
+timeout /T 2 >nul
 goto :finish
 
 
@@ -2096,7 +2121,7 @@ if !file_found! EQU 0 (
     call :elog .
     exit /b 1
 )
-timeout /T 1 >nul
+timeout /T 2 >nul
 goto :finish
 
 
@@ -2339,8 +2364,8 @@ for /f "delims=" %%A in ("%WORKDIR%") do (
     endlocal
     cd /d "%%A"
 )
-echo %PYTHONGAME% "%fname%.py" game translate "%translation_lang%" >> "%UNRENLOG%"
-%PYTHONGAME% "%fname%.py" game translate "%translation_lang%" %DEBUGREDIR%
+echo "%PYTHONGAME%" "%fname%.py" game translate "%translation_lang%" >> "%UNRENLOG%"
+"%PYTHONGAME%" "%fname%.py" game translate "%translation_lang%" %DEBUGREDIR%
 if %errorlevel% NEQ 0 (
 	call :elog "%NOK%" "!etext4.%LNG%!"
 ) else (
@@ -2980,8 +3005,8 @@ if not exist "%choiceEx%" if not defined ALREADYCREATED (
     set "alreadycreated=1"
 )
 
-echo %PYTHONGAME% "%choiceEx%" "%~1" "%~2" "%~3" "%~4" "%~5" >> "%UNRENLOG%"
-%PYTHONGAME% "%choiceEx%" "%~1" "%~2" "%~3" "%~4" "%~5"
+echo "%PYTHONGAME%" "%choiceEx%" "%~1" "%~2" "%~3" "%~4" "%~5" >> "%UNRENLOG%"
+"%PYTHONGAME%" "%choiceEx%" "%~1" "%~2" "%~3" "%~4" "%~5"
 
 endlocal & set "ALREADYCREATED=%alreadycreated%" & exit /b %errorlevel%
 
@@ -2998,7 +3023,7 @@ echo SCRIPTDIR      = %SCRIPTDIR% >> "%UNRENLOG%"
 echo WORKDIR        = %WORKDIR% >> "%UNRENLOG%"
 echo PYTHONHOME     = %PYTHONHOME% >> "%UNRENLOG%"
 echo PYTHONPATH     = %PYTHONPATH% >> "%UNRENLOG%"
-echo PYTHONSYST     = %PYTHONSYST% >> "%UNRENLOG%"
+echo PYTHONSYST     = [%PYTHONSYST%] >> "%UNRENLOG%"
 echo PYTHONGAME     = %PYTHONGAME% >> "%UNRENLOG%"
 echo PYNOASSERT     = [%PYNOASSERT%] >> "%UNRENLOG%"
 echo PYTHONV2       = [%PYTHONV2%] >> "%UNRENLOG%"
@@ -3349,7 +3374,7 @@ if exist "%pythonhome%Lib" (
 )
 set "pythongame=%pythonhome%python.exe %pynoassert%"
 
-for /f "tokens=2 delims= " %%a in ('%pythongame% -V 2^>^&1') do set pythonvers=%%a
+for /f "tokens=2 delims= " %%a in ('"%pythongame%" -V 2^>^&1') do set pythonvers=%%a
 :: Extracting Major and Minor Versions
 for /f "tokens=1,2 delims=." %%b in ("%pythonvers%") do (
     set pythonmajor=%%b
@@ -3450,8 +3475,8 @@ if not exist "%detect_renpy_version%" (
 
     call :exitn 3
 ) else (
-    echo %PYTHONGAME% "%detect_renpy_version%" "%WORKDIR%" >> "%UNRENLOG%"
-    %PYTHONGAME% "%detect_renpy_version%" "%WORKDIR%" > "%TEMP%\renpy_version.tmp"
+    echo "%PYTHONGAME%" "%detect_renpy_version%" "%WORKDIR%" >> "%UNRENLOG%"
+    "%PYTHONGAME%" "%detect_renpy_version%" "%WORKDIR%" > "%TEMP%\renpy_version.tmp"
     set /p renpyversion=<"%TEMP%\renpy_version.tmp"
     del "%TEMP%\renpy_version.tmp"
     if not defined RENPYVERSION (

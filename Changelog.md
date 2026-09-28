@@ -4,7 +4,23 @@ All dates are in the format MM/DD/YY.
 
 ---
 
-## 05/18/26:
+09/29/26:
+	UnRen-forall.bat 0.85, UnRen-current.bat 9.8.14 & UnRen-legacy.bat 9.8.14
+
+	Common modifications for all scripts:
+	- Fixed the bug related to the language test if it is set in UnRen-cfg.txt.
+	- SPACE character support has been restored after it was temporarily removed for testing purposes.
+	- Add languages for font installation and, most importantly, check whether the font is present.
+
+	Modification for UnRen-forall.bat only:
+	-
+
+	Common modifications for UnRen-current.bat & UnRen-legacy.bat:
+	-
+
+---
+
+## 09/26/26:
 	UnRen-forall.bat 0.82, UnRen-current.bat 9.8.11 & UnRen-legacy.bat 9.8.11
 
 	Common modifications for all scripts:

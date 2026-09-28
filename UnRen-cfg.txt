@@ -18,7 +18,7 @@
 :: Sie können die Sprache erzwingen mit: en fr es it de ru zh
 :: Вы можете принудительно установить язык: en fr es it de ru zh
 :: 您可以强制设置语言为以下之一: en fr es it de ru zh
-set "LNG="
+::set "LNG="
 
 :: Default multi-choice options for UnRen-forall.bat
 :: Options multi-choix par défaut pour UnRen-forall.bat
@@ -77,7 +77,7 @@ set "CTIME=3"
 :: Bei der Einstellung 1 werden alle Dateien verarbeitet. Standardwert: 0.
 :: Если установлено значение 1, обрабатываются все файлы. По умолчанию — 0.
 :: 若设置为 1，则处理所有文件。默认值为 0。
-set "PROCESSALL=1"
+::set "PROCESSALL=1"
 
 :: If set to 1, no rename with .org extension. 0 by Default.
 :: Si réglé sur 1, aucun renommage avec l'extension .org. 0 par défaut.
@@ -95,7 +95,7 @@ set "PROCESSALL=1"
 :: Wenn dieser Wert auf 1 gesetzt ist, werden keine rpy-Dateien überschrieben. Standardwert: 0.
 :: Если для этого параметра установлено значение 1, файлы rpy не будут перезаписываться. Значение по умолчанию: 0.
 :: 如果将此值设置为 1，则不会覆盖任何 rpy 文件。默认值：0。
-set "OVERWRITE=1"
+::set "OVERWRITE=1"
 
 
 :: End of configuration file
