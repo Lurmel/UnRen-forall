@@ -4,7 +4,22 @@ All dates are in the format MM/DD/YY.
 
 ---
 
-09/29/26:
+## 10//05/26:
+	UnRen-forall.bat 0.87, UnRen-current.bat 9.8.15 & UnRen-legacy.bat 9.8.15
+
+	Common modifications for all scripts:
+	- OVERWRITE bug correction.
+	- UnRen-cfg.txt updated.
+
+	Modification for UnRen-forall.bat only:
+	-
+
+	Common modifications for UnRen-current.bat & UnRen-legacy.bat:
+	-
+
+---
+
+## 09/29/26:
 	UnRen-forall.bat 0.85, UnRen-current.bat 9.8.14 & UnRen-legacy.bat 9.8.14
 
 	Common modifications for all scripts:

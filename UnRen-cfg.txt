@@ -1,6 +1,6 @@
 @echo off
 
-:: Version 1.3 09/22/2026
+:: Version 1.4 10/05/2026
 
 :: Configuration file for all UnRen-*.bat scripts
 :: Fichier de configuration pour tous les scripts UnRen-*.bat
@@ -88,13 +88,13 @@ set "CTIME=3"
 :: Если установлено значение 1, переименование с расширением .org не производится. По умолчанию — 0.
 ::set "NOBACKUP=1"
 
-:: If this value is set to 1, no rpy files will be overwritten. Default value: 0.
-:: Si cette valeur est définie sur 1, aucun fichier rpy ne sera écrasé. Valeur par défaut : 0.
-:: Si este valor se establece en 1, no se sobrescribirán los archivos rpy. Valor por defecto: 0.
-:: Se questo valore è impostato su 1, nessun file rpy verrà sovrascritto. Valore predefinito: 0.
-:: Wenn dieser Wert auf 1 gesetzt ist, werden keine rpy-Dateien überschrieben. Standardwert: 0.
-:: Если для этого параметра установлено значение 1, файлы rpy не будут перезаписываться. Значение по умолчанию: 0.
-:: 如果将此值设置为 1，则不会覆盖任何 rpy 文件。默认值：0。
+:: If this value is set to 1, RPY files will be overwritten. Default value: 0.
+:: Si cette valeur est définie sur 1, les fichiers RPY seront écrasés. Valeur par défaut : 0.
+:: Si este valor se establece en 1, los archivos RPY se sobrescribirán. Valor por defecto: 0.
+:: Se questo valore è impostato su 1, i file RPY verranno sovrascritti. Valore predefinito: 0.
+:: Wenn dieser Wert auf 1 gesetzt ist, werden RPY-Dateien überschrieben. Standardwert: 0.
+:: Если для этого параметра установлено значение 1, файлы RPY будут перезаписаны. Значение по умолчанию: 0.
+:: 如果将此值设置为 1，RPY 文件将被覆盖。默认值：0。
 ::set "OVERWRITE=1"
 
 

@@ -37,7 +37,7 @@ setlocal enabledelayedexpansion
 :: DO NOT MODIFY BELOW THIS LINE unless you know what you're doing
 :: Define various global names
 set "NAME=legacy"
-set "VERSION=v9.8.14 - 09/29/26"
+set "VERSION=v9.8.15 - 10/03/26"
 title UnRen-%NAME%.bat - %VERSION%
 set "URL_REF=https://f95zone.to/threads/92717/post-17110063/"
 set "SCRIPTDIR=%~dp0"
@@ -49,7 +49,7 @@ set "REGEXE=%SystemRoot%\System32\reg.exe"
 
 
 :: Initializing debug mode
-set "DEBUGREDIR=1>nul 2>>%UNRENLOG%"
+set "DEBUGREDIR=1>nul 2>>"%UNRENLOG%""
 set "DEBUGLEVEL=0"
 set "NOCLS=0"
 if exist "%UNRENLOG%" del /f /q "%UNRENLOG%" >nul
@@ -76,13 +76,14 @@ set "MDEFS=acefg"
 set "MDEFS2=12acefg"
 set "CTIME=5"
 set "PROCESSALL=0"
+set "OVERWRITE=0"
 set "NOBACKUP=0"
 set "_7ZIPLOC=%ProgramFiles%\7-Zip\7z.exe"
 :: External configuration file for LNG, MDEFS, MDEFS2 and CTIME.
 set "UNREN_CFG=%SCRIPTDIR%UnRen-cfg.txt"
 set "OLD_UNREN_CFG=%SCRIPTDIR%UnRen-cfg.bat"
 if exist "%OLD_UNREN_CFG%" if not exist "%UNREN_CFG%" (
-    move /y "%OLD_UNREN_CFG%" "%UNREN_CFG%" "%DEBUGREDIR%"
+    move /y "%OLD_UNREN_CFG%" "%UNREN_CFG%" %DEBUGREDIR%
 )
 :: Load external configuration
 if exist "%UNREN_CFG%" (
@@ -99,11 +100,11 @@ if defined LNG call :lngtest
 call :CheckLanguage
 
 if "%LOCALE%" == "fr-FR" if "%LNG%" == "zh" (
-    "%SystemRoot%\System32\chcp.com" 936 "%DEBUGREDIR%"
+    "%SystemRoot%\System32\chcp.com" 936 %DEBUGREDIR%
 ) else if "%LNG%" == "zh" (
-    "%SystemRoot%\System32\chcp.com" "%OLD_CP%" "%DEBUGREDIR%"
+    "%SystemRoot%\System32\chcp.com" "%OLD_CP%" %DEBUGREDIR%
 ) else if "%LNG%" == "ru" (
-    "%SystemRoot%\System32\chcp.com" "%OLD_CP%" "%DEBUGREDIR%"
+    "%SystemRoot%\System32\chcp.com" "%OLD_CP%" %DEBUGREDIR%
 )
 
 call :CheckPowershell
@@ -720,7 +721,7 @@ for /f "delims=" %%A in ("%WORKDIR%") do (
 
 :: Analysis of debug arguments
 if /i "%~3" == "-d" (
-    set "DEBUGREDIR=>>%UNRENLOG% 2>&1"
+    set "DEBUGREDIR=>>"%UNRENLOG%" 2>&1"
     set "DEBUGLEVEL=1"
     set "NOCLS=1"
     echo "%PWRSHELL%" -NoProfile -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(!NEW_COLS!,5000)" >> "%UNRENLOG%"
@@ -728,7 +729,7 @@ if /i "%~3" == "-d" (
 )
 if /i "%~3" == "-dd" (
     echo on
-    set "DEBUGREDIR=>>%UNRENLOG% 2>&1"
+    set "DEBUGREDIR=>>"%UNRENLOG%" 2>&1"
     set "DEBUGLEVEL=2"
     set "NOCLS=1"
     echo "%PWRSHELL%" -NoProfile -Command "$h = Get-Host; $h.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(!NEW_COLS!,9000)" >> "%UNRENLOG%"
@@ -3386,7 +3387,7 @@ goto :eof
 
 :: Check if old registry key is present and require Administrator rights to remove it
 :check_old_reg
-echo %REGEXE% query "HKLM\Software\Classes\Directory\shell\Run%SCRIPTNAME%" >> %UNRENLOG%
+echo %REGEXE% query "HKLM\Software\Classes\Directory\shell\Run%SCRIPTNAME%" >> "%UNRENLOG%"
 %REGEXE% query "HKLM\Software\Classes\Directory\shell\Run%SCRIPTNAME%" %DEBUGREDIR%
 if %errorlevel% EQU 0 (
     set OLDREG=1
@@ -3958,7 +3959,7 @@ set "templog=%UNRENLOG%.temp"
 
 call :elog -n "%EMPTY%" "!choicez.%LNG%!..."
 if exist "%UNRENLOG%" (
-    echo "%PWRSHELL%" -NoProfile -Command "(Get-Content -Raw -Path '%UNRENLOG%') -replace '(?i)\\Users\\[^\\]+', '\Users\XXX' | Set-Content -Path '%templog%' -Encoding UTF8" >> %UNRENLOG%
+    echo "%PWRSHELL%" -NoProfile -Command "(Get-Content -Raw -Path '%UNRENLOG%') -replace '(?i)\\Users\\[^\\]+', '\Users\XXX' | Set-Content -Path '%templog%' -Encoding UTF8" >> "%UNRENLOG%"
     "%PWRSHELL%" -NoProfile -Command "(Get-Content -Raw -Path '%UNRENLOG%') -replace '(?i)\\Users\\[^\\]+', '\Users\XXX' | Set-Content -Path '%templog%' -Encoding UTF8" %DEBUGREDIR%
     if !errorlevel! EQU 0 (
         move /y "%templog%" "%UNRENLOG%" %DEBUGREDIR%
